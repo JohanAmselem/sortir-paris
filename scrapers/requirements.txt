@@ -1,0 +1,9 @@
+scrapy>=2.11
+playwright>=1.49
+beautifulsoup4>=4.12
+httpx>=0.28
+python-dateutil>=2.9
+redis>=5.2
+psycopg2-binary>=2.9
+python-dotenv>=1.0
+unidecode>=1.3

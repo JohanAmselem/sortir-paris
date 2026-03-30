@@ -1,0 +1,22 @@
+{
+  "name": "sortir-paris",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "db:generate": "turbo db:generate --filter=@sortir/db",
+    "db:migrate": "turbo db:migrate --filter=@sortir/db",
+    "db:seed": "turbo db:seed --filter=@sortir/db"
+  },
+  "devDependencies": {
+    "turbo": "^2.4",
+    "typescript": "^5.7"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -37,3 +37,4 @@ scrapers/*.egg-info/
 # misc
 *.log
 coverage/
+.vercel

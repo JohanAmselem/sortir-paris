@@ -15,7 +15,10 @@
     "db:seed": "turbo db:seed --filter=@sortir/db"
   },
   "devDependencies": {
+    "meilisearch": "^0.56.0",
     "next": "^15.1",
+    "postgres": "^3.4",
+    "tsx": "^4.19",
     "turbo": "^2.4",
     "typescript": "^5.7"
   },

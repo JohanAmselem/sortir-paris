@@ -1,7 +1,10 @@
 {
   "name": "sortir-paris",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -12,6 +15,7 @@
     "db:seed": "turbo db:seed --filter=@sortir/db"
   },
   "devDependencies": {
+    "next": "^15.1",
     "turbo": "^2.4",
     "typescript": "^5.7"
   },

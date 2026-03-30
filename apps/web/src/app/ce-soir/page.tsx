@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/ce-soir' },
 }
 
-export const revalidate = 1800 // 30 min
+export const dynamic = 'force-dynamic'
 
 async function getTonightEvents() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'

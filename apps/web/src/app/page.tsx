@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { Suspense } from 'react'
 import { SearchBar } from '@/components/search/search-bar'
 import { SectionRow } from '@/components/events/section-row'
 import { FilterBar } from '@/components/search/filter-bar'
@@ -8,8 +9,7 @@ export const metadata: Metadata = {
   title: 'Sortir — Tous les événements culturels à Paris',
 }
 
-// ISR: refresh every 5 minutes
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 async function getHomeData() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -51,7 +51,9 @@ export default async function HomePage() {
 
       {/* Quick filters */}
       <div className="border-b border-border bg-surface px-4 py-3">
-        <FilterBar categories={categories} />
+        <Suspense fallback={<div className="h-10" />}>
+          <FilterBar categories={categories} />
+        </Suspense>
       </div>
 
       {/* Ce soir */}

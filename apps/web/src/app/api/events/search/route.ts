@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { meiliAdmin, EVENTS_INDEX } from '@/lib/meilisearch'
+import { meiliAdmin, isMeilisearchEnabled, EVENTS_INDEX } from '@/lib/meilisearch'
 
 // GET /api/events/search — Meilisearch-powered search
 export async function GET(request: NextRequest) {
+  // If Meilisearch is not configured, return empty results
+  if (!isMeilisearchEnabled || !meiliAdmin) {
+    return NextResponse.json({
+      data: [],
+      total: 0,
+      facets: {},
+      page: 1,
+      limit: 20,
+      hasMore: false,
+      processingTimeMs: 0,
+      message: 'Search not available — Meilisearch not configured',
+    })
+  }
+
   const { searchParams } = request.nextUrl
 
   const query = searchParams.get('q') ?? ''

@@ -1,16 +1,25 @@
 import { MeiliSearch } from 'meilisearch'
 
 // Server-side client (admin key — full access)
-export const meiliAdmin = new MeiliSearch({
-  host: process.env.MEILISEARCH_HOST!,
-  apiKey: process.env.MEILISEARCH_API_KEY!,
-})
+// Meilisearch is optional — search falls back to DB if not configured
+const meiliHost = process.env.MEILISEARCH_HOST || ''
+const meiliKey = process.env.MEILISEARCH_API_KEY || ''
+
+export const isMeilisearchEnabled = meiliHost.length > 0 && meiliHost !== 'http://localhost:7700'
+
+export const meiliAdmin = isMeilisearchEnabled
+  ? new MeiliSearch({ host: meiliHost, apiKey: meiliKey })
+  : null
 
 // Index name
 export const EVENTS_INDEX = 'events'
 
 // Setup index settings (run once on deploy)
 export async function setupMeilisearchIndex() {
+  if (!meiliAdmin) {
+    console.log('Meilisearch not configured — skipping index setup')
+    return
+  }
   const index = meiliAdmin.index(EVENTS_INDEX)
 
   await index.updateSettings({

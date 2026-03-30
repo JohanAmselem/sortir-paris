@@ -8,7 +8,7 @@ This is the primary data source — structured API, reliable, high quality.
 
 import httpx
 from datetime import datetime, timedelta
-from typing import Generator
+from typing import Generator, Optional
 
 from utils.normalize import (
     clean_text,
@@ -36,8 +36,8 @@ API_BASE = "https://api.openagenda.com/v2"
 def fetch_events(
     api_key: str,
     agenda_uid: str,
-    from_date: str | None = None,
-    to_date: str | None = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     limit: int = 100,
 ) -> Generator[dict, None, None]:
     """Fetch events from an OpenAgenda agenda."""

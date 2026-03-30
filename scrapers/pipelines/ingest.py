@@ -13,6 +13,7 @@ import psycopg2
 import psycopg2.extras
 import httpx
 from datetime import datetime
+from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,7 +27,7 @@ def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-def find_or_create_venue(cursor, event: dict) -> str | None:
+def find_or_create_venue(cursor, event: dict) -> Optional[str]:
     """Find existing venue or create new one. Returns venue ID."""
     venue_name = event.get("venue_name")
     if not venue_name:
@@ -66,7 +67,7 @@ def find_or_create_venue(cursor, event: dict) -> str | None:
     return cursor.fetchone()[0]
 
 
-def find_category_id(cursor, category_slug: str | None) -> str | None:
+def find_category_id(cursor, category_slug: Optional[str]) -> Optional[str]:
     """Find category ID by slug."""
     if not category_slug:
         return None
@@ -75,7 +76,7 @@ def find_category_id(cursor, category_slug: str | None) -> str | None:
     return row[0] if row else None
 
 
-def upsert_event(cursor, event: dict, venue_id: str | None, category_id: str | None) -> tuple[str, str]:
+def upsert_event(cursor, event: dict, venue_id: Optional[str], category_id: Optional[str]) -> Tuple[str, str]:
     """Upsert event. Returns (event_id, action) where action is 'new', 'updated', or 'duplicate'."""
 
     # Check dedup by source + source_id
@@ -159,7 +160,7 @@ def upsert_event(cursor, event: dict, venue_id: str | None, category_id: str | N
     return "", "duplicate"
 
 
-def sync_to_meilisearch(events_to_sync: list[dict]):
+def sync_to_meilisearch(events_to_sync: List[dict]):
     """Push events to Meilisearch index."""
     if not events_to_sync:
         return
@@ -182,19 +183,18 @@ def run_pipeline(events: list[dict], source_name: str):
     print(f"{'='*50}")
 
     conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Enable pg_trgm for fuzzy matching
-    cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    conn.autocommit = False
 
     stats = {"new": 0, "updated": 0, "duplicate": 0, "errors": 0}
-    meili_batch: list[dict] = []
+    meili_batch: List[dict] = []
 
     for event in events:
         try:
+            cursor = conn.cursor()
             venue_id = find_or_create_venue(cursor, event)
             category_id = find_category_id(cursor, event.get("category_slug"))
             event_id, action = upsert_event(cursor, event, venue_id, category_id)
+            conn.commit()
             stats[action] += 1
 
             if action in ("new", "updated") and event_id:
@@ -225,14 +225,16 @@ def run_pipeline(events: list[dict], source_name: str):
                     "ambiances": [],
                 })
 
+            cursor.close()
+
         except Exception as e:
+            conn.rollback()
             stats["errors"] += 1
             print(f"  Error processing '{event.get('title', '?')}': {e}")
 
-    conn.commit()
-
     # Log ingestion
-    cursor.execute(
+    log_cursor = conn.cursor()
+    log_cursor.execute(
         """
         INSERT INTO ingestion_logs (source, started_at, finished_at, status, events_found, events_new, events_updated, events_duped, errors)
         VALUES (%s, %s, NOW(), %s, %s, %s, %s, %s, %s)
@@ -249,6 +251,7 @@ def run_pipeline(events: list[dict], source_name: str):
         ),
     )
     conn.commit()
+    log_cursor.close()
 
     # Sync to Meilisearch
     if meili_batch:
@@ -257,7 +260,6 @@ def run_pipeline(events: list[dict], source_name: str):
         except Exception as e:
             print(f"  Meilisearch sync error: {e}")
 
-    cursor.close()
     conn.close()
 
     print(f"\nResults: {stats}")

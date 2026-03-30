@@ -1,6 +1,13 @@
-import { db, categories, ambiances, tags } from './index'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+
+// Charge le .env.local à la racine du monorepo AVANT d'importer la DB
+config({ path: resolve(__dirname, '../../../.env.local') })
 
 async function seed() {
+  // Import dynamique pour que process.env.DATABASE_URL soit déjà défini
+  const { db, categories, ambiances, tags } = await import('./index')
+
   console.log('Seeding database...')
 
   // Categories

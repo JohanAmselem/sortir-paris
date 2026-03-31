@@ -9,7 +9,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -31,4 +31,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MEILISEARCH_HOST: ${{ secrets.MEILISEARCH_HOST }}
           MEILISEARCH_API_KEY: ${{ secrets.MEILISEARCH_API_KEY }}
+          PYTHONUNBUFFERED: '1'
         run: python cron.py --all

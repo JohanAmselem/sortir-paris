@@ -187,15 +187,20 @@ def run_pipeline(events: list[dict], source_name: str):
 
     stats = {"new": 0, "updated": 0, "duplicate": 0, "errors": 0}
     meili_batch: List[dict] = []
+    COMMIT_EVERY = 50  # Commit every N events for speed
 
-    for event in events:
+    for i, event in enumerate(events):
         try:
             cursor = conn.cursor()
             venue_id = find_or_create_venue(cursor, event)
             category_id = find_category_id(cursor, event.get("category_slug"))
             event_id, action = upsert_event(cursor, event, venue_id, category_id)
-            conn.commit()
             stats[action] += 1
+
+            # Commit in batches for performance
+            if (i + 1) % COMMIT_EVERY == 0:
+                conn.commit()
+                print(f"  Progress: {i + 1}/{len(events)} events processed...", flush=True)
 
             if action in ("new", "updated") and event_id:
                 # Prepare Meilisearch document
@@ -231,6 +236,9 @@ def run_pipeline(events: list[dict], source_name: str):
             conn.rollback()
             stats["errors"] += 1
             print(f"  Error processing '{event.get('title', '?')}': {e}")
+
+    # Final commit for remaining events
+    conn.commit()
 
     # Log ingestion
     log_cursor = conn.cursor()

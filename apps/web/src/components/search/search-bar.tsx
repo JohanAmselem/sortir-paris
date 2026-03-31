@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, X } from 'lucide-react'
+import { Search, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SearchResult {
@@ -13,6 +13,8 @@ interface SearchResult {
   venueName: string | null
 }
 
+const AI_QUERY_THRESHOLD = 15
+
 export function SearchBar({ className }: { className?: string }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -22,8 +24,11 @@ export function SearchBar({ className }: { className?: string }) {
   const router = useRouter()
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
+  const isAIQuery = query.trim().length >= AI_QUERY_THRESHOLD
+
   useEffect(() => {
-    if (query.length < 2) {
+    // Only do autocomplete for short queries
+    if (query.length < 2 || isAIQuery) {
       setResults([])
       return
     }
@@ -43,12 +48,16 @@ export function SearchBar({ className }: { className?: string }) {
     }, 250)
 
     return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }, [query, isAIQuery])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (query.trim()) {
-      router.push(`/evenements?q=${encodeURIComponent(query.trim())}`)
+      if (isAIQuery) {
+        router.push(`/evenements?q=${encodeURIComponent(query.trim())}&ai=1`)
+      } else {
+        router.push(`/evenements?q=${encodeURIComponent(query.trim())}`)
+      }
       setIsOpen(false)
     }
   }
@@ -69,30 +78,50 @@ export function SearchBar({ className }: { className?: string }) {
             onFocus={() => setIsOpen(true)}
             placeholder="Rechercher un événement, lieu..."
             className={cn(
-              'w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-10',
+              'w-full rounded-lg border border-border bg-surface py-2.5 pl-10',
+              isAIQuery ? 'pr-32' : 'pr-10',
               'text-sm text-text-primary placeholder:text-text-muted',
               'focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20',
               'transition-all duration-150'
             )}
           />
-          {query && (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery('')
-                setResults([])
-                inputRef.current?.focus()
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {isAIQuery && (
+              <button
+                type="submit"
+                className="flex items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-accent/90"
+              >
+                <Sparkles className="h-3 w-3" />
+                Recherche IA
+              </button>
+            )}
+            {query && !isAIQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  setResults([])
+                  inputRef.current?.focus()
+                }}
+                className="text-text-muted hover:text-text-secondary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </form>
 
+      {/* AI hint for medium-length queries */}
+      {query.trim().length >= 8 && !isAIQuery && (
+        <div className="absolute z-40 mt-1 w-full rounded-lg border border-border/50 bg-surface/80 px-4 py-2 text-xs text-text-muted backdrop-blur-sm">
+          <Sparkles className="mr-1 inline h-3 w-3 text-accent" />
+          Tapez une phrase plus longue pour activer la recherche IA
+        </div>
+      )}
+
       {/* Autocomplete dropdown */}
-      {isOpen && results.length > 0 && (
+      {isOpen && results.length > 0 && !isAIQuery && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-surface shadow-lg">
           {results.map((result) => (
             <button

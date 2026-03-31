@@ -5,6 +5,7 @@ import { FilterBar } from '@/components/search/filter-bar'
 import { SearchBar } from '@/components/search/search-bar'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
+import { aiSearch, type AIFilters } from '@/lib/ai-search'
 
 export const metadata: Metadata = {
   title: 'Explorer — Tous les événements',
@@ -75,20 +76,138 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
   return { events: eventsList, categories: allCategories }
 }
 
+const CATEGORY_ICONS: Record<string, string> = {
+  concert: '🎵',
+  expo: '🎨',
+  theatre: '🎭',
+  cinema: '🎬',
+  festival: '🎪',
+  conference: '🎤',
+  danse: '💃',
+  spectacle: '🎪',
+  atelier: '🛠️',
+  visite: '🏛️',
+}
+
+const DATE_LABELS: Record<string, string> = {
+  today: "Aujourd'hui",
+  weekend: 'Ce week-end',
+  week: 'Cette semaine',
+}
+
+function AIFilterPills({ filters, query }: { filters: AIFilters; query: string }) {
+  const pills: Array<{ icon: string; label: string }> = []
+
+  if (filters.category) {
+    const icon = CATEGORY_ICONS[filters.category] || '📌'
+    pills.push({
+      icon,
+      label: filters.category.charAt(0).toUpperCase() + filters.category.slice(1),
+    })
+  }
+
+  if (filters.arrondissement) {
+    pills.push({ icon: '📍', label: `${filters.arrondissement} arr.` })
+  }
+
+  if (filters.isFree === true) {
+    pills.push({ icon: '💰', label: 'Gratuit' })
+  }
+
+  if (filters.specificDate) {
+    const date = new Date(filters.specificDate)
+    const formatted = date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    })
+    pills.push({ icon: '📅', label: formatted })
+  } else if (filters.dateFilter) {
+    pills.push({
+      icon: '📅',
+      label: DATE_LABELS[filters.dateFilter] || filters.dateFilter,
+    })
+  }
+
+  if (filters.keywords.length > 0) {
+    pills.push({ icon: '🔑', label: filters.keywords.join(', ') })
+  }
+
+  if (pills.length === 0) return null
+
+  return (
+    <div className="mt-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+      <p className="mb-2 text-xs font-medium text-text-muted">
+        Recherche IA pour &laquo;&nbsp;{query}&nbsp;&raquo; :
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {pills.map((pill, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-xs font-medium text-text-primary shadow-sm border border-border"
+          >
+            <span>{pill.icon}</span>
+            {pill.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default async function EvenementsPage({ searchParams }: Props) {
   const params = await searchParams
-  const { events: eventsList, categories: cats } = await getEvents(params)
+  const isAI = params.ai === '1' && params.q && params.q.trim().length >= 3
+
+  let eventsList: Awaited<ReturnType<typeof getEvents>>['events'] = []
+  let cats: Awaited<ReturnType<typeof getEvents>>['categories'] = []
+  let aiFilters: AIFilters | null = null
+  let aiError = false
+
+  if (isAI) {
+    try {
+      const result = await aiSearch(params.q!)
+      aiFilters = result.filters
+      eventsList = result.events
+
+      // Still fetch categories for the filter bar
+      cats = await db
+        .select()
+        .from(categories)
+        .orderBy(asc(categories.position))
+    } catch (error) {
+      console.error('[AI Search Page] Error:', error)
+      aiError = true
+      // Fall back to normal search
+      const normalResult = await getEvents(params)
+      eventsList = normalResult.events
+      cats = normalResult.categories
+    }
+  } else {
+    const normalResult = await getEvents(params)
+    eventsList = normalResult.events
+    cats = normalResult.categories
+  }
 
   return (
     <div className="px-4 py-6">
       <h1 className="text-2xl font-bold text-text-primary">Explorer</h1>
       <p className="mt-1 text-sm text-text-muted">
-        {eventsList.length} événements trouvés
+        {eventsList.length} événement{eventsList.length !== 1 ? 's' : ''} trouvé{eventsList.length !== 1 ? 's' : ''}
       </p>
 
       <div className="mt-4">
         <SearchBar className="max-w-lg" />
       </div>
+
+      {aiError && (
+        <div className="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+          La recherche IA a rencontré une erreur. Voici les résultats classiques.
+        </div>
+      )}
+
+      {aiFilters && params.q && (
+        <AIFilterPills filters={aiFilters} query={params.q} />
+      )}
 
       <div className="mt-4">
         <Suspense fallback={<div className="h-10" />}>
@@ -118,7 +237,9 @@ export default async function EvenementsPage({ searchParams }: Props) {
             Aucun événement trouvé
           </p>
           <p className="mt-1 text-sm text-text-muted">
-            Essayez avec d&apos;autres filtres
+            {isAI
+              ? 'Essayez de reformuler votre recherche'
+              : "Essayez avec d'autres filtres"}
           </p>
         </div>
       )}

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@meilisearch/instant-meilisearch": "^0.21",
     "@sortir/db": "workspace:*",
     "@sortir/shared": "workspace:*",

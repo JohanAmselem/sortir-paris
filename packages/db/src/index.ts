@@ -32,5 +32,10 @@ const schema = {
   ...ingestionSchema,
 }
 
-const client = postgres(connectionString, { prepare: false })
+const client = postgres(connectionString, {
+  prepare: false,
+  connect_timeout: 15,
+  idle_timeout: 20,
+  max: 1,
+})
 export const db = drizzle(client, { schema })

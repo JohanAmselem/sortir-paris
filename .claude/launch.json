@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "/Users/johan/Library/pnpm/pnpm",
+      "runtimeArgs": ["--filter", "@sortir/web", "dev"],
+      "port": 3000
+    }
+  ]
+}

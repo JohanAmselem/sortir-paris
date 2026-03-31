@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import { Suspense } from 'react'
-import { SearchBar } from '@/components/search/search-bar'
 import { SectionRow } from '@/components/events/section-row'
+import { AISearchBox } from '@/components/search/ai-search-box'
 import { FilterBar } from '@/components/search/filter-bar'
 import Link from 'next/link'
 import { db, events, venues, categories } from '@sortir/db'
@@ -66,7 +66,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="relative overflow-hidden bg-primary px-4 pb-10 pt-12">
+      <section className="relative overflow-hidden bg-primary px-4 pb-16 pt-12">
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-accent/30" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--color-accent)_0%,_transparent_50%)] opacity-20" />
@@ -76,10 +76,14 @@ export default async function HomePage() {
             <span className="gradient-text">Paname</span>{' '}
             <span className="text-white">Club</span>
           </h1>
-          <p className="mx-auto mt-3 max-w-md text-center text-sm text-white/60 md:text-base">
-            Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.
+          <p className="mx-auto mt-4 max-w-lg text-center text-base font-medium text-white/80 md:text-lg">
+            L&apos;IA culturelle qui te trouve ton meilleur plan pour ce soir&nbsp;!
           </p>
-          <SearchBar className="mx-auto mt-8 max-w-lg" />
+
+          {/* AI Search — central feature */}
+          <div className="mx-auto mt-8 max-w-xl">
+            <AISearchBox />
+          </div>
         </div>
       </section>
 

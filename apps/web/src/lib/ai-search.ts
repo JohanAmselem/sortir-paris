@@ -13,6 +13,7 @@ const VALID_CATEGORIES = [
   'spectacle',
   'atelier',
   'visite',
+  'sport',
 ] as const
 
 export interface AIFilters {

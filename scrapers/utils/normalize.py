@@ -88,6 +88,7 @@ CATEGORY_KEYWORDS = {
     "spectacles": ["spectacle", "cirque", "magie", "one man show", "humour", "stand-up"],
     "ateliers": ["atelier", "workshop", "stage", "cours"],
     "visites": ["visite", "balade", "parcours", "patrimoine"],
+    "sport": ["sport", "yoga", "fitness", "running", "course à pied", "pilates", "boxe", "crossfit", "gym", "natation", "escalade", "vélo", "tennis", "basketball", "foot", "musculation", "stretching", "zumba", "kickboxing", "bootcamp"],
 }
 
 

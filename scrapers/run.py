@@ -8,6 +8,10 @@ Usage:
     python run.py --source theatreonline
     python run.py --source billetreduc
     python run.py --source shotgun
+    python run.py --source dice
+    python run.py --source timeout
+    python run.py --source sortiraparis
+    python run.py --source paris_fr
     python run.py --all
 """
 
@@ -29,6 +33,10 @@ from spiders.newmorning import fetch_events as fetch_newmorning
 from spiders.theatreonline import fetch_events as fetch_theatreonline
 from spiders.billetreduc import fetch_events as fetch_billetreduc
 from spiders.shotgun import fetch_events as fetch_shotgun
+from spiders.dice import fetch_events as fetch_dice
+from spiders.timeout_paris import fetch_events as fetch_timeout
+from spiders.sortir_a_paris import fetch_events as fetch_sortiraparis
+from spiders.paris_fr import fetch_events as fetch_paris_fr
 from pipelines.ingest import run_pipeline
 
 
@@ -37,16 +45,13 @@ def run_openagenda():
     if not api_key:
         print("Warning: OPENAGENDA_API_KEY not set, skipping OpenAgenda")
         return
-
     from spiders.openagenda import AGENDA_IDS
-
     all_events = []
     for agenda_id in AGENDA_IDS:
         print(f"Fetching from OpenAgenda: {agenda_id}")
         events = list(fetch_openagenda(api_key, agenda_id))
         all_events.extend(events)
         print(f"  Found {len(events)} events")
-
     if all_events:
         run_pipeline(all_events, "openagenda")
 
@@ -99,6 +104,38 @@ def run_shotgun():
         run_pipeline(events, "shotgun")
 
 
+def run_dice():
+    print("Fetching from DICE...")
+    events = list(fetch_dice(days_ahead=60, max_pages=10))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "dice")
+
+
+def run_timeout():
+    print("Fetching from Timeout Paris...")
+    events = list(fetch_timeout(max_pages=3))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "timeout")
+
+
+def run_sortiraparis():
+    print("Fetching from SortirAParis...")
+    events = list(fetch_sortiraparis(max_pages=3))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "sortiraparis")
+
+
+def run_paris_fr():
+    print("Fetching from Paris.fr...")
+    events = list(fetch_paris_fr(max_pages=5))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "paris_fr")
+
+
 SOURCES = {
     "openagenda": run_openagenda,
     "paris_opendata": run_paris_opendata,
@@ -107,6 +144,10 @@ SOURCES = {
     "theatreonline": run_theatreonline,
     "billetreduc": run_billetreduc,
     "shotgun": run_shotgun,
+    "dice": run_dice,
+    "timeout": run_timeout,
+    "sortiraparis": run_sortiraparis,
+    "paris_fr": run_paris_fr,
 }
 
 

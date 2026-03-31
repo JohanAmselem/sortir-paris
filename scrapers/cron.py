@@ -122,6 +122,7 @@ def sync_meilisearch():
 def main():
     parser = argparse.ArgumentParser(description="Sortir Paris — Daily Cron")
     parser.add_argument("--source", choices=list(SOURCES.keys()), help="Run one source only")
+    parser.add_argument("--all", action="store_true", help="Run all sources")
     args = parser.parse_args()
 
     start = datetime.now()
@@ -134,7 +135,7 @@ def main():
     if args.source:
         print(f"\nRunning source: {args.source}")
         SOURCES[args.source]()
-    else:
+    elif args.all:
         print("\nRunning all sources...")
         for name, runner in SOURCES.items():
             try:

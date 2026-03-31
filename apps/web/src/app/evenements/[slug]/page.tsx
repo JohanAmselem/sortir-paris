@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Calendar, MapPin, ExternalLink, Share2 } from 'lucide-react'
+import { Calendar, MapPin, ExternalLink, Share2, Clock, ArrowLeft } from 'lucide-react'
 import { SaveButton } from '@/components/events/save-button'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
 import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
@@ -109,8 +109,19 @@ export default async function EventPage({ params }: Props) {
       />
 
       <article className="pb-20">
+        {/* Back button */}
+        <div className="px-4 py-3">
+          <Link
+            href="/evenements"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour
+          </Link>
+        </div>
+
         {/* Hero image */}
-        <div className="relative aspect-[2/1] w-full overflow-hidden bg-border md:aspect-[3/1] md:rounded-b-xl">
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-surface-hover md:aspect-[2.5/1] md:rounded-xl md:mx-4 md:max-w-[calc(100%-2rem)]">
           {event.imageUrl ? (
             <Image
               src={event.imageUrl}
@@ -121,10 +132,12 @@ export default async function EventPage({ params }: Props) {
               sizes="100vw"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-6xl text-text-muted">
-              {event.category?.icon ?? '🎭'}
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent/10 to-neon/10">
+              <span className="text-7xl opacity-60">{event.category?.icon ?? '🎭'}</span>
             </div>
           )}
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
         </div>
 
         <div className="mx-auto max-w-3xl px-4 pt-6">
@@ -133,20 +146,20 @@ export default async function EventPage({ params }: Props) {
             {event.category && (
               <Link
                 href={`/categories/${event.category.slug}`}
-                className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-text-secondary border border-border hover:border-border-strong"
+                className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/20 transition-colors"
               >
                 {event.category.icon} {event.category.name}
               </Link>
             )}
             {event.isFree && (
-              <span className="rounded-full bg-free/10 px-3 py-1 text-xs font-medium text-free">
+              <span className="rounded-full bg-free/10 px-3 py-1 text-xs font-semibold text-free">
                 Gratuit
               </span>
             )}
             {event.ambiances?.map((a) => (
               <span
                 key={a.slug}
-                className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent"
+                className="rounded-full bg-surface-hover px-3 py-1 text-xs font-medium text-text-secondary"
               >
                 {a.emoji} {a.name}
               </span>
@@ -154,56 +167,80 @@ export default async function EventPage({ params }: Props) {
           </div>
 
           {/* Title */}
-          <h1 className="mt-4 text-2xl font-bold text-text-primary md:text-3xl">
+          <h1 className="mt-4 text-2xl font-bold text-text-primary leading-tight md:text-3xl">
             {event.title}
           </h1>
 
-          {/* Meta info */}
-          <div className="mt-4 space-y-2">
+          {/* Key info card */}
+          <div className="mt-5 rounded-xl border border-border bg-surface p-4 space-y-3">
             {event.startDate && (
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <Calendar className="h-4 w-4" />
-                <span>{formatEventDate(new Date(event.startDate))}</span>
-                {event.endDate && (
-                  <span className="text-text-muted">
-                    — {formatEventDate(new Date(event.endDate))}
-                  </span>
-                )}
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                  <Calendar className="h-4 w-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary">
+                    {formatEventDate(new Date(event.startDate))}
+                  </p>
+                  {event.endDate && (
+                    <p className="text-xs text-text-muted">
+                      Jusqu&apos;au {formatEventDate(new Date(event.endDate))}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
             {event.venue && (
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <MapPin className="h-4 w-4" />
-                <span className="hover:text-accent transition-colors">
-                  {event.venue.name}
-                </span>
-                {event.venue.arrondissement && (
-                  <span className="text-text-muted">· {event.venue.arrondissement}</span>
-                )}
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-neon/10">
+                  <MapPin className="h-4 w-4 text-neon" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary">
+                    {event.venue.name}
+                  </p>
+                  {(event.venue.address || event.venue.arrondissement) && (
+                    <p className="text-xs text-text-muted">
+                      {event.venue.address}{event.venue.arrondissement ? ` · ${event.venue.arrondissement}` : ''}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
-            <p className="text-lg font-semibold text-text-primary">
-              {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-free/10">
+                <Clock className="h-4 w-4 text-free" />
+              </div>
+              <p className="text-sm font-semibold text-text-primary">
+                {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
+              </p>
+            </div>
           </div>
 
           {/* Action buttons */}
-          <div className="mt-6 flex gap-3">
-            {event.bookingUrl && (
+          <div className="mt-5 flex gap-3">
+            {event.bookingUrl ? (
               <a
                 href={event.bookingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 hover:bg-accent/90 transition-all active:scale-[0.98]"
               >
                 <ExternalLink className="h-4 w-4" />
                 {event.isFree ? 'Voir le site' : 'Réserver'}
               </a>
+            ) : (
+              <div className="flex-1" />
             )}
-            <SaveButton eventId={event.id} className="h-12 w-12 rounded-lg border border-border" />
-            <button className="flex h-12 w-12 items-center justify-center rounded-lg border border-border hover:bg-surface-hover transition-colors">
+            <div onClick={(e) => e.stopPropagation()}>
+              <SaveButton
+                eventId={event.id}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-border hover:border-accent/30 hover:shadow-md transition-all"
+              />
+            </div>
+            <button className="flex h-12 w-12 items-center justify-center rounded-xl border border-border hover:border-accent/30 hover:shadow-md transition-all">
               <Share2 className="h-4 w-4 text-text-secondary" />
             </button>
           </div>
@@ -211,28 +248,68 @@ export default async function EventPage({ params }: Props) {
           {/* Description */}
           {event.description && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold text-text-primary">À propos</h2>
+              <h2 className="text-lg font-bold text-text-primary">À propos</h2>
               <div className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-secondary">
                 {event.description}
               </div>
             </div>
           )}
 
-          {/* Venue info */}
+          {/* Tags */}
+          {event.tags && event.tags.length > 0 && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {event.tags.map((tag) => (
+                <span
+                  key={tag.slug}
+                  className="rounded-full bg-surface-hover px-3 py-1 text-xs font-medium text-text-secondary"
+                >
+                  #{tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Venue details */}
           {event.venue && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold text-text-primary">Lieu</h2>
-              <div className="mt-3 rounded-lg border border-border bg-surface p-4">
-                <p className="font-medium text-text-primary">{event.venue.name}</p>
+              <h2 className="text-lg font-bold text-text-primary">Lieu</h2>
+              <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+                <p className="font-semibold text-text-primary">{event.venue.name}</p>
                 {event.venue.address && (
                   <p className="mt-1 text-sm text-text-secondary">{event.venue.address}</p>
                 )}
-                {event.venue.lat && event.venue.lng && (
-                  <div className="mt-3 h-48 rounded-md bg-border/50 flex items-center justify-center text-text-muted text-sm">
-                    Carte interactive (Mapbox)
-                  </div>
+                {event.venue.city && (
+                  <p className="text-sm text-text-muted">{event.venue.city}{event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}</p>
+                )}
+                {event.venue.website && (
+                  <a
+                    href={event.venue.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Site du lieu
+                  </a>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Source attribution */}
+          {event.sourceUrl && (
+            <div className="mt-8 rounded-lg bg-surface-hover/50 p-4">
+              <p className="text-xs text-text-muted">
+                Source :{' '}
+                <a
+                  href={event.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  {event.source === 'openagenda' ? 'OpenAgenda' : event.source === 'parisjazzclub' ? 'Paris Jazz Club' : event.source ?? 'Externe'}
+                </a>
+              </p>
             </div>
           )}
         </div>

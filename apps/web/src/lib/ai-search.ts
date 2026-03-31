@@ -48,62 +48,98 @@ La date d'aujourd'hui est : DATE_TODAY
 
 Réponds UNIQUEMENT avec le JSON, sans commentaire ni explication.`
 
+// Simple fallback parser when AI is unavailable
+function parseQueryFallback(query: string): AIFilters {
+  const q = query.toLowerCase()
+  const stopWords = ['je', 'un', 'une', 'le', 'la', 'les', 'de', 'du', 'des', 'dans', 'pour', 'ce', 'cette', 'mon', 'ma', 'mes', 'cherche', 'recherche', 'veux', 'voudrais', 'aimerais', 'voir', 'trouver', 'soir', 'près', 'chez', 'moi']
+
+  let category: string | null = null
+  for (const cat of VALID_CATEGORIES) {
+    if (q.includes(cat)) { category = cat; break }
+  }
+  if (q.includes('jazz') || q.includes('musique') || q.includes('rock')) category = 'concert'
+  if (q.includes('photo') || q.includes('exposition') || q.includes('galerie')) category = 'expo'
+  if (q.includes('pièce') || q.includes('comédie') || q.includes('comique') || q.includes('humour')) category = 'theatre'
+
+  let dateFilter: 'today' | 'weekend' | 'week' | null = null
+  if (q.includes('ce soir') || q.includes("aujourd'hui") || q.includes('aujourd')) dateFilter = 'today'
+  else if (q.includes('week-end') || q.includes('weekend') || q.includes('samedi') || q.includes('dimanche')) dateFilter = 'weekend'
+  else if (q.includes('semaine') || q.includes('prochains jours')) dateFilter = 'week'
+
+  const isFree = q.includes('gratuit') || q.includes('free') ? true : null
+
+  const arrMatch = q.match(/(\d{1,2})(?:e|er|ème|eme)\s*(?:arr|arrondissement)?/)
+  const arrondissement = arrMatch ? `${arrMatch[1]}e` : null
+
+  const keywords = query
+    .replace(/['']/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.includes(w.toLowerCase()))
+    .slice(0, 5)
+
+  return { category, dateFilter, specificDate: null, isFree, arrondissement, keywords }
+}
+
 export async function parseQueryWithAI(query: string): Promise<AIFilters> {
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  })
-
-  const today = new Date().toISOString().split('T')[0]
-  const currentYear = new Date().getFullYear()
-
-  const systemPrompt = SYSTEM_PROMPT
-    .replace('DATE_TODAY', today)
-    .replace('CURRENT_YEAR', String(currentYear))
-
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 500,
-    system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: query,
-      },
-    ],
-  })
-
-  const responseText =
-    message.content[0].type === 'text' ? message.content[0].text : ''
-
-  // Extract JSON from response (handle potential markdown code blocks)
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    return {
-      category: null,
-      dateFilter: null,
-      specificDate: null,
-      isFree: null,
-      arrondissement: null,
-      keywords: [query],
-    }
+  // Check if API key is configured
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('[AI Search] No ANTHROPIC_API_KEY — using fallback parser')
+    return parseQueryFallback(query)
   }
 
-  const parsed = JSON.parse(jsonMatch[0])
+  try {
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    })
 
-  return {
-    category:
-      parsed.category && VALID_CATEGORIES.includes(parsed.category)
-        ? parsed.category
-        : null,
-    dateFilter:
-      parsed.dateFilter &&
-      ['today', 'weekend', 'week'].includes(parsed.dateFilter)
-        ? parsed.dateFilter
-        : null,
-    specificDate: parsed.specificDate || null,
-    isFree: typeof parsed.isFree === 'boolean' ? parsed.isFree : null,
-    arrondissement: parsed.arrondissement || null,
-    keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+    const today = new Date().toISOString().split('T')[0]
+    const currentYear = new Date().getFullYear()
+
+    const systemPrompt = SYSTEM_PROMPT
+      .replace('DATE_TODAY', today)
+      .replace('CURRENT_YEAR', String(currentYear))
+
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 500,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: query,
+        },
+      ],
+    })
+
+    const responseText =
+      message.content[0].type === 'text' ? message.content[0].text : ''
+
+    // Extract JSON from response (handle potential markdown code blocks)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return parseQueryFallback(query)
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+
+    return {
+      category:
+        parsed.category && VALID_CATEGORIES.includes(parsed.category)
+          ? parsed.category
+          : null,
+      dateFilter:
+        parsed.dateFilter &&
+        ['today', 'weekend', 'week'].includes(parsed.dateFilter)
+          ? parsed.dateFilter
+          : null,
+      specificDate: parsed.specificDate || null,
+      isFree: typeof parsed.isFree === 'boolean' ? parsed.isFree : null,
+      arrondissement: parsed.arrondissement || null,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+    }
+  } catch (error) {
+    console.error('[AI Search] API error, using fallback:', error)
+    return parseQueryFallback(query)
   }
 }
 

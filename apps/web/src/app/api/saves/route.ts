@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, userSaves, events } from '@sortir/db'
-import { eq, and, sql } from 'drizzle-orm'
+import { db, userSaves, events, venues, categories } from '@sortir/db'
+import { eq, and, sql, desc } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
 
-// GET /api/saves — Get user's saved events
+// GET /api/saves — Get user's saved events with full event data
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -15,12 +15,28 @@ export async function GET() {
   }
 
   const saves = await db
-    .select()
+    .select({
+      id: events.id,
+      title: events.title,
+      slug: events.slug,
+      imageUrl: events.imageUrl,
+      startDate: events.startDate,
+      isFree: events.isFree,
+      priceMin: events.priceMin,
+      priceMax: events.priceMax,
+      venueName: venues.name,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+      savedAt: userSaves.createdAt,
+    })
     .from(userSaves)
+    .innerJoin(events, eq(userSaves.eventId, events.id))
+    .leftJoin(venues, eq(events.venueId, venues.id))
+    .leftJoin(categories, eq(events.categoryId, categories.id))
     .where(eq(userSaves.userId, user.id))
-    .orderBy(userSaves.createdAt)
+    .orderBy(desc(userSaves.createdAt))
 
-  return NextResponse.json(saves)
+  return NextResponse.json({ events: saves })
 }
 
 // POST /api/saves — Toggle save on an event

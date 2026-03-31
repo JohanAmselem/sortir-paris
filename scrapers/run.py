@@ -3,6 +3,7 @@ Main entry point for running scrapers.
 Usage:
     python run.py --source openagenda
     python run.py --source paris_opendata
+    python run.py --source parisjazzclub
     python run.py --all
 """
 
@@ -19,6 +20,7 @@ load_dotenv()
 
 from spiders.openagenda import fetch_events as fetch_openagenda
 from spiders.paris_opendata import fetch_events as fetch_paris_opendata
+from spiders.parisjazzclub import fetch_events as fetch_parisjazzclub
 from pipelines.ingest import run_pipeline
 
 
@@ -49,9 +51,18 @@ def run_paris_opendata():
         run_pipeline(events, "paris_opendata")
 
 
+def run_parisjazzclub():
+    print("Fetching from Paris Jazz Club...")
+    events = list(fetch_parisjazzclub(max_pages=15, days_ahead=60))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "parisjazzclub")
+
+
 SOURCES = {
     "openagenda": run_openagenda,
     "paris_opendata": run_paris_opendata,
+    "parisjazzclub": run_parisjazzclub,
 }
 
 

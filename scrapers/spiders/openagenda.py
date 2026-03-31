@@ -20,14 +20,16 @@ from utils.normalize import (
 )
 
 
-# OpenAgenda agenda IDs for Paris cultural institutions
-# These are discovered via https://openagenda.com/agendas?search=paris+culture
+# OpenAgenda agenda UIDs for Paris cultural institutions
 AGENDA_IDS = [
-    # Add real agenda IDs here after research
-    # Examples:
-    # "quefaireaparis",       # Mairie de Paris
-    # "philharmoniedeparis",  # Philharmonie
-    # "centrepompidou",       # Centre Pompidou
+    64649366,   # Parc de la Villette (~3000 events)
+    83174464,   # La Gaîté Lyrique (~330 events)
+    35234157,   # Théâtre Mandapa (~260 events)
+    37232304,   # Centre Pompidou (~50 events)
+    36691733,   # Opéra national de Paris
+    61774014,   # Jeu de Paume
+    74002720,   # Fondation Louis Vuitton
+    65853096,   # Musée du Petit Palais
 ]
 
 API_BASE = "https://api.openagenda.com/v2"

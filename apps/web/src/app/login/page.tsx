@@ -2,11 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Sparkles, Mail, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const supabase = useMemo(() => createClient(), [])
 
   const handleGoogle = async () => {
@@ -23,6 +26,7 @@ export default function LoginPage() {
     if (!email.trim()) return
 
     setLoading(true)
+    setError('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -30,24 +34,54 @@ export default function LoginPage() {
       },
     })
 
-    if (!error) setSent(true)
+    if (error) {
+      setError('Une erreur est survenue. Réessaie.')
+    } else {
+      setSent(true)
+    }
     setLoading(false)
   }
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
+    <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-center text-2xl font-bold text-text-primary">
-          Connexion
-        </h1>
-        <p className="mt-2 text-center text-sm text-text-secondary">
-          Sauvegarde tes événements et reçois des recommandations.
-        </p>
+        {/* Logo */}
+        <div className="text-center">
+          <Link href="/" className="inline-flex items-baseline gap-1">
+            <span className="text-2xl font-black tracking-tight text-primary">PANAME</span>
+            <span className="text-2xl font-light tracking-tight text-accent">CLUB</span>
+          </Link>
+        </div>
+
+        {/* Welcome message */}
+        <div className="mt-6 text-center">
+          <h1 className="text-xl font-bold text-text-primary">
+            Rejoins le club
+          </h1>
+          <p className="mt-2 text-sm text-text-secondary">
+            Crée ton compte pour des recommandations personnalisées
+            et ne plus jamais rater un bon plan.
+          </p>
+        </div>
+
+        {/* Benefits */}
+        <div className="mt-6 space-y-2">
+          {[
+            { icon: '🎯', text: 'Recommandations personnalisées par IA' },
+            { icon: '💜', text: 'Sauvegarde tes événements favoris' },
+            { icon: '🔔', text: 'Alertes pour tes sorties idéales' },
+          ].map((item) => (
+            <div key={item.text} className="flex items-center gap-3 rounded-lg bg-surface-hover/50 px-3 py-2">
+              <span className="text-lg">{item.icon}</span>
+              <span className="text-xs font-medium text-text-secondary">{item.text}</span>
+            </div>
+          ))}
+        </div>
 
         {/* Google */}
         <button
           onClick={handleGoogle}
-          className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-sm font-medium text-text-primary hover:bg-surface-hover transition-colors"
+          className="mt-8 flex w-full items-center justify-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-sm font-semibold text-text-primary shadow-sm hover:bg-surface-hover hover:shadow-md transition-all active:scale-[0.98]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -73,37 +107,62 @@ export default function LoginPage() {
         {/* Separator */}
         <div className="mt-6 flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-text-muted">ou</span>
+          <span className="text-xs font-medium text-text-muted">ou par email</span>
           <div className="h-px flex-1 bg-border" />
         </div>
 
         {/* Magic link */}
         {sent ? (
-          <div className="mt-6 rounded-lg bg-free/10 p-4 text-center">
-            <p className="text-sm font-medium text-free">Lien envoyé !</p>
+          <div className="mt-6 rounded-xl border border-accent/30 bg-accent/5 p-5 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
+              <Mail className="h-6 w-6 text-accent" />
+            </div>
+            <p className="text-sm font-semibold text-text-primary">Lien envoyé !</p>
             <p className="mt-1 text-xs text-text-secondary">
-              Vérifie ta boîte mail ({email})
+              Vérifie ta boîte mail <span className="font-medium text-accent">{email}</span>
+            </p>
+            <p className="mt-2 text-[11px] text-text-muted">
+              Clique sur le lien dans le mail pour te connecter
             </p>
           </div>
         ) : (
           <form onSubmit={handleMagicLink} className="mt-6">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ton@email.com"
-              required
-              className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ton@email.com"
+                required
+                className="w-full rounded-xl border border-border bg-surface py-3.5 pl-11 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+              />
+            </div>
+            {error && (
+              <p className="mt-2 text-xs text-red-500">{error}</p>
+            )}
             <button
               type="submit"
-              disabled={loading}
-              className="mt-3 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              disabled={loading || !email.trim()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-accent/90 hover:shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]"
             >
-              {loading ? 'Envoi...' : 'Recevoir un lien de connexion'}
+              {loading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <>
+                  Recevoir un lien magique
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
         )}
+
+        {/* Footer */}
+        <p className="mt-8 text-center text-[11px] text-text-muted">
+          En continuant, tu acceptes les{' '}
+          <span className="underline">conditions d&apos;utilisation</span> de Paname Club.
+        </p>
       </div>
     </div>
   )

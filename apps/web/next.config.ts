@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.parisinfo.com' },
       { protocol: 'https', hostname: '**.fnac.com' },
       { protocol: 'https', hostname: '**.shotgun.live' },
+      { protocol: 'https', hostname: '**.googleusercontent.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
   experimental: {

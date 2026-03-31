@@ -1,6 +1,9 @@
 import { Metadata } from 'next'
+import { Suspense } from 'react'
 import { EventCard } from '@/components/events/event-card'
 import { FilterBar } from '@/components/search/filter-bar'
+import { db, events, venues, categories } from '@sortir/db'
+import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'Sortir ce soir à Paris — Concerts, Expos, Théâtre',
@@ -11,45 +14,59 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-async function getTonightEvents() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const res = await fetch(`${baseUrl}/api/events?date=today&limit=30&sort=popular`, {
-    next: { revalidate: 1800 },
-  })
-  return res.json()
-}
+async function getTonightData() {
+  const now = new Date()
+  const endOfDay = new Date(now)
+  endOfDay.setHours(23, 59, 59, 999)
 
-async function getCategories() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const res = await fetch(`${baseUrl}/api/categories`, { next: { revalidate: 3600 } })
-  return res.json()
+  const [tonightEvents, allCategories] = await Promise.all([
+    db
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(
+        and(
+          eq(events.status, 'active'),
+          gte(events.startDate, now),
+          lte(events.startDate, endOfDay)
+        )
+      )
+      .orderBy(desc(events.saveCount))
+      .limit(30),
+    db.select().from(categories).orderBy(asc(categories.position)),
+  ])
+
+  return { events: tonightEvents, categories: allCategories }
 }
 
 export default async function CeSoirPage() {
-  const [eventsData, categories] = await Promise.all([
-    getTonightEvents(),
-    getCategories(),
-  ])
-
-  const events = eventsData.data ?? []
+  const { events: tonightEvents, categories: cats } = await getTonightData()
 
   return (
     <div className="px-4 py-6">
       <h1 className="text-2xl font-bold text-text-primary">Ce soir à Paris</h1>
       <p className="mt-1 text-sm text-text-secondary">
-        {events.length} événements ce soir
+        {tonightEvents.length} événements ce soir
       </p>
 
       <div className="mt-4">
-        <FilterBar categories={categories} />
+        <Suspense fallback={<div className="h-10" />}>
+          <FilterBar categories={cats} />
+        </Suspense>
       </div>
 
-      {events.length > 0 ? (
+      {tonightEvents.length > 0 ? (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {events.map((item: { event?: Record<string, unknown>; id?: string }) => {
-            const event = item.event ?? item
-            return <EventCard key={(event as { id: string }).id} event={event as never} />
-          })}
+          {tonightEvents.map((item) => (
+            <EventCard key={item.event.id} event={{
+              ...item.event,
+              category: item.category,
+              venue: item.venue,
+              tags: [],
+              ambiances: [],
+            } as never} />
+          ))}
         </div>
       ) : (
         <div className="mt-16 text-center">

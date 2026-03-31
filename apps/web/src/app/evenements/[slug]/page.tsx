@@ -4,20 +4,47 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, MapPin, ExternalLink, Share2 } from 'lucide-react'
 import { SaveButton } from '@/components/events/save-button'
-import { SectionRow } from '@/components/events/section-row'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
+import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
+import { eq } from 'drizzle-orm'
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
 async function getEvent(slug: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const res = await fetch(`${baseUrl}/api/events/${slug}`, {
-    next: { revalidate: 3600 },
-  })
-  if (!res.ok) return null
-  return res.json()
+  const result = await db
+    .select({ event: events, venue: venues, category: categories })
+    .from(events)
+    .leftJoin(venues, eq(events.venueId, venues.id))
+    .leftJoin(categories, eq(events.categoryId, categories.id))
+    .where(eq(events.slug, slug))
+    .limit(1)
+
+  if (result.length === 0) return null
+
+  const { event, venue, category } = result[0]
+
+  const [eventTagsList, eventAmbiancesList] = await Promise.all([
+    db
+      .select({ tag: tags })
+      .from(eventTags)
+      .innerJoin(tags, eq(eventTags.tagId, tags.id))
+      .where(eq(eventTags.eventId, event.id)),
+    db
+      .select({ ambiance: ambiances })
+      .from(eventAmbiances)
+      .innerJoin(ambiances, eq(eventAmbiances.ambianceId, ambiances.id))
+      .where(eq(eventAmbiances.eventId, event.id)),
+  ])
+
+  return {
+    ...event,
+    venue,
+    category,
+    tags: eventTagsList.map((t) => t.tag),
+    ambiances: eventAmbiancesList.map((a) => a.ambiance),
+  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -116,7 +143,7 @@ export default async function EventPage({ params }: Props) {
                 Gratuit
               </span>
             )}
-            {event.ambiances?.map((a: { slug: string; emoji: string | null; name: string }) => (
+            {event.ambiances?.map((a) => (
               <span
                 key={a.slug}
                 className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent"
@@ -133,25 +160,24 @@ export default async function EventPage({ params }: Props) {
 
           {/* Meta info */}
           <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              <Calendar className="h-4 w-4" />
-              <span>{formatEventDate(new Date(event.startDate))}</span>
-              {event.endDate && (
-                <span className="text-text-muted">
-                  — {formatEventDate(new Date(event.endDate))}
-                </span>
-              )}
-            </div>
+            {event.startDate && (
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                <Calendar className="h-4 w-4" />
+                <span>{formatEventDate(new Date(event.startDate))}</span>
+                {event.endDate && (
+                  <span className="text-text-muted">
+                    — {formatEventDate(new Date(event.endDate))}
+                  </span>
+                )}
+              </div>
+            )}
 
             {event.venue && (
               <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <MapPin className="h-4 w-4" />
-                <Link
-                  href={`/lieux/${event.venue.slug}`}
-                  className="hover:text-accent transition-colors"
-                >
+                <span className="hover:text-accent transition-colors">
                   {event.venue.name}
-                </Link>
+                </span>
                 {event.venue.arrondissement && (
                   <span className="text-text-muted">· {event.venue.arrondissement}</span>
                 )}
@@ -192,7 +218,7 @@ export default async function EventPage({ params }: Props) {
             </div>
           )}
 
-          {/* Venue info + map placeholder */}
+          {/* Venue info */}
           {event.venue && (
             <div className="mt-8">
               <h2 className="text-lg font-semibold text-text-primary">Lieu</h2>
@@ -201,7 +227,6 @@ export default async function EventPage({ params }: Props) {
                 {event.venue.address && (
                   <p className="mt-1 text-sm text-text-secondary">{event.venue.address}</p>
                 )}
-                {/* Map placeholder — Mapbox integration in Sprint 4 */}
                 {event.venue.lat && event.venue.lng && (
                   <div className="mt-3 h-48 rounded-md bg-border/50 flex items-center justify-center text-text-muted text-sm">
                     Carte interactive (Mapbox)

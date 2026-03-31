@@ -4,6 +4,8 @@ import { SearchBar } from '@/components/search/search-bar'
 import { SectionRow } from '@/components/events/section-row'
 import { FilterBar } from '@/components/search/filter-bar'
 import Link from 'next/link'
+import { db, events, venues, categories } from '@sortir/db'
+import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'Sortir — Tous les événements culturels à Paris',
@@ -12,29 +14,50 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 async function getHomeData() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const now = new Date()
+  const endOfDay = new Date(now)
+  endOfDay.setHours(23, 59, 59, 999)
 
-  const [tonightRes, trendingRes, categoriesRes] = await Promise.all([
-    fetch(`${baseUrl}/api/events?date=today&limit=10&sort=date`, { next: { revalidate: 300 } }),
-    fetch(`${baseUrl}/api/events?limit=10&sort=popular`, { next: { revalidate: 300 } }),
-    fetch(`${baseUrl}/api/categories`, { next: { revalidate: 3600 } }),
-  ])
+  const [tonight, trending, allCategories] = await Promise.all([
+    // Tonight's events
+    db
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(
+        and(
+          eq(events.status, 'active'),
+          gte(events.startDate, now),
+          lte(events.startDate, endOfDay)
+        )
+      )
+      .orderBy(desc(events.startDate))
+      .limit(10),
 
-  const [tonight, trending, categories] = await Promise.all([
-    tonightRes.json(),
-    trendingRes.json(),
-    categoriesRes.json(),
+    // Trending events
+    db
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(eq(events.status, 'active'))
+      .orderBy(desc(events.saveCount))
+      .limit(10),
+
+    // All categories
+    db.select().from(categories).orderBy(asc(categories.position)),
   ])
 
   return {
-    tonight: tonight.data ?? [],
-    trending: trending.data ?? [],
-    categories: categories ?? [],
+    tonight,
+    trending,
+    categories: allCategories,
   }
 }
 
 export default async function HomePage() {
-  const { tonight, trending, categories } = await getHomeData()
+  const { tonight, trending, categories: cats } = await getHomeData()
 
   return (
     <div>
@@ -52,7 +75,7 @@ export default async function HomePage() {
       {/* Quick filters */}
       <div className="border-b border-border bg-surface px-4 py-3">
         <Suspense fallback={<div className="h-10" />}>
-          <FilterBar categories={categories} />
+          <FilterBar categories={cats} />
         </Suspense>
       </div>
 
@@ -61,7 +84,13 @@ export default async function HomePage() {
         title="Ce soir"
         icon="🌙"
         href="/ce-soir"
-        events={tonight.map((r: { event: unknown }) => r.event ?? r)}
+        events={tonight.map((r) => ({
+          ...r.event,
+          category: r.category,
+          venue: r.venue,
+          tags: [],
+          ambiances: [],
+        })) as never[]}
       />
 
       {/* Tendances */}
@@ -69,14 +98,20 @@ export default async function HomePage() {
         title="Tendances"
         icon="🔥"
         href="/evenements?sort=popular"
-        events={trending.map((r: { event: unknown }) => r.event ?? r)}
+        events={trending.map((r) => ({
+          ...r.event,
+          category: r.category,
+          venue: r.venue,
+          tags: [],
+          ambiances: [],
+        })) as never[]}
       />
 
       {/* Categories grid */}
       <section className="px-4 py-8 lg:px-0">
         <h2 className="text-xl font-bold text-text-primary">Par catégorie</h2>
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-          {categories.map((cat: { slug: string; name: string; icon: string | null; color: string | null }) => (
+          {cats.map((cat) => (
             <Link
               key={cat.slug}
               href={`/categories/${cat.slug}`}

@@ -1,32 +1,39 @@
 @import "tailwindcss";
 
 /*
- * SORTIR PARIS — Design System Tokens
+ * PANAME CLUB — Design System
+ * Jeune, moderne, branchée, parisienne
  * ====================================
  */
 
 @theme {
-  /* Colors — Primary */
-  --color-primary: #1A1A2E;
-  --color-primary-light: #16213E;
-  --color-primary-hover: #2A2A4E;
+  /* Colors — Primary (noir profond parisien) */
+  --color-primary: #0D0D0D;
+  --color-primary-light: #1A1A1A;
+  --color-primary-hover: #2D2D2D;
 
-  /* Colors — Accent */
-  --color-accent: #E94560;
-  --color-accent-hover: #D63B54;
-  --color-accent-soft: #FFF0F3;
+  /* Colors — Accent (violet électrique) */
+  --color-accent: #7C3AED;
+  --color-accent-hover: #6D28D9;
+  --color-accent-soft: #F3EEFF;
+  --color-accent-glow: #A78BFA;
+
+  /* Colors — Secondary (rose néon) */
+  --color-neon: #F43F5E;
+  --color-neon-soft: #FFF1F2;
 
   /* Colors — Surfaces */
-  --color-bg: #FAFAFA;
+  --color-bg: #FAFAF9;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #F5F5F5;
-  --color-border: #E5E7EB;
-  --color-border-strong: #D1D5DB;
+  --color-surface-hover: #F5F5F4;
+  --color-surface-dark: #18181B;
+  --color-border: #E7E5E4;
+  --color-border-strong: #D6D3D1;
 
   /* Colors — Text */
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
+  --color-text-primary: #0D0D0D;
+  --color-text-secondary: #57534E;
+  --color-text-muted: #A8A29E;
 
   /* Colors — Semantic */
   --color-success: #10B981;
@@ -36,23 +43,23 @@
 
   /* Radius */
   --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.1);
 
   /* Font */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   /* Animations */
-  --animate-fade-in: fade-in 0.15s ease-out;
-  --animate-slide-up: slide-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-slide-up: slide-up 0.25s ease-out;
   --animate-bounce-sm: bounce-sm 0.2s ease-out;
 }
 
@@ -81,10 +88,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Selection */
+::selection {
+  background-color: var(--color-accent);
+  color: white;
+}
+
 /* Scrollbar — discret */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -101,4 +114,12 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-neon) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

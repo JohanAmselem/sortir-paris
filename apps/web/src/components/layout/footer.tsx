@@ -2,52 +2,56 @@ import Link from 'next/link'
 
 export function Footer() {
   return (
-    <footer className="mt-16 hidden border-t border-border bg-surface pb-4 pt-10 md:block">
+    <footer className="border-t border-border bg-primary pb-20 pt-10 md:pb-8">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="grid grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {/* Brand */}
-          <div>
-            <p className="text-lg font-bold text-primary">Sortir</p>
-            <p className="mt-2 text-sm text-text-secondary">
-              Tous les événements culturels à Paris en un seul endroit.
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-lg font-black text-white">
+              PANAME <span className="font-light text-accent-glow">CLUB</span>
+            </p>
+            <p className="mt-2 text-sm text-white/40">
+              Toute la culture parisienne en un clic.
             </p>
           </div>
 
           {/* Discover */}
           <div>
-            <h3 className="text-sm font-semibold text-text-primary">Découvrir</h3>
-            <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-              <li><Link href="/ce-soir" className="hover:text-text-primary">Ce soir</Link></li>
-              <li><Link href="/ce-week-end" className="hover:text-text-primary">Ce week-end</Link></li>
-              <li><Link href="/gratuit" className="hover:text-text-primary">Gratuit</Link></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Découvrir</h3>
+            <ul className="mt-3 space-y-2 text-sm text-white/40">
+              <li><Link href="/ce-soir" className="hover:text-white transition-colors">Ce soir</Link></li>
+              <li><Link href="/evenements?date=weekend" className="hover:text-white transition-colors">Ce week-end</Link></li>
+              <li><Link href="/evenements?free=true" className="hover:text-white transition-colors">Gratuit</Link></li>
             </ul>
           </div>
 
           {/* Categories */}
           <div>
-            <h3 className="text-sm font-semibold text-text-primary">Catégories</h3>
-            <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-              <li><Link href="/categories/concerts" className="hover:text-text-primary">Concerts</Link></li>
-              <li><Link href="/categories/expos" className="hover:text-text-primary">Expositions</Link></li>
-              <li><Link href="/categories/theatre" className="hover:text-text-primary">Théâtre</Link></li>
-              <li><Link href="/categories/cinema" className="hover:text-text-primary">Cinéma</Link></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Catégories</h3>
+            <ul className="mt-3 space-y-2 text-sm text-white/40">
+              <li><Link href="/categories/concerts" className="hover:text-white transition-colors">Concerts</Link></li>
+              <li><Link href="/categories/expos" className="hover:text-white transition-colors">Expositions</Link></li>
+              <li><Link href="/categories/theatre" className="hover:text-white transition-colors">Théâtre</Link></li>
+              <li><Link href="/categories/cinema" className="hover:text-white transition-colors">Cinéma</Link></li>
             </ul>
           </div>
 
           {/* Legal */}
           <div>
-            <h3 className="text-sm font-semibold text-text-primary">Sortir</h3>
-            <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-              <li><Link href="/a-propos" className="hover:text-text-primary">À propos</Link></li>
-              <li><Link href="/contact" className="hover:text-text-primary">Contact</Link></li>
-              <li><Link href="/cgu" className="hover:text-text-primary">CGU</Link></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Infos</h3>
+            <ul className="mt-3 space-y-2 text-sm text-white/40">
+              <li><Link href="/a-propos" className="hover:text-white transition-colors">À propos</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/cgu" className="hover:text-white transition-colors">CGU</Link></li>
             </ul>
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-text-muted">
-          &copy; {new Date().getFullYear()} Sortir. Tous droits réservés.
-        </p>
+        <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-6">
+          <p className="text-xs text-white/30">
+            &copy; {new Date().getFullYear()} Paname Club. Fait avec amour depuis Paris.
+          </p>
+        </div>
       </div>
     </footer>
   )

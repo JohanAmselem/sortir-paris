@@ -6,16 +6,16 @@ import '@/styles/globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'Sortir — Tous les événements culturels à Paris',
-    template: '%s | Sortir',
+    default: 'Paname Club — Sorties culturelles à Paris',
+    template: '%s | Paname Club',
   },
   description:
-    'Découvrez concerts, expos, théâtre, cinéma et festivals à Paris et petite couronne. Trouvez votre sortie en 30 secondes.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://sortir.paris'),
+    'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic. Trouve ta sortie à Paris.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://panameclub.fr'),
   openGraph: {
     type: 'website',
     locale: 'fr_FR',
-    siteName: 'Sortir',
+    siteName: 'Paname Club',
   },
 }
 

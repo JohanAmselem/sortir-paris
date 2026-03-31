@@ -1,9 +1,12 @@
 import { Suspense } from 'react'
 import { SectionRow } from '@/components/events/section-row'
+import { EventCard } from '@/components/events/event-card'
 import { AISearchBox } from '@/components/search/ai-search-box'
-import { FilterBar } from '@/components/search/filter-bar'
+import { MoodSelector } from '@/components/ui/mood-selector'
+import { BackToTop } from '@/components/ui/back-to-top'
+import { SkeletonRow } from '@/components/ui/skeleton-card'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Sparkles } from 'lucide-react'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
 
@@ -65,91 +68,126 @@ function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeo
 export default async function HomePage() {
   const { tonight, upcoming, free, categories: cats } = await getHomeData()
 
+  // Pick first 2 events as featured
+  const featuredEvents = tonight.length > 0 ? tonight.slice(0, 2) : upcoming.slice(0, 2)
+  const regularTonight = tonight.length > 2 ? tonight.slice(2) : tonight
+
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="relative overflow-hidden bg-primary px-4 pb-20 pt-16 md:pb-28 md:pt-24">
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,_var(--color-accent),_transparent_70%)] opacity-15" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_80%_at_80%_50%,_var(--color-neon),_transparent_70%)] opacity-8" />
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-bg to-transparent" />
+      <section className="relative overflow-hidden bg-primary px-4 pb-16 pt-12 md:pb-24 md:pt-20">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_-10%,_var(--color-accent),_transparent_60%)] opacity-20" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_60%_at_90%_50%,_var(--color-neon),_transparent_60%)] opacity-8" />
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-bg to-transparent" />
 
         <div className="relative z-10 mx-auto max-w-2xl">
-          {/* Logo */}
-          <h1 className="text-center text-4xl font-black tracking-tight md:text-6xl">
+          <h1 className="text-center text-3xl font-black tracking-tight md:text-5xl">
             <span className="gradient-text">Paname</span>
             <span className="text-white"> Club</span>
           </h1>
 
-          {/* Tagline */}
-          <p className="mx-auto mt-4 max-w-sm text-center text-[15px] leading-relaxed text-white/50 md:text-base">
-            L&apos;IA culturelle qui te trouve ton meilleur plan pour ce soir
+          <p className="mx-auto mt-3 max-w-xs text-center text-[14px] leading-relaxed text-white/40 md:max-w-md md:text-[15px]">
+            Dis-nous ce que tu veux, on te trouve la sortie parfaite
           </p>
 
-          {/* AI Search */}
-          <div className="mt-10">
+          <div className="mt-8">
             <AISearchBox />
           </div>
         </div>
       </section>
 
-      {/* Sticky filters */}
-      <div className="sticky top-14 z-30 border-b border-border/50 bg-white/80 backdrop-blur-xl px-4 py-2.5">
-        <Suspense fallback={<div className="h-9" />}>
-          <FilterBar categories={cats} />
-        </Suspense>
-      </div>
+      {/* Mood selector */}
+      <section className="px-4 py-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-4 w-4 text-accent" />
+          <h2 className="text-[14px] font-bold text-text-primary">J&apos;ai envie de...</h2>
+        </div>
+        <MoodSelector />
+      </section>
 
-      {/* Content sections */}
-      <div className="space-y-2">
-        {tonight.length > 0 && (
-          <SectionRow title="Ce soir" icon="🌙" href="/ce-soir" events={mapEvents(tonight)} />
-        )}
+      {/* Featured events */}
+      {featuredEvents.length > 0 && (
+        <section className="px-4 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
+              <span>⭐</span> A la une
+            </h2>
+            <Link href="/ce-soir" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
+              Voir tout <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {featuredEvents.map((item) => (
+              <EventCard
+                key={item.event.id}
+                event={{
+                  ...item.event,
+                  category: item.category,
+                  venue: item.venue,
+                  tags: [],
+                  ambiances: [],
+                } as never}
+                variant="featured"
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-        {upcoming.length > 0 && (
-          <SectionRow title="A ne pas rater" icon="🔥" href="/evenements" events={mapEvents(upcoming)} />
-        )}
-
-        {free.length > 0 && (
-          <SectionRow title="Bons plans gratuits" icon="✨" href="/evenements?free=true" events={mapEvents(free)} />
-        )}
-      </div>
+      {/* Event sections */}
+      <Suspense fallback={<SkeletonRow />}>
+        <div className="space-y-2">
+          {regularTonight.length > 0 && (
+            <SectionRow title="Ce soir" icon="🌙" href="/ce-soir" events={mapEvents(regularTonight)} />
+          )}
+          {upcoming.length > 0 && (
+            <SectionRow title="Cette semaine" icon="🔥" href="/evenements" events={mapEvents(upcoming)} />
+          )}
+          {free.length > 0 && (
+            <SectionRow title="Bons plans gratuits" icon="✨" href="/evenements?free=true" events={mapEvents(free)} />
+          )}
+        </div>
+      </Suspense>
 
       {/* Categories */}
-      <section className="px-4 py-12">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-text-primary">Explorer par catégorie</h2>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5">
+      <section className="px-4 py-10">
+        <h2 className="text-lg font-bold text-text-primary">Explorer par catégorie</h2>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
           {cats.map((cat) => (
             <Link
               key={cat.slug}
               href={`/categories/${cat.slug}`}
-              className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-surface p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-accent/20"
+              className="group flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-surface p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-accent/20 active:scale-[0.97]"
             >
               <span className="text-2xl transition-transform duration-200 group-hover:scale-110">{cat.icon}</span>
-              <span className="text-[12px] font-semibold text-text-primary">{cat.name}</span>
+              <span className="text-[11px] font-semibold text-text-secondary group-hover:text-text-primary">{cat.name}</span>
             </Link>
           ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="mx-4 mb-8 rounded-2xl bg-primary p-8 text-center md:p-10">
-        <h2 className="text-lg font-bold text-white md:text-xl">
-          Ne rate plus aucune sortie
-        </h2>
-        <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-white/40">
-          Crée ton compte, dis-nous ce que tu aimes, et on te trouve les meilleurs plans chaque jour.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-[13px] font-bold text-primary transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
-        >
-          Rejoindre le club
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+      <section className="mx-4 mb-8 overflow-hidden rounded-2xl bg-primary relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_100%_at_0%_50%,_var(--color-accent),_transparent_60%)] opacity-15" />
+        <div className="relative p-8 text-center md:p-10">
+          <h2 className="text-lg font-bold text-white md:text-xl">
+            Ne rate plus aucune sortie
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-white/35">
+            Crée ton compte, dis-nous ce que tu aimes, et on te trouve les meilleurs plans chaque jour.
+          </p>
+          <Link
+            href="/login"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-[13px] font-bold text-primary transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
+          >
+            Rejoindre le club
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </section>
+
+      <BackToTop />
     </div>
   )
 }

@@ -1,66 +1,69 @@
 @import "tailwindcss";
 
 /*
- * PANAME CLUB — Design System
- * Jeune, moderne, branchée, parisienne
+ * PANAME CLUB — Design System v2
+ * Minimal, élégant, parisien
  * ====================================
  */
 
 @theme {
-  /* Colors — Primary (noir profond parisien) */
-  --color-primary: #0D0D0D;
-  --color-primary-light: #1A1A1A;
-  --color-primary-hover: #2D2D2D;
+  /* Colors — Primary */
+  --color-primary: #0A0A0A;
+  --color-primary-light: #171717;
+  --color-primary-hover: #262626;
 
-  /* Colors — Accent (violet électrique) */
+  /* Colors — Accent (violet profond) */
   --color-accent: #7C3AED;
   --color-accent-hover: #6D28D9;
-  --color-accent-soft: #F3EEFF;
+  --color-accent-soft: #F5F3FF;
   --color-accent-glow: #A78BFA;
 
-  /* Colors — Secondary (rose néon) */
+  /* Colors — Secondary (corail chaud) */
   --color-neon: #F43F5E;
   --color-neon-soft: #FFF1F2;
 
   /* Colors — Surfaces */
-  --color-bg: #FAFAF9;
+  --color-bg: #FAFAFA;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #F5F5F4;
-  --color-surface-dark: #18181B;
-  --color-border: #E7E5E4;
-  --color-border-strong: #D6D3D1;
+  --color-surface-hover: #F5F5F5;
+  --color-surface-dark: #0A0A0A;
+  --color-border: #E5E5E5;
+  --color-border-strong: #D4D4D4;
 
   /* Colors — Text */
-  --color-text-primary: #0D0D0D;
-  --color-text-secondary: #57534E;
-  --color-text-muted: #A8A29E;
+  --color-text-primary: #0A0A0A;
+  --color-text-secondary: #525252;
+  --color-text-muted: #A3A3A3;
 
   /* Colors — Semantic */
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-error: #EF4444;
-  --color-free: #10B981;
+  --color-free: #059669;
 
   /* Radius */
   --radius-sm: 0.375rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08);
-  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.1);
+  /* Shadows — more subtle */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.05), 0 4px 6px rgba(0, 0, 0, 0.02);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.06), 0 8px 10px rgba(0, 0, 0, 0.03);
 
   /* Font */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   /* Animations */
-  --animate-fade-in: fade-in 0.2s ease-out;
-  --animate-slide-up: slide-up 0.25s ease-out;
-  --animate-bounce-sm: bounce-sm 0.2s ease-out;
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-bounce-sm: bounce-sm 0.3s ease-out;
+  --animate-shimmer: shimmer 2s linear infinite;
 }
 
 @keyframes fade-in {
@@ -69,7 +72,7 @@
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -79,13 +82,20 @@
   100% { transform: scale(1); }
 }
 
-/* Base styles */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Base */
 body {
   font-family: var(--font-sans);
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.011em;
 }
 
 /* Selection */
@@ -94,10 +104,17 @@ body {
   color: white;
 }
 
-/* Scrollbar — discret */
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Scrollbar — ultra discret */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -106,8 +123,11 @@ body {
   background: var(--color-border);
   border-radius: var(--radius-full);
 }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
 
-/* Horizontal scroll — hide scrollbar */
+/* Hide scrollbar */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -116,10 +136,29 @@ body {
   scrollbar-width: none;
 }
 
-/* Gradient text utility */
+/* Gradient text */
 .gradient-text {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-neon) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Skeleton loading shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-hover) 25%, var(--color-surface) 50%, var(--color-surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Smooth page transitions */
+main {
+  animation: fade-in 0.2s ease-out;
 }

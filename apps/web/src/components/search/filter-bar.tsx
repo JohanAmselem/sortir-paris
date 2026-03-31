@@ -4,13 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const DATE_FILTERS = [
-  { label: 'Ce soir', value: 'today' },
-  { label: 'Ce week-end', value: 'weekend' },
-  { label: 'Cette semaine', value: 'week' },
-] as const
-
-const PRICE_FILTERS = [
-  { label: 'Gratuit', value: 'true' },
+  { label: 'Ce soir', value: 'today', icon: '🌙' },
+  { label: 'Ce week-end', value: 'weekend', icon: '📅' },
+  { label: 'Cette semaine', value: 'week', icon: '🗓️' },
 ] as const
 
 interface FilterBarProps {
@@ -33,46 +29,45 @@ export function FilterBar({ categories, className }: FilterBarProps) {
     } else {
       params.set(key, value)
     }
-    params.delete('page') // reset pagination
+    params.delete('page')
     router.push(`?${params.toString()}`, { scroll: false })
   }
 
   return (
-    <div className={cn('scrollbar-hide flex gap-2 overflow-x-auto', className)}>
+    <div className={cn('scrollbar-hide flex items-center gap-1.5 overflow-x-auto py-0.5', className)}>
       {/* Date filters */}
       {DATE_FILTERS.map((filter) => (
         <button
           key={filter.value}
           onClick={() => setFilter('date', filter.value)}
           className={cn(
-            'flex-shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
+            'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
             activeDate === filter.value
-              ? 'border-accent bg-accent text-white'
-              : 'border-border bg-surface text-text-secondary hover:border-border-strong'
+              ? 'border-accent bg-accent text-white shadow-sm'
+              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
           )}
         >
+          <span className="text-sm">{filter.icon}</span>
           {filter.label}
         </button>
       ))}
 
       {/* Free filter */}
-      {PRICE_FILTERS.map((filter) => (
-        <button
-          key={filter.value}
-          onClick={() => setFilter('free', filter.value)}
-          className={cn(
-            'flex-shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
-            activeFree === filter.value
-              ? 'border-free bg-free text-white'
-              : 'border-border bg-surface text-text-secondary hover:border-border-strong'
-          )}
-        >
-          Gratuit
-        </button>
-      ))}
+      <button
+        onClick={() => setFilter('free', 'true')}
+        className={cn(
+          'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
+          activeFree === 'true'
+            ? 'border-free bg-free text-white shadow-sm'
+            : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
+        )}
+      >
+        <span className="text-sm">🆓</span>
+        Gratuit
+      </button>
 
       {/* Separator */}
-      <div className="h-8 w-px flex-shrink-0 bg-border" />
+      <div className="mx-0.5 h-6 w-px flex-shrink-0 bg-border" />
 
       {/* Category filters */}
       {categories.map((cat) => (
@@ -80,13 +75,13 @@ export function FilterBar({ categories, className }: FilterBarProps) {
           key={cat.slug}
           onClick={() => setFilter('category', cat.slug)}
           className={cn(
-            'flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors',
+            'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
             activeCategory === cat.slug
-              ? 'border-primary bg-primary text-white'
-              : 'border-border bg-surface text-text-secondary hover:border-border-strong'
+              ? 'border-primary bg-primary text-white shadow-sm'
+              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
           )}
         >
-          {cat.icon && <span>{cat.icon}</span>}
+          {cat.icon && <span className="text-sm">{cat.icon}</span>}
           {cat.name}
         </button>
       ))}

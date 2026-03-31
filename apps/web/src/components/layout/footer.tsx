@@ -2,53 +2,79 @@ import Link from 'next/link'
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-primary pb-20 pt-10 md:pb-8">
+    <footer className="border-t border-border bg-primary pb-20 pt-12 md:pb-10">
       <div className="mx-auto max-w-7xl px-4">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <p className="text-lg font-black text-white">
-              PANAME <span className="font-light text-accent-glow">CLUB</span>
+            <p className="text-[17px] font-black text-white">
+              PANAME<span className="font-extralight text-accent-glow">CLUB</span>
             </p>
-            <p className="mt-2 text-sm text-white/40">
-              Toute la culture parisienne en un clic.
+            <p className="mt-3 max-w-[200px] text-[13px] leading-relaxed text-white/30">
+              L&apos;IA culturelle qui te trouve ton meilleur plan pour ce soir.
             </p>
           </div>
 
           {/* Discover */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Découvrir</h3>
-            <ul className="mt-3 space-y-2 text-sm text-white/40">
-              <li><Link href="/ce-soir" className="hover:text-white transition-colors">Ce soir</Link></li>
-              <li><Link href="/evenements?date=weekend" className="hover:text-white transition-colors">Ce week-end</Link></li>
-              <li><Link href="/evenements?free=true" className="hover:text-white transition-colors">Gratuit</Link></li>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Découvrir</h3>
+            <ul className="mt-4 space-y-2.5">
+              {[
+                { href: '/ce-soir', label: 'Ce soir' },
+                { href: '/evenements?date=weekend', label: 'Ce week-end' },
+                { href: '/evenements?free=true', label: 'Gratuit' },
+                { href: '/evenements', label: 'Tous les événements' },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Categories */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Catégories</h3>
-            <ul className="mt-3 space-y-2 text-sm text-white/40">
-              <li><Link href="/categories/concerts" className="hover:text-white transition-colors">Concerts</Link></li>
-              <li><Link href="/categories/expos" className="hover:text-white transition-colors">Expositions</Link></li>
-              <li><Link href="/categories/theatre" className="hover:text-white transition-colors">Théâtre</Link></li>
-              <li><Link href="/categories/cinema" className="hover:text-white transition-colors">Cinéma</Link></li>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Catégories</h3>
+            <ul className="mt-4 space-y-2.5">
+              {[
+                { href: '/categories/concerts', label: 'Concerts' },
+                { href: '/categories/expos', label: 'Expositions' },
+                { href: '/categories/theatre', label: 'Théâtre' },
+                { href: '/categories/cinema', label: 'Cinéma' },
+                { href: '/categories/festivals', label: 'Festivals' },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Legal */}
+          {/* Info */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Infos</h3>
-            <ul className="mt-3 space-y-2 text-sm text-white/40">
-              <li><Link href="/a-propos" className="hover:text-white transition-colors">À propos</Link></li>
-              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-              <li><Link href="/cgu" className="hover:text-white transition-colors">CGU</Link></li>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Infos</h3>
+            <ul className="mt-4 space-y-2.5">
+              {[
+                { href: '/a-propos', label: 'À propos' },
+                { href: '/contact', label: 'Contact' },
+                { href: '/cgu', label: 'Conditions d\'utilisation' },
+              ].map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
-        <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-6">
-          <p className="text-xs text-white/30">
+        <div className="mt-12 border-t border-white/5 pt-6">
+          <p className="text-[11px] text-white/20">
             &copy; {new Date().getFullYear()} Paname Club. Fait avec amour depuis Paris.
           </p>
         </div>

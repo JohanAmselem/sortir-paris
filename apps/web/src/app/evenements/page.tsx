@@ -190,33 +190,45 @@ export default async function EvenementsPage({ searchParams }: Props) {
 
   return (
     <div className="px-4 py-6">
-      <h1 className="text-2xl font-bold text-text-primary">Explorer</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        {eventsList.length} événement{eventsList.length !== 1 ? 's' : ''} trouvé{eventsList.length !== 1 ? 's' : ''}
-      </p>
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {isAI ? 'Résultats' : 'Explorer'}
+          </h1>
+          <p className="mt-0.5 text-[13px] text-text-muted">
+            {eventsList.length} événement{eventsList.length !== 1 ? 's' : ''} trouvé{eventsList.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+      </div>
 
+      {/* Search bar */}
       <div className="mt-4">
         <SearchBar className="max-w-lg" />
       </div>
 
+      {/* AI error */}
       {aiError && (
-        <div className="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-          La recherche IA a rencontré une erreur. Voici les résultats classiques.
+        <div className="mt-3 rounded-lg border border-yellow-200/80 bg-yellow-50 px-4 py-2.5 text-[13px] text-yellow-700">
+          La recherche IA n&apos;a pas pu analyser ta demande. Voici les résultats classiques.
         </div>
       )}
 
+      {/* AI filter pills */}
       {aiFilters && params.q && (
         <AIFilterPills filters={aiFilters} query={params.q} />
       )}
 
+      {/* Filters */}
       <div className="mt-4">
-        <Suspense fallback={<div className="h-10" />}>
+        <Suspense fallback={<div className="h-9" />}>
           <FilterBar categories={cats} />
         </Suspense>
       </div>
 
+      {/* Results grid */}
       {eventsList.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {eventsList.map((item) => (
             <EventCard
               key={item.event.id}
@@ -231,15 +243,15 @@ export default async function EvenementsPage({ searchParams }: Props) {
           ))}
         </div>
       ) : (
-        <div className="mt-16 text-center">
+        <div className="mt-20 text-center">
           <p className="text-5xl">🔍</p>
-          <p className="mt-4 text-lg font-semibold text-text-primary">
+          <p className="mt-4 text-lg font-bold text-text-primary">
             Aucun événement trouvé
           </p>
-          <p className="mt-1 text-sm text-text-muted">
+          <p className="mt-1 text-[13px] text-text-muted">
             {isAI
-              ? 'Essayez de reformuler votre recherche'
-              : "Essayez avec d'autres filtres"}
+              ? 'Essaie de reformuler ta recherche'
+              : "Essaie avec d'autres filtres"}
           </p>
         </div>
       )}

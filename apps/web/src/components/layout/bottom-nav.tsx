@@ -15,9 +15,12 @@ const NAV_ITEMS = [
 export function BottomNav() {
   const pathname = usePathname()
 
+  // Hide on login/onboarding pages
+  if (pathname === '/login' || pathname === '/onboarding') return null
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-surface/95 backdrop-blur-xl md:hidden">
-      <div className="flex h-16 items-center justify-around px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 bg-white/90 backdrop-blur-xl md:hidden safe-area-bottom">
+      <div className="flex h-14 items-center justify-around px-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== '/' && pathname.startsWith(href))
 
@@ -26,12 +29,12 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 transition-all',
-                isActive ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
+                'flex flex-col items-center gap-0.5 px-4 py-1 transition-colors',
+                isActive ? 'text-accent' : 'text-text-muted'
               )}
             >
-              <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 1.5} />
-              <span className="text-[10px] font-semibold">{label}</span>
+              <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.5 : 1.5} />
+              <span className="text-[10px] font-medium">{label}</span>
             </Link>
           )
         })}

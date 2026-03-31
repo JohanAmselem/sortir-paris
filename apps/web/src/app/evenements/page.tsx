@@ -106,8 +106,11 @@ function AIFilterPills({ filters, query }: { filters: AIFilters; query: string }
     })
   }
 
-  if (filters.arrondissement) {
-    pills.push({ icon: '📍', label: `${filters.arrondissement} arr.` })
+  if (filters.arrondissements && filters.arrondissements.length > 0) {
+    const arrLabel = filters.arrondissements.length === 1
+      ? `${filters.arrondissements[0]} arr.`
+      : filters.arrondissements.join(', ') + ' arr.'
+    pills.push({ icon: '📍', label: arrLabel })
   }
 
   if (filters.isFree === true) {

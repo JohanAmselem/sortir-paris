@@ -2,10 +2,10 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Calendar, MapPin, ExternalLink, Share2, Clock, ArrowLeft } from 'lucide-react'
+import { Calendar, MapPin, ExternalLink, Share2, Euro, ArrowLeft } from 'lucide-react'
 import { SaveButton } from '@/components/events/save-button'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
-import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
+import { db, events, venues, categories } from '@sortir/db'
 import { eq } from 'drizzle-orm'
 
 interface Props {
@@ -25,25 +25,12 @@ async function getEvent(slug: string) {
 
   const { event, venue, category } = result[0]
 
-  const [eventTagsList, eventAmbiancesList] = await Promise.all([
-    db
-      .select({ tag: tags })
-      .from(eventTags)
-      .innerJoin(tags, eq(eventTags.tagId, tags.id))
-      .where(eq(eventTags.eventId, event.id)),
-    db
-      .select({ ambiance: ambiances })
-      .from(eventAmbiances)
-      .innerJoin(ambiances, eq(eventAmbiances.ambianceId, ambiances.id))
-      .where(eq(eventAmbiances.eventId, event.id)),
-  ])
-
   return {
     ...event,
     venue,
     category,
-    tags: eventTagsList.map((t) => t.tag),
-    ambiances: eventAmbiancesList.map((a) => a.ambiance),
+    tags: [] as { slug: string; name: string }[],
+    ambiances: [] as { slug: string; name: string; emoji: string | null }[],
   }
 }
 
@@ -54,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `${event.title} — ${event.venue?.name ?? 'Paris'}`,
-    description: event.shortDesc ?? event.description?.slice(0, 160),
+    description: event.shortDesc ?? event.description?.slice(0, 160) ?? '',
     openGraph: {
       title: event.title,
       description: event.shortDesc ?? undefined,
@@ -70,35 +57,39 @@ export default async function EventPage({ params }: Props) {
 
   if (!event) notFound()
 
+  // Safe date conversion
+  const startDate = event.startDate ? new Date(event.startDate) : null
+  const endDate = event.endDate ? new Date(event.endDate) : null
+
   // JSON-LD structured data
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: event.title,
-    description: event.shortDesc,
-    startDate: event.startDate,
-    endDate: event.endDate,
+    description: event.shortDesc ?? '',
+    startDate: event.startDate?.toString(),
+    endDate: event.endDate?.toString(),
     location: event.venue
       ? {
           '@type': 'Place',
           name: event.venue.name,
           address: {
             '@type': 'PostalAddress',
-            streetAddress: event.venue.address,
-            addressLocality: event.venue.city,
-            postalCode: event.venue.zipCode,
+            streetAddress: event.venue.address ?? '',
+            addressLocality: event.venue.city ?? 'Paris',
+            postalCode: event.venue.zipCode ?? '',
             addressCountry: 'FR',
           },
         }
       : undefined,
     offers: {
       '@type': 'Offer',
-      price: event.priceMin / 100,
+      price: event.priceMin ? event.priceMin / 100 : 0,
       priceCurrency: 'EUR',
       availability: 'https://schema.org/InStock',
-      url: event.bookingUrl,
+      url: event.bookingUrl ?? '',
     },
-    image: event.imageUrl,
+    image: event.imageUrl ?? '',
   }
 
   return (
@@ -113,15 +104,15 @@ export default async function EventPage({ params }: Props) {
         <div className="px-4 py-3">
           <Link
             href="/evenements"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Retour
           </Link>
         </div>
 
         {/* Hero image */}
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-surface-hover md:aspect-[2.5/1] md:rounded-xl md:mx-4 md:max-w-[calc(100%-2rem)]">
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-surface-hover md:aspect-[2.5/1] md:rounded-2xl md:mx-4 md:max-w-[calc(100%-2rem)]">
           {event.imageUrl ? (
             <Image
               src={event.imageUrl}
@@ -132,59 +123,50 @@ export default async function EventPage({ params }: Props) {
               sizes="100vw"
             />
           ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent/10 to-neon/10">
-              <span className="text-7xl opacity-60">{event.category?.icon ?? '🎭'}</span>
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent/5 to-neon/5">
+              <span className="text-7xl opacity-40">{event.category?.icon ?? '🎭'}</span>
             </div>
           )}
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         </div>
 
         <div className="mx-auto max-w-3xl px-4 pt-6">
-          {/* Tags */}
+          {/* Badges */}
           <div className="flex flex-wrap gap-2">
             {event.category && (
               <Link
                 href={`/categories/${event.category.slug}`}
-                className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/20 transition-colors"
+                className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accent hover:bg-accent/20 transition-colors"
               >
                 {event.category.icon} {event.category.name}
               </Link>
             )}
             {event.isFree && (
-              <span className="rounded-full bg-free/10 px-3 py-1 text-xs font-semibold text-free">
+              <span className="rounded-lg bg-free/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-free">
                 Gratuit
               </span>
             )}
-            {event.ambiances?.map((a) => (
-              <span
-                key={a.slug}
-                className="rounded-full bg-surface-hover px-3 py-1 text-xs font-medium text-text-secondary"
-              >
-                {a.emoji} {a.name}
-              </span>
-            ))}
           </div>
 
           {/* Title */}
-          <h1 className="mt-4 text-2xl font-bold text-text-primary leading-tight md:text-3xl">
+          <h1 className="mt-4 text-2xl font-bold leading-tight text-text-primary md:text-3xl">
             {event.title}
           </h1>
 
-          {/* Key info card */}
-          <div className="mt-5 rounded-xl border border-border bg-surface p-4 space-y-3">
-            {event.startDate && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-accent/10">
+          {/* Info card */}
+          <div className="mt-5 divide-y divide-border rounded-2xl border border-border bg-surface">
+            {startDate && (
+              <div className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/10">
                   <Calendar className="h-4 w-4 text-accent" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-text-primary">
-                    {formatEventDate(new Date(event.startDate))}
+                  <p className="text-[14px] font-semibold text-text-primary">
+                    {formatEventDate(startDate)}
                   </p>
-                  {event.endDate && (
-                    <p className="text-xs text-text-muted">
-                      Jusqu&apos;au {formatEventDate(new Date(event.endDate))}
+                  {endDate && (
+                    <p className="text-[12px] text-text-muted">
+                      Jusqu&apos;au {formatEventDate(endDate)}
                     </p>
                   )}
                 </div>
@@ -192,41 +174,42 @@ export default async function EventPage({ params }: Props) {
             )}
 
             {event.venue && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-neon/10">
+              <div className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-neon/10">
                   <MapPin className="h-4 w-4 text-neon" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-text-primary">
+                  <p className="text-[14px] font-semibold text-text-primary">
                     {event.venue.name}
                   </p>
                   {(event.venue.address || event.venue.arrondissement) && (
-                    <p className="text-xs text-text-muted">
-                      {event.venue.address}{event.venue.arrondissement ? ` · ${event.venue.arrondissement}` : ''}
+                    <p className="text-[12px] text-text-muted">
+                      {event.venue.address}
+                      {event.venue.arrondissement ? ` · ${event.venue.arrondissement}` : ''}
                     </p>
                   )}
                 </div>
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-free/10">
-                <Clock className="h-4 w-4 text-free" />
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-free/10">
+                <Euro className="h-4 w-4 text-free" />
               </div>
-              <p className="text-sm font-semibold text-text-primary">
+              <p className="text-[14px] font-semibold text-text-primary">
                 {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
               </p>
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="mt-5 flex gap-3">
+          <div className="mt-5 flex gap-2.5">
             {event.bookingUrl ? (
               <a
                 href={event.bookingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 hover:bg-accent/90 transition-all active:scale-[0.98]"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[14px] font-bold text-white shadow-lg shadow-accent/20 hover:bg-accent-hover transition-all active:scale-[0.98]"
               >
                 <ExternalLink className="h-4 w-4" />
                 {event.isFree ? 'Voir le site' : 'Réserver'}
@@ -237,10 +220,10 @@ export default async function EventPage({ params }: Props) {
             <div onClick={(e) => e.stopPropagation()}>
               <SaveButton
                 eventId={event.id}
-                className="flex h-12 w-12 items-center justify-center rounded-xl border border-border hover:border-accent/30 hover:shadow-md transition-all"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all"
               />
             </div>
-            <button className="flex h-12 w-12 items-center justify-center rounded-xl border border-border hover:border-accent/30 hover:shadow-md transition-all">
+            <button className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all">
               <Share2 className="h-4 w-4 text-text-secondary" />
             </button>
           </div>
@@ -248,45 +231,34 @@ export default async function EventPage({ params }: Props) {
           {/* Description */}
           {event.description && (
             <div className="mt-8">
-              <h2 className="text-lg font-bold text-text-primary">À propos</h2>
-              <div className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-secondary">
+              <h2 className="text-base font-bold text-text-primary">À propos</h2>
+              <div className="mt-3 whitespace-pre-line text-[14px] leading-relaxed text-text-secondary">
                 {event.description}
               </div>
-            </div>
-          )}
-
-          {/* Tags */}
-          {event.tags && event.tags.length > 0 && (
-            <div className="mt-6 flex flex-wrap gap-2">
-              {event.tags.map((tag) => (
-                <span
-                  key={tag.slug}
-                  className="rounded-full bg-surface-hover px-3 py-1 text-xs font-medium text-text-secondary"
-                >
-                  #{tag.name}
-                </span>
-              ))}
             </div>
           )}
 
           {/* Venue details */}
           {event.venue && (
             <div className="mt-8">
-              <h2 className="text-lg font-bold text-text-primary">Lieu</h2>
-              <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+              <h2 className="text-base font-bold text-text-primary">Lieu</h2>
+              <div className="mt-3 rounded-2xl border border-border bg-surface p-5">
                 <p className="font-semibold text-text-primary">{event.venue.name}</p>
                 {event.venue.address && (
-                  <p className="mt-1 text-sm text-text-secondary">{event.venue.address}</p>
+                  <p className="mt-1 text-[13px] text-text-secondary">{event.venue.address}</p>
                 )}
                 {event.venue.city && (
-                  <p className="text-sm text-text-muted">{event.venue.city}{event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}</p>
+                  <p className="text-[13px] text-text-muted">
+                    {event.venue.city}
+                    {event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}
+                  </p>
                 )}
                 {event.venue.website && (
                   <a
                     href={event.venue.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+                    className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     Site du lieu
@@ -296,10 +268,10 @@ export default async function EventPage({ params }: Props) {
             </div>
           )}
 
-          {/* Source attribution */}
+          {/* Source */}
           {event.sourceUrl && (
-            <div className="mt-8 rounded-lg bg-surface-hover/50 p-4">
-              <p className="text-xs text-text-muted">
+            <div className="mt-8 rounded-xl bg-surface-hover/50 px-4 py-3">
+              <p className="text-[11px] text-text-muted">
                 Source :{' '}
                 <a
                   href={event.sourceUrl}
@@ -307,7 +279,11 @@ export default async function EventPage({ params }: Props) {
                   rel="noopener noreferrer"
                   className="text-accent hover:underline"
                 >
-                  {event.source === 'openagenda' ? 'OpenAgenda' : event.source === 'parisjazzclub' ? 'Paris Jazz Club' : event.source ?? 'Externe'}
+                  {event.source === 'openagenda'
+                    ? 'OpenAgenda'
+                    : event.source === 'parisjazzclub'
+                      ? 'Paris Jazz Club'
+                      : event.source ?? 'Externe'}
                 </a>
               </p>
             </div>

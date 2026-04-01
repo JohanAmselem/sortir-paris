@@ -1,13 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { DatePicker } from './date-picker'
 
 const DATE_FILTERS = [
   { label: 'Ce soir', value: 'today', icon: '🌙' },
   { label: 'Ce week-end', value: 'weekend', icon: '📅' },
   { label: 'Cette semaine', value: 'week', icon: '🗓️' },
 ] as const
+
+const MONTHS_SHORT = [
+  'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+]
 
 interface FilterBarProps {
   categories: { slug: string; name: string; icon: string | null }[]
@@ -17,10 +24,14 @@ interface FilterBarProps {
 export function FilterBar({ categories, className }: FilterBarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   const activeCategory = searchParams.get('category')
   const activeDate = searchParams.get('date')
   const activeFree = searchParams.get('free')
+
+  // Check if activeDate is an ISO date (YYYY-MM-DD)
+  const isISODate = activeDate && /^\d{4}-\d{2}-\d{2}$/.test(activeDate)
 
   const setFilter = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -31,6 +42,11 @@ export function FilterBar({ categories, className }: FilterBarProps) {
     }
     params.delete('page')
     router.push(`?${params.toString()}`, { scroll: false })
+  }
+
+  const formatSelectedDate = (isoDate: string): string => {
+    const d = new Date(isoDate + 'T00:00:00')
+    return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
   }
 
   return (
@@ -51,6 +67,30 @@ export function FilterBar({ categories, className }: FilterBarProps) {
           {filter.label}
         </button>
       ))}
+
+      {/* Date picker button */}
+      <div className="relative flex-shrink-0">
+        <button
+          onClick={() => setShowDatePicker(!showDatePicker)}
+          className={cn(
+            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
+            isISODate
+              ? 'border-accent bg-accent text-white shadow-sm'
+              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
+          )}
+        >
+          <span className="text-sm">📆</span>
+          {isISODate ? formatSelectedDate(activeDate!) : 'Date...'}
+        </button>
+
+        {showDatePicker && (
+          <DatePicker
+            selectedDate={isISODate ? activeDate : null}
+            onSelect={(date) => setFilter('date', date)}
+            onClose={() => setShowDatePicker(false)}
+          />
+        )}
+      </div>
 
       {/* Free filter */}
       <button

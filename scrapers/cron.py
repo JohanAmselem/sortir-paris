@@ -143,7 +143,14 @@ def main():
             except Exception as e:
                 print(f"Error running {name}: {e}")
 
-    # 2. Full Meilisearch re-sync
+    # 2. Geocode venues with missing coordinates
+    try:
+        from utils.geocode import geocode_missing_venues
+        geocode_missing_venues()
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+
+    # 3. Full Meilisearch re-sync
     try:
         sync_meilisearch()
     except Exception as e:

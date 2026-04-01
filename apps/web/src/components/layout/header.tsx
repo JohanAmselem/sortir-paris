@@ -11,8 +11,9 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 const NAV_LINKS = [
   { href: '/ce-soir', label: 'Ce soir' },
-  { href: '/evenements?date=weekend', label: 'Week-end' },
-  { href: '/evenements?free=true', label: 'Gratuit' },
+  { href: '/ce-week-end', label: 'Week-end' },
+  { href: '/gratuit', label: 'Gratuit' },
+  { href: '/carte', label: 'Carte' },
   { href: '/evenements', label: 'Explorer' },
 ]
 

@@ -43,6 +43,12 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
     endOfWeek.setDate(now.getDate() + 7)
     conditions.push(gte(events.startDate, now))
     conditions.push(lte(events.startDate, endOfWeek))
+  } else if (searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)) {
+    // Specific date (ISO format from date picker)
+    const target = new Date(searchParams.date + 'T00:00:00')
+    const endOfTarget = new Date(searchParams.date + 'T23:59:59.999')
+    conditions.push(gte(events.startDate, target))
+    conditions.push(lte(events.startDate, endOfTarget))
   } else {
     // Default: future events
     conditions.push(gte(events.startDate, now))

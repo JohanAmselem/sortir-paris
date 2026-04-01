@@ -5,9 +5,11 @@ import { AISearchBox } from '@/components/search/ai-search-box'
 import { MoodSelector } from '@/components/ui/mood-selector'
 import { BackToTop } from '@/components/ui/back-to-top'
 import { SkeletonRow } from '@/components/ui/skeleton-card'
+import { PourToiSection } from '@/components/events/pour-toi-section'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ArrowRight, Sparkles } from 'lucide-react'
-import { db, events, venues, categories } from '@sortir/db'
+import { db, events, venues, categories, users } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
 
 export const metadata = {
@@ -68,6 +70,23 @@ function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeo
 export default async function HomePage() {
   const { tonight, upcoming, free, categories: cats } = await getHomeData()
 
+  // Check if user is logged in and onboarded for personalized section
+  let currentUserId: string | null = null
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const dbUser = await db.query.users?.findFirst({
+        where: eq(users.id, user.id),
+      })
+      if (dbUser?.onboarded) {
+        currentUserId = user.id
+      }
+    }
+  } catch {
+    // Not logged in, that's fine
+  }
+
   // Pick first 2 events as featured
   const featuredEvents = tonight.length > 0 ? tonight.slice(0, 2) : upcoming.slice(0, 2)
   const regularTonight = tonight.length > 2 ? tonight.slice(2) : tonight
@@ -105,6 +124,13 @@ export default async function HomePage() {
         </div>
         <MoodSelector />
       </section>
+
+      {/* Personalized section */}
+      {currentUserId && (
+        <Suspense fallback={<SkeletonRow />}>
+          <PourToiSection userId={currentUserId} />
+        </Suspense>
+      )}
 
       {/* Featured events */}
       {featuredEvents.length > 0 && (

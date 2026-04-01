@@ -6,6 +6,7 @@ import { Calendar, MapPin, ExternalLink, Euro, ArrowLeft, Clock } from 'lucide-r
 import { SaveButton } from '@/components/events/save-button'
 import { ShareButton } from '@/components/ui/share-button'
 import { Countdown } from '@/components/ui/countdown'
+import { ViewTracker } from '@/components/events/view-tracker'
 import { EventCard } from '@/components/events/event-card'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
 import { db, events, venues, categories } from '@sortir/db'
@@ -106,6 +107,8 @@ export default async function EventPage({ params }: Props) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
+      <ViewTracker eventId={event.id} />
+
       <article className="pb-24">
         {/* Back */}
         <div className="px-4 py-3">
@@ -186,7 +189,9 @@ export default async function EventPage({ params }: Props) {
                   <MapPin className="h-4.5 w-4.5 text-neon" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-text-primary">{event.venue.name}</p>
+                  <Link href={`/lieux/${event.venue.slug}`} className="text-[14px] font-semibold text-text-primary hover:text-accent transition-colors">
+                    {event.venue.name}
+                  </Link>
                   {(event.venue.address || event.venue.arrondissement) && (
                     <p className="text-[12px] text-text-muted truncate">
                       {event.venue.address}{event.venue.arrondissement ? ` · ${event.venue.arrondissement}` : ''}

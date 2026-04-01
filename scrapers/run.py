@@ -12,6 +12,11 @@ Usage:
     python run.py --source timeout
     python run.py --source sortiraparis
     python run.py --source paris_fr
+    python run.py --source infoconcert
+    python run.py --source offi
+    python run.py --source eventbrite
+    python run.py --source quefaire_paris
+    python run.py --source lebonbon
     python run.py --all
 """
 
@@ -37,6 +42,11 @@ from spiders.dice import fetch_events as fetch_dice
 from spiders.timeout_paris import fetch_events as fetch_timeout
 from spiders.sortir_a_paris import fetch_events as fetch_sortiraparis
 from spiders.paris_fr import fetch_events as fetch_paris_fr
+from spiders.infoconcert import fetch_events as fetch_infoconcert
+from spiders.offi import fetch_events as fetch_offi
+from spiders.eventbrite_paris import fetch_events as fetch_eventbrite
+from spiders.quefaire_paris import fetch_events as fetch_quefaire
+from spiders.lebonbon import fetch_events as fetch_lebonbon
 from pipelines.ingest import run_pipeline
 
 
@@ -136,6 +146,46 @@ def run_paris_fr():
         run_pipeline(events, "paris_fr")
 
 
+def run_infoconcert():
+    print("Fetching from InfoConcert...")
+    events = list(fetch_infoconcert(max_pages=15, days_ahead=90))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "infoconcert")
+
+
+def run_offi():
+    print("Fetching from L'Officiel des Spectacles...")
+    events = list(fetch_offi(max_pages=5))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "offi")
+
+
+def run_eventbrite():
+    print("Fetching from Eventbrite Paris...")
+    events = list(fetch_eventbrite(max_pages=5))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "eventbrite")
+
+
+def run_quefaire():
+    print("Fetching from Que Faire à Paris...")
+    events = list(fetch_quefaire(max_pages=10))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "quefaire_paris")
+
+
+def run_lebonbon():
+    print("Fetching from Le Bonbon Paris...")
+    events = list(fetch_lebonbon(max_pages=10))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "lebonbon")
+
+
 SOURCES = {
     "openagenda": run_openagenda,
     "paris_opendata": run_paris_opendata,
@@ -148,6 +198,11 @@ SOURCES = {
     "timeout": run_timeout,
     "sortiraparis": run_sortiraparis,
     "paris_fr": run_paris_fr,
+    "infoconcert": run_infoconcert,
+    "offi": run_offi,
+    "eventbrite": run_eventbrite,
+    "quefaire_paris": run_quefaire,
+    "lebonbon": run_lebonbon,
 }
 
 

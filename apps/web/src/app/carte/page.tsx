@@ -1,24 +1,8 @@
 import { Metadata } from 'next'
-import dynamic from 'next/dynamic'
+import { MapWrapper } from '@/components/map/map-wrapper'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, isNotNull, desc } from 'drizzle-orm'
 import type { MapEvent } from '@/components/map/event-map'
-
-// Load map client-side only (mapbox-gl requires browser APIs)
-const EventMap = dynamic(
-  () => import('@/components/map/event-map').then((mod) => mod.EventMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[calc(100vh-8rem)] items-center justify-center rounded-2xl bg-surface-hover">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-text-muted">Chargement de la carte...</p>
-        </div>
-      </div>
-    ),
-  }
-)
 
 export const metadata: Metadata = {
   title: 'Carte des événements — Paris',
@@ -91,7 +75,7 @@ export default async function CartePage() {
         </p>
       </div>
 
-      <EventMap events={mapEvents} />
+      <MapWrapper events={mapEvents} />
     </div>
   )
 }

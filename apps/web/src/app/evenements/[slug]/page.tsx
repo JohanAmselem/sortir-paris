@@ -109,7 +109,7 @@ export default async function EventPage({ params }: Props) {
 
       <ViewTracker eventId={event.id} />
 
-      <article className="pb-24">
+      <article className="pb-36 md:pb-24">
         {/* Back */}
         <div className="px-4 py-3">
           <Link href="/evenements" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors">
@@ -226,9 +226,7 @@ export default async function EventPage({ params }: Props) {
             ) : (
               <div className="flex-1" />
             )}
-            <div onClick={(e) => e.stopPropagation()}>
-              <SaveButton eventId={event.id} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all" />
-            </div>
+            <SaveButton eventId={event.id} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all" />
             <ShareButton title={event.title} text={event.shortDesc ?? event.title} className="h-11 w-11" />
           </div>
 
@@ -293,7 +291,7 @@ export default async function EventPage({ params }: Props) {
 
       {/* Sticky mobile CTA */}
       {(event.bookingUrl || event.sourceUrl) && (
-        <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-lg md:hidden">
+        <div className="fixed bottom-[4.5rem] left-0 right-0 z-40 border-t border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-lg md:hidden">
           <a
             href={event.bookingUrl ?? event.sourceUrl!}
             target="_blank"

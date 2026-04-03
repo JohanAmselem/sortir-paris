@@ -59,9 +59,9 @@ export function Footer() {
             <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Infos</h3>
             <ul className="mt-4 space-y-2.5">
               {[
-                { href: '/a-propos', label: 'À propos' },
-                { href: '/contact', label: 'Contact' },
-                { href: '/cgu', label: 'Conditions d\'utilisation' },
+                { href: '/surprise', label: 'Surprise moi' },
+                { href: '/carte', label: 'Carte interactive' },
+                { href: '/login', label: 'Mon compte' },
               ].map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">

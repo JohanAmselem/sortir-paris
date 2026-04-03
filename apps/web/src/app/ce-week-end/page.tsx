@@ -4,7 +4,7 @@ import { EventCard } from '@/components/events/event-card'
 import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
 import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, asc, count } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'Ce week-end à Paris — Concerts, Expos, Spectacles',
@@ -35,35 +35,36 @@ async function getWeekendData() {
   sunday.setDate(saturday.getDate() + 1)
   sunday.setHours(23, 59, 59, 999)
 
-  const [weekendEvents, allCategories] = await Promise.all([
+  const weekendCondition = and(
+    eq(events.status, 'active'),
+    gte(events.startDate, saturday),
+    lte(events.startDate, sunday)
+  )
+
+  const [weekendEvents, allCategories, totalCount] = await Promise.all([
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
       .leftJoin(venues, eq(events.venueId, venues.id))
       .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(
-        and(
-          eq(events.status, 'active'),
-          gte(events.startDate, saturday),
-          lte(events.startDate, sunday)
-        )
-      )
+      .where(weekendCondition)
       .orderBy(desc(events.qualityScore))
       .limit(48),
     db.select().from(categories).orderBy(asc(categories.position)),
+    db.select({ value: count() }).from(events).where(weekendCondition),
   ])
 
-  return { events: weekendEvents, categories: allCategories }
+  return { events: weekendEvents, categories: allCategories, total: Number(totalCount[0].value) }
 }
 
 export default async function WeekEndPage() {
-  const { events: weekendEvents, categories: cats } = await getWeekendData()
+  const { events: weekendEvents, categories: cats, total } = await getWeekendData()
 
   return (
     <div className="px-4 py-6">
       <h1 className="text-2xl font-bold text-text-primary">Ce week-end à Paris</h1>
       <p className="mt-1 text-sm text-text-secondary">
-        {weekendEvents.length} événement{weekendEvents.length !== 1 ? 's' : ''} ce week-end
+        {total.toLocaleString('fr-FR')} événement{total !== 1 ? 's' : ''} ce week-end
       </p>
 
       <div className="mt-4">

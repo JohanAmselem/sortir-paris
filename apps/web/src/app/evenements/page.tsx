@@ -5,7 +5,7 @@ import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
 import { SearchBar } from '@/components/search/search-bar'
 import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm'
 import { aiSearch, type AIFilters } from '@/lib/ai-search'
 
 export const metadata: Metadata = {
@@ -68,7 +68,7 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
     conditions.push(eq(events.isFree, true))
   }
 
-  const [eventsList, allCategories] = await Promise.all([
+  const [eventsList, allCategories, totalCount] = await Promise.all([
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -78,9 +78,10 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
       .orderBy(desc(events.qualityScore))
       .limit(48),
     db.select().from(categories).orderBy(asc(categories.position)),
+    db.select({ value: count() }).from(events).where(and(...conditions)),
   ])
 
-  return { events: eventsList, categories: allCategories }
+  return { events: eventsList, categories: allCategories, total: Number(totalCount[0].value) }
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -170,6 +171,7 @@ export default async function EvenementsPage({ searchParams }: Props) {
 
   let eventsList: Awaited<ReturnType<typeof getEvents>>['events'] = []
   let cats: Awaited<ReturnType<typeof getEvents>>['categories'] = []
+  let totalEvents = 0
   let aiFilters: AIFilters | null = null
   let aiError = false
 
@@ -178,6 +180,7 @@ export default async function EvenementsPage({ searchParams }: Props) {
       const result = await aiSearch(params.q!)
       aiFilters = result.filters
       eventsList = result.events
+      totalEvents = result.events.length
 
       // Still fetch categories for the filter bar
       cats = await db
@@ -191,11 +194,13 @@ export default async function EvenementsPage({ searchParams }: Props) {
       const normalResult = await getEvents(params)
       eventsList = normalResult.events
       cats = normalResult.categories
+      totalEvents = normalResult.total
     }
   } else {
     const normalResult = await getEvents(params)
     eventsList = normalResult.events
     cats = normalResult.categories
+    totalEvents = normalResult.total
   }
 
   return (
@@ -207,7 +212,7 @@ export default async function EvenementsPage({ searchParams }: Props) {
             {isAI ? 'Résultats' : 'Explorer'}
           </h1>
           <p className="mt-0.5 text-[13px] text-text-muted">
-            {eventsList.length} événement{eventsList.length !== 1 ? 's' : ''} trouvé{eventsList.length !== 1 ? 's' : ''}
+            {totalEvents.toLocaleString('fr-FR')} événement{totalEvents !== 1 ? 's' : ''} trouvé{totalEvents !== 1 ? 's' : ''}
           </p>
         </div>
       </div>

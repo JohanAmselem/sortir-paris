@@ -34,7 +34,7 @@ async function getHomeData() {
       .leftJoin(categories, eq(events.categoryId, categories.id))
       .where(and(eq(events.status, 'active'), gte(events.startDate, now), lte(events.startDate, endOfDay)))
       .orderBy(desc(events.qualityScore))
-      .limit(12),
+      .limit(20),
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -42,7 +42,7 @@ async function getHomeData() {
       .leftJoin(categories, eq(events.categoryId, categories.id))
       .where(and(eq(events.status, 'active'), gte(events.startDate, now), lte(events.startDate, nextWeek)))
       .orderBy(desc(events.qualityScore))
-      .limit(12),
+      .limit(20),
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -50,7 +50,7 @@ async function getHomeData() {
       .leftJoin(categories, eq(events.categoryId, categories.id))
       .where(and(eq(events.status, 'active'), eq(events.isFree, true), gte(events.startDate, now)))
       .orderBy(desc(events.qualityScore))
-      .limit(12),
+      .limit(20),
     db.select().from(categories).orderBy(asc(categories.position)),
   ])
 

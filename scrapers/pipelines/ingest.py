@@ -187,10 +187,16 @@ def run_pipeline(events: list[dict], source_name: str):
 
     stats = {"new": 0, "updated": 0, "duplicate": 0, "errors": 0}
     meili_batch: List[dict] = []
-    COMMIT_EVERY = 50  # Commit every N events for speed
+    COMMIT_EVERY = 25  # Commit every N events — keep connection alive
 
     for i, event in enumerate(events):
         try:
+            # Reconnect if connection lost
+            if conn.closed:
+                print("  Reconnecting to database...")
+                conn = get_db_connection()
+                conn.autocommit = False
+
             cursor = conn.cursor()
             venue_id = find_or_create_venue(cursor, event)
             category_id = find_category_id(cursor, event.get("category_slug"))
@@ -233,9 +239,14 @@ def run_pipeline(events: list[dict], source_name: str):
             cursor.close()
 
         except Exception as e:
-            conn.rollback()
+            try:
+                if not conn.closed:
+                    conn.rollback()
+            except Exception:
+                pass
             stats["errors"] += 1
-            print(f"  Error processing '{event.get('title', '?')}': {e}")
+            if stats["errors"] <= 5:
+                print(f"  Error processing '{event.get('title', '?')}': {e}")
 
     # Final commit for remaining events
     conn.commit()

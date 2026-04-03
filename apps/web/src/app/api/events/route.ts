@@ -58,11 +58,19 @@ export async function GET(request: NextRequest) {
     endOfWeek.setDate(now.getDate() + 7)
     conditions.push(gte(events.startDate, now))
     conditions.push(lte(events.startDate, endOfWeek))
+  } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
+    const target = new Date(dateFilter + 'T00:00:00')
+    const endOfTarget = new Date(dateFilter + 'T23:59:59.999')
+    conditions.push(gte(events.startDate, target))
+    conditions.push(lte(events.startDate, endOfTarget))
+  } else {
+    // Default: future events only
+    conditions.push(gte(events.startDate, now))
   }
 
   // Sort
   const orderBy =
-    sort === 'popular' ? desc(events.saveCount) : desc(events.startDate)
+    sort === 'popular' ? desc(events.saveCount) : sort === 'quality' ? desc(events.qualityScore) : desc(events.startDate)
 
   // Query
   const [results, countResult] = await Promise.all([

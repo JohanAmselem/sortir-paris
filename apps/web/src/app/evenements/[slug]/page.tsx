@@ -213,15 +213,15 @@ export default async function EventPage({ params }: Props) {
 
           {/* Actions */}
           <div className="mt-5 flex gap-2">
-            {event.bookingUrl ? (
+            {(event.bookingUrl || event.sourceUrl) ? (
               <a
-                href={event.bookingUrl}
+                href={event.bookingUrl ?? event.sourceUrl!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[14px] font-bold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent-hover active:scale-[0.98]"
               >
                 <ExternalLink className="h-4 w-4" />
-                {event.isFree ? 'Voir le site' : 'Réserver'}
+                {event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
               </a>
             ) : (
               <div className="flex-1" />
@@ -290,6 +290,21 @@ export default async function EventPage({ params }: Props) {
           </div>
         )}
       </article>
+
+      {/* Sticky mobile CTA */}
+      {(event.bookingUrl || event.sourceUrl) && (
+        <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-lg md:hidden">
+          <a
+            href={event.bookingUrl ?? event.sourceUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[14px] font-bold text-white shadow-lg shadow-accent/20 transition-all active:scale-[0.98]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            {event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
+          </a>
+        </div>
+      )}
     </>
   )
 }

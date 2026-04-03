@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import { Suspense } from 'react'
 import { EventCard } from '@/components/events/event-card'
+import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
@@ -33,7 +34,7 @@ async function getTonightData() {
         )
       )
       .orderBy(desc(events.saveCount))
-      .limit(30),
+      .limit(100),
     db.select().from(categories).orderBy(asc(categories.position)),
   ])
 
@@ -57,16 +58,18 @@ export default async function CeSoirPage() {
       </div>
 
       {tonightEvents.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tonightEvents.map((item) => (
-            <EventCard key={item.event.id} event={{
+        <div className="mt-6">
+          <InfiniteEventGrid
+            initialEvents={tonightEvents.map((item) => ({
               ...item.event,
               category: item.category,
               venue: item.venue,
               tags: [],
               ambiances: [],
-            } as never} />
-          ))}
+            } as never))}
+            apiParams={{ date: 'today' }}
+            sort="popular"
+          />
         </div>
       ) : (
         <div className="mt-16 text-center">

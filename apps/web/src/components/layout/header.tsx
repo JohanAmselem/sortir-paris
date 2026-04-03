@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: '/gratuit', label: 'Gratuit' },
   { href: '/carte', label: 'Carte' },
   { href: '/evenements', label: 'Explorer' },
+  { href: '/surprise', label: '🎲 Surprise' },
 ]
 
 export function Header() {

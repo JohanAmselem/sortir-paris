@@ -34,8 +34,11 @@ const schema = {
 
 const client = postgres(connectionString, {
   prepare: false,
-  connect_timeout: 15,
+  connect_timeout: 10,
   idle_timeout: 20,
-  max: 1,
+  max: 3,
+  connection: {
+    application_name: 'panameclub-web',
+  },
 })
 export const db = drizzle(client, { schema })

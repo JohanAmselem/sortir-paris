@@ -1,22 +1,16 @@
 """
 Main entry point for running scrapers.
+23 sources total.
+
 Usage:
     python run.py --source openagenda
-    python run.py --source paris_opendata
-    python run.py --source parisjazzclub
-    python run.py --source newmorning
-    python run.py --source theatreonline
-    python run.py --source billetreduc
-    python run.py --source shotgun
-    python run.py --source dice
-    python run.py --source timeout
-    python run.py --source sortiraparis
-    python run.py --source paris_fr
-    python run.py --source infoconcert
-    python run.py --source offi
-    python run.py --source eventbrite
-    python run.py --source quefaire_paris
-    python run.py --source lebonbon
+    python run.py --source allocine        # Cinema showtimes (thousands)
+    python run.py --source bandsintown     # Concerts
+    python run.py --source parismusees     # Museum exhibitions
+    python run.py --source fnacspectacles  # Theatre, comedy, dance
+    python run.py --source mapado          # Large aggregator
+    python run.py --source tmdb            # Films currently showing
+    python run.py --source meetup          # Community events
     python run.py --all
 """
 
@@ -47,6 +41,13 @@ from spiders.offi import fetch_events as fetch_offi
 from spiders.eventbrite_paris import fetch_events as fetch_eventbrite
 from spiders.quefaire_paris import fetch_events as fetch_quefaire
 from spiders.lebonbon import fetch_events as fetch_lebonbon
+from spiders.allocine import fetch_events as fetch_allocine
+from spiders.bandsintown import fetch_events as fetch_bandsintown
+from spiders.parismusees import fetch_events as fetch_parismusees
+from spiders.fnacspectacles import fetch_events as fetch_fnacspectacles
+from spiders.mapado import fetch_events as fetch_mapado
+from spiders.tmdb_cinema import fetch_events as fetch_tmdb
+from spiders.meetup_paris import fetch_events as fetch_meetup
 from pipelines.ingest import run_pipeline
 
 
@@ -186,6 +187,62 @@ def run_lebonbon():
         run_pipeline(events, "lebonbon")
 
 
+def run_allocine():
+    print("Fetching from Allociné (cinéma)...")
+    events = list(fetch_allocine(max_cinemas=60, days_ahead=7))
+    print(f"  Found {len(events)} showtimes")
+    if events:
+        run_pipeline(events, "allocine")
+
+
+def run_bandsintown():
+    print("Fetching from Bandsintown (concerts)...")
+    events = list(fetch_bandsintown(max_pages=20, days_ahead=90))
+    print(f"  Found {len(events)} concerts")
+    if events:
+        run_pipeline(events, "bandsintown")
+
+
+def run_parismusees():
+    print("Fetching from Paris Musées + musées nationaux (expos)...")
+    events = list(fetch_parismusees(max_pages=10))
+    print(f"  Found {len(events)} exhibitions")
+    if events:
+        run_pipeline(events, "parismusees")
+
+
+def run_fnacspectacles():
+    print("Fetching from FNAC Spectacles...")
+    events = list(fetch_fnacspectacles(max_pages_per_cat=5))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "fnacspectacles")
+
+
+def run_mapado():
+    print("Fetching from Mapado...")
+    events = list(fetch_mapado(max_pages_per_cat=5))
+    print(f"  Found {len(events)} events")
+    if events:
+        run_pipeline(events, "mapado")
+
+
+def run_tmdb():
+    print("Fetching from TMDB (films à l'affiche)...")
+    events = list(fetch_tmdb(days_ahead=7, max_pages=5))
+    print(f"  Found {len(events)} screenings")
+    if events:
+        run_pipeline(events, "tmdb")
+
+
+def run_meetup():
+    print("Fetching from Meetup Paris...")
+    events = list(fetch_meetup(max_pages=5))
+    print(f"  Found {len(events)} meetups")
+    if events:
+        run_pipeline(events, "meetup")
+
+
 SOURCES = {
     "openagenda": run_openagenda,
     "paris_opendata": run_paris_opendata,
@@ -203,6 +260,13 @@ SOURCES = {
     "eventbrite": run_eventbrite,
     "quefaire_paris": run_quefaire,
     "lebonbon": run_lebonbon,
+    "allocine": run_allocine,
+    "bandsintown": run_bandsintown,
+    "parismusees": run_parismusees,
+    "fnacspectacles": run_fnacspectacles,
+    "mapado": run_mapado,
+    "tmdb": run_tmdb,
+    "meetup": run_meetup,
 }
 
 

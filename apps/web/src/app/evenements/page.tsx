@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import { Suspense } from 'react'
 import { EventCard } from '@/components/events/event-card'
+import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
 import { SearchBar } from '@/components/search/search-bar'
 import { db, events, venues, categories } from '@sortir/db'
@@ -237,19 +238,22 @@ export default async function EvenementsPage({ searchParams }: Props) {
 
       {/* Results grid */}
       {eventsList.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {eventsList.map((item) => (
-            <EventCard
-              key={item.event.id}
-              event={{
-                ...item.event,
-                category: item.category,
-                venue: item.venue,
-                tags: [],
-                ambiances: [],
-              } as never}
-            />
-          ))}
+        <div className="mt-6">
+          <InfiniteEventGrid
+            initialEvents={eventsList.map((item) => ({
+              ...item.event,
+              category: item.category,
+              venue: item.venue,
+              tags: [],
+              ambiances: [],
+            } as never))}
+            apiParams={{
+              ...(params.category ? { category: params.category } : {}),
+              ...(params.date ? { date: params.date } : {}),
+              ...(params.free === 'true' ? { free: 'true' } : {}),
+            }}
+            sort="quality"
+          />
         </div>
       ) : (
         <div className="mt-20 text-center">

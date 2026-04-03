@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/carte' },
 }
 
-export const revalidate = 300 // Revalidate every 5 minutes
+export const dynamic = 'force-dynamic'
 
 async function getGeocodedEvents(): Promise<MapEvent[]> {
   const now = new Date()

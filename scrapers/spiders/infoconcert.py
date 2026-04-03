@@ -1,16 +1,19 @@
 """
 InfoConcert spider.
-Source: https://www.infoconcert.com/ville/paris-s20.html
-Fetches concert listings in Paris from infoconcert.com (357+ pages).
+Source: https://www.infoconcert.com
+Fetches concert listings in Paris from infoconcert.com.
 
-Pagination via ?page=N query parameter.
-The site uses Next.js SSR so content is pre-rendered HTML.
+Strategy: Use the sitemap to find Paris concert URLs, then fetch each
+detail page to extract event data from meta tags and server-rendered HTML.
+The listing page is Next.js RSC (client-rendered), but detail pages have
+good server-rendered HTML with og: tags and structured content.
 """
 
 import re
 import hashlib
 import logging
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Generator, Optional
 
@@ -22,297 +25,239 @@ from utils.normalize import (
     truncate,
     generate_slug,
     parse_price,
-    detect_category,
     compute_quality_score,
 )
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.infoconcert.com/ville/paris-s20.html"
 DOMAIN = "https://www.infoconcert.com"
+SITEMAP_INDEX = f"{DOMAIN}/sitemap.xml"
 
-# French month mapping
 FRENCH_MONTHS = {
     "janvier": 1, "février": 2, "mars": 3, "avril": 4,
     "mai": 5, "juin": 6, "juillet": 7, "août": 8,
     "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
 }
 
-USER_AGENT = "SortirParis/1.0 (+https://sortir.paris)"
-REQUEST_DELAY = 1.2  # polite crawl delay in seconds
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "fr-FR,fr;q=0.9",
+}
+
+REQUEST_DELAY = 0.5
 
 
-def _parse_french_date(text: str) -> Optional[str]:
-    """Parse a French date string into ISO 8601 datetime.
+def fetch_events(max_pages: int = 15, days_ahead: int = 90) -> Generator[dict, None, None]:
+    """Fetch Paris concerts from InfoConcert via sitemap + detail pages."""
 
-    Supports:
-        - "Mardi 31 mars 2026 à 19h00" -> "2026-03-31T19:00:00"
-        - "Samedi 5 avril 2026 à 20h30" -> "2026-04-05T20:30:00"
-        - "Du 7 au 31 mars 2026 à 16h30" -> returns start date only
-    """
-    if not text:
-        return None
+    cutoff = datetime.now() + timedelta(days=days_ahead)
+    seen_ids: set[str] = set()
 
-    text = text.strip().lower()
+    with httpx.Client(headers=HEADERS, follow_redirects=True, timeout=30) as client:
+        # Step 1: Get Paris concert URLs from sitemaps
+        paris_urls = get_paris_concert_urls(client, max_sitemaps=max_pages)
+        print(f"  Found {len(paris_urls)} Paris concert URLs in sitemaps")
 
-    # Extract time (e.g. "19h00", "20h30", "21h")
-    time_match = re.search(r"(\d{1,2})h(\d{2})?", text)
-    hour = int(time_match.group(1)) if time_match else 0
-    minute = int(time_match.group(2) or 0) if time_match else 0
+        # Step 2: Fetch each detail page
+        for i, url in enumerate(paris_urls):
+            source_id = hashlib.md5(url.encode()).hexdigest()[:16]
+            if source_id in seen_ids:
+                continue
 
-    # Try single date: "mardi 31 mars 2026"
-    single_match = re.search(
-        r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|"
-        r"août|septembre|octobre|novembre|décembre)\s+(\d{4})",
-        text,
-    )
-    if single_match:
-        day = int(single_match.group(1))
-        month = FRENCH_MONTHS[single_match.group(2)]
-        year = int(single_match.group(3))
-        try:
-            dt = datetime(year, month, day, hour, minute)
-            return dt.isoformat()
-        except ValueError:
-            return None
+            event = fetch_concert_detail(client, url)
+            if not event:
+                continue
 
-    return None
+            seen_ids.add(source_id)
+            event["source_id"] = source_id
 
+            # Filter by date
+            if event.get("start_date"):
+                try:
+                    event_dt = datetime.fromisoformat(event["start_date"])
+                    if event_dt > cutoff:
+                        continue
+                    if event_dt < datetime.now():
+                        continue
+                except ValueError:
+                    pass
 
-def _parse_french_date_range(text: str) -> tuple[Optional[str], Optional[str]]:
-    """Parse a date range, returning (start_iso, end_iso).
+            yield event
 
-    Handles:
-        - "Du 7 au 31 mars 2026 à 16h30"
-        - "Du 28 mars au 5 avril 2026 à 20h00"
-        - Single dates: "Mardi 31 mars 2026 à 19h00"
-    """
-    if not text:
-        return None, None
+            if (i + 1) % 50 == 0:
+                print(f"  Processed {i + 1}/{len(paris_urls)} concert pages")
 
-    lower = text.strip().lower()
+            time.sleep(REQUEST_DELAY)
 
-    # Extract time
-    time_match = re.search(r"(\d{1,2})h(\d{2})?", lower)
-    hour = int(time_match.group(1)) if time_match else 0
-    minute = int(time_match.group(2) or 0) if time_match else 0
-
-    month_pattern = (
-        r"janvier|février|mars|avril|mai|juin|juillet|"
-        r"août|septembre|octobre|novembre|décembre"
-    )
-
-    # Range with different months: "du 28 mars au 5 avril 2026"
-    range_diff = re.search(
-        rf"du\s+(\d{{1,2}})\s+({month_pattern})\s+au\s+(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
-        lower,
-    )
-    if range_diff:
-        day1 = int(range_diff.group(1))
-        month1 = FRENCH_MONTHS[range_diff.group(2)]
-        day2 = int(range_diff.group(3))
-        month2 = FRENCH_MONTHS[range_diff.group(4)]
-        year = int(range_diff.group(5))
-        try:
-            start = datetime(year, month1, day1, hour, minute)
-            end = datetime(year, month2, day2, hour, minute)
-            return start.isoformat(), end.isoformat()
-        except ValueError:
-            pass
-
-    # Range same month: "du 7 au 31 mars 2026"
-    range_same = re.search(
-        rf"du\s+(\d{{1,2}})\s+au\s+(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
-        lower,
-    )
-    if range_same:
-        day1 = int(range_same.group(1))
-        day2 = int(range_same.group(2))
-        month = FRENCH_MONTHS[range_same.group(3)]
-        year = int(range_same.group(4))
-        try:
-            start = datetime(year, month, day1, hour, minute)
-            end = datetime(year, month, day2, hour, minute)
-            return start.isoformat(), end.isoformat()
-        except ValueError:
-            pass
-
-    # Single date fallback
-    start_iso = _parse_french_date(text)
-    return start_iso, None
+    logger.info("InfoConcert scrape complete. Total events: %d", len(seen_ids))
 
 
-def _extract_source_id(url: str) -> str:
-    """Extract a stable source ID from the event URL."""
-    # Use the URL path as a unique identifier
-    return hashlib.md5(url.encode()).hexdigest()[:16]
+def get_paris_concert_urls(client: httpx.Client, max_sitemaps: int = 15) -> list[str]:
+    """Get Paris concert URLs from the sitemap index."""
+    urls = []
 
-
-def _extract_arrondissement(text: Optional[str]) -> Optional[str]:
-    """Try to extract Paris arrondissement from address text.
-
-    Looks for patterns like "75011", "75001", "Paris 11e", etc.
-    """
-    if not text:
-        return None
-    zip_match = re.search(r"750(\d{2})", text)
-    if zip_match:
-        arr = int(zip_match.group(1))
-        if 1 <= arr <= 20:
-            return str(arr)
-    arr_match = re.search(r"(\d{1,2})\s*(?:e|er|ème|eme)\s*arr", text, re.IGNORECASE)
-    if arr_match:
-        arr = int(arr_match.group(1))
-        if 1 <= arr <= 20:
-            return str(arr)
-    return None
-
-
-def _extract_zipcode(text: Optional[str]) -> Optional[str]:
-    """Extract a Paris zipcode (750xx) from text."""
-    if not text:
-        return None
-    match = re.search(r"(750\d{2})", text)
-    return match.group(1) if match else None
-
-
-def _fetch_page(client: httpx.Client, page: int) -> Optional[BeautifulSoup]:
-    """Fetch a single listing page and return parsed soup."""
-    params = {"page": page} if page > 1 else {}
     try:
-        response = client.get(BASE_URL, params=params, timeout=30)
-        response.raise_for_status()
-        return BeautifulSoup(response.text, "html.parser")
-    except httpx.HTTPStatusError as e:
-        logger.warning("HTTP %s on page %d: %s", e.response.status_code, page, e)
-        return None
-    except httpx.RequestError as e:
-        logger.warning("Request error on page %d: %s", page, e)
-        return None
+        # Fetch sitemap index
+        resp = client.get(SITEMAP_INDEX)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+        ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+
+        # Find concert sitemaps
+        concert_sitemaps = []
+        for sitemap in root.findall("sm:sitemap", ns):
+            loc = sitemap.find("sm:loc", ns)
+            if loc is not None and "/concerts/" in loc.text:
+                concert_sitemaps.append(loc.text)
+
+        print(f"  Found {len(concert_sitemaps)} concert sitemaps")
+
+        # Fetch each concert sitemap (most recent first — highest page numbers)
+        for sitemap_url in concert_sitemaps[-max_sitemaps:]:
+            try:
+                resp = client.get(sitemap_url)
+                resp.raise_for_status()
+                sitemap_root = ET.fromstring(resp.text)
+
+                for url_el in sitemap_root.findall("sm:url", ns):
+                    loc = url_el.find("sm:loc", ns)
+                    if loc is not None and "-paris-" in loc.text:
+                        urls.append(loc.text)
+
+                time.sleep(0.2)
+            except Exception as e:
+                logger.warning("Error fetching sitemap %s: %s", sitemap_url, e)
+                continue
+
+    except Exception as e:
+        logger.error("Error fetching sitemap index: %s", e)
+        # Fallback: try direct listing page approach
+        urls = get_urls_from_listing(client, max_pages=5)
+
+    return urls
 
 
-def _parse_card(card) -> Optional[dict]:
-    """Parse a single event card element into a raw event dict."""
+def get_urls_from_listing(client: httpx.Client, max_pages: int = 5) -> list[str]:
+    """Fallback: get concert URLs from the listing page HTML."""
+    urls = []
+    base = f"{DOMAIN}/ville/paris-s20.html"
 
-    # --- Title ---
-    title_el = card.find(["h2", "h3"])
-    if not title_el:
-        return None
-    title = clean_text(title_el.get_text())
-    if not title:
-        return None
+    for page in range(1, max_pages + 1):
+        params = {"page": page} if page > 1 else {}
+        try:
+            resp = client.get(base, params=params)
+            resp.raise_for_status()
 
-    # --- Event link ---
-    event_link_el = card.find("a", href=re.compile(r"/concerts?/"))
-    if not event_link_el:
-        # Fallback: any link in the card
-        event_link_el = card.find("a", href=True)
-    event_url = None
-    if event_link_el:
-        href = event_link_el.get("href", "")
-        event_url = href if href.startswith("http") else DOMAIN + href
+            # Find concert links in the HTML
+            for match in re.findall(r'href="(/concerts/concert-[^"]+paris[^"]*)"', resp.text):
+                full_url = f"{DOMAIN}{match}"
+                if full_url not in urls:
+                    urls.append(full_url)
 
-    # --- Date ---
-    date_text = None
-    # Look for date patterns in the card text
-    for el in card.find_all(["span", "p", "div", "time"]):
-        el_text = el.get_text(strip=True)
-        if el_text and re.search(
-            r"(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|du\s+\d)",
-            el_text.lower(),
-        ):
-            date_text = el_text
+            time.sleep(REQUEST_DELAY)
+        except Exception as e:
+            logger.warning("Error on listing page %d: %s", page, e)
             break
 
-    # If no date found in specific elements, search full card text
-    if not date_text:
-        card_text = card.get_text(" ", strip=True)
-        date_match = re.search(
-            r"(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|du)\s+"
-            r"\d{1,2}.*?\d{4}(?:\s+à\s+\d{1,2}h\d{0,2})?",
-            card_text,
-            re.IGNORECASE,
-        )
-        if date_match:
-            date_text = date_match.group(0)
+    return urls
 
-    start_date, end_date = _parse_french_date_range(date_text) if date_text else (None, None)
 
-    # --- Venue ---
-    venue_link = card.find("a", href=re.compile(r"/salle/"))
-    venue_name = clean_text(venue_link.get_text()) if venue_link else None
-    venue_url = None
-    if venue_link:
-        href = venue_link.get("href", "")
-        venue_url = href if href.startswith("http") else DOMAIN + href
+def fetch_concert_detail(client: httpx.Client, url: str) -> Optional[dict]:
+    """Fetch a concert detail page and extract event data."""
+    try:
+        resp = client.get(url)
+        resp.raise_for_status()
+    except Exception as e:
+        logger.debug("Error fetching %s: %s", url, e)
+        return None
 
-    # Try to get address info from venue element's parent or nearby text
-    venue_address = None
-    venue_zip = None
-    venue_arrondissement = None
-    card_full_text = card.get_text(" ", strip=True)
+    soup = BeautifulSoup(resp.text, "html.parser")
 
-    venue_zip = _extract_zipcode(card_full_text)
-    venue_arrondissement = _extract_arrondissement(card_full_text)
+    # Extract from meta tags (most reliable on this SSR site)
+    og_title = get_meta(soup, "og:title")
+    og_desc = get_meta(soup, "og:description")
 
-    # --- Price ---
+    if not og_title:
+        # Try h1
+        h1 = soup.find("h1")
+        if h1:
+            og_title = clean_text(h1.get_text())
+
+    if not og_title:
+        return None
+
+    # Parse title: "Concert de ARTIST - VENUE City"
+    title = clean_text(og_title)
+    artist_name = title
+    venue_name = None
+
+    title_match = re.match(r"Concert\s+de\s+(.+?)\s*[-–]\s*(.+)", title, re.IGNORECASE)
+    if title_match:
+        artist_name = title_match.group(1).strip()
+        venue_part = title_match.group(2).strip()
+        # Remove city from venue: "L'OLYMPIA Paris" -> "L'OLYMPIA"
+        venue_name = re.sub(r"\s+Paris$", "", venue_part).strip()
+        title = f"{artist_name} — {venue_name}" if venue_name else artist_name
+
+    # Image
+    image_url = None
+    for img in soup.find_all("img", src=True):
+        src = img["src"]
+        if "statics-infoconcert" in src or "artiste" in src:
+            image_url = src if src.startswith("http") else f"{DOMAIN}{src}"
+            break
+    if not image_url:
+        image_url = get_meta(soup, "og:image")
+
+    # Date and time from page text
+    page_text = soup.get_text(" ", strip=True)
+    start_date = extract_date_from_text(page_text)
+
+    # Price
     price_text = None
-    for el in card.find_all(["span", "p", "div"]):
-        el_text = el.get_text(strip=True)
-        if el_text and ("€" in el_text or "gratuit" in el_text.lower()):
-            price_text = el_text
-            break
-
+    price_match = re.search(r"(\d+[.,]\d{2})\s*€", page_text)
+    if price_match:
+        price_text = price_match.group(0)
     price_data = parse_price(price_text)
 
-    # --- Image ---
-    img_el = card.find("img")
-    image_url = None
-    if img_el:
-        image_url = img_el.get("src") or img_el.get("data-src")
-        if image_url and not image_url.startswith("http"):
-            image_url = DOMAIN + image_url
+    # Venue address / arrondissement
+    venue_zip = None
+    venue_arrondissement = None
+    zip_match = re.search(r"(750\d{2})", page_text)
+    if zip_match:
+        venue_zip = zip_match.group(1)
+        try:
+            venue_arrondissement = str(int(venue_zip[3:]))
+        except ValueError:
+            pass
 
-    # --- Source ID ---
-    source_id = _extract_source_id(event_url or title)
-    source_url = event_url
+    # Description
+    description = clean_text(og_desc)
 
-    # --- Build the event ---
     slug = generate_slug(title, start_date)
-
-    # Short description from card (if any descriptive text exists)
-    desc_el = card.find("p")
-    description = clean_text(desc_el.get_text()) if desc_el else None
-    # Avoid using date/price text as description
-    if description and (
-        re.search(r"\d{4}", description or "")
-        and re.search(r"(janvier|février|mars|avril|mai)", (description or "").lower())
-    ):
-        description = None
-
-    short_desc = truncate(description) if description else None
-
     quality = compute_quality_score(
-        title, description, image_url, start_date, price_text, source_url
+        title=title, description=description, image_url=image_url,
+        start_date=start_date, price_raw=price_text, booking_url=url,
     )
 
     return {
         "title": title,
         "slug": slug,
         "description": description,
-        "short_desc": short_desc,
+        "short_desc": truncate(description),
         "image_url": image_url,
         "start_date": start_date,
-        "end_date": end_date,
+        "end_date": None,
         "price_min": price_data["price_min"],
         "price_max": price_data["price_max"],
         "is_free": price_data["is_free"],
-        "booking_url": source_url,
+        "booking_url": url,
         "source": "infoconcert",
-        "source_url": source_url,
-        "source_id": source_id,
+        "source_url": url,
+        "source_id": hashlib.md5(url.encode()).hexdigest()[:16],
         "venue_name": venue_name,
-        "venue_address": venue_address,
+        "venue_address": None,
         "venue_city": "Paris",
         "venue_zip": venue_zip,
         "venue_arrondissement": venue_arrondissement,
@@ -325,86 +270,56 @@ def _parse_card(card) -> Optional[dict]:
     }
 
 
-def fetch_events(max_pages: int = 15, days_ahead: int = 90) -> Generator[dict, None, None]:
-    """Fetch concert events from infoconcert.com.
+def get_meta(soup: BeautifulSoup, property_name: str) -> Optional[str]:
+    """Get content of a meta tag by property or name."""
+    tag = soup.find("meta", property=property_name)
+    if not tag:
+        tag = soup.find("meta", attrs={"name": property_name})
+    return tag["content"] if tag and tag.get("content") else None
 
-    Args:
-        max_pages: Maximum number of listing pages to scrape.
-        days_ahead: Only yield events starting within this many days.
 
-    Yields:
-        Event dicts in the standard raw format.
-    """
-    cutoff = datetime.now() + timedelta(days=days_ahead)
-    seen_ids: set[str] = set()
+def extract_date_from_text(text: str) -> Optional[str]:
+    """Extract a date from page text."""
+    if not text:
+        return None
 
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
-    }
+    lower = text.lower()
 
-    with httpx.Client(headers=headers, follow_redirects=True) as client:
-        for page in range(1, max_pages + 1):
-            logger.info("Fetching infoconcert page %d/%d", page, max_pages)
+    # Pattern: "vendredi 23 avril 2027 à 20h00" or "vendredi 23 avril 2027 20:00"
+    month_pattern = "|".join(FRENCH_MONTHS.keys())
+    match = re.search(
+        rf"(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+"
+        rf"(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})"
+        rf"(?:\s+(?:à\s+)?(\d{{1,2}})[h:](\d{{2}}))?",
+        lower,
+    )
+    if match:
+        day = int(match.group(1))
+        month = FRENCH_MONTHS[match.group(2)]
+        year = int(match.group(3))
+        hour = int(match.group(4)) if match.group(4) else 20
+        minute = int(match.group(5)) if match.group(5) else 0
+        try:
+            return datetime(year, month, day, hour, minute).isoformat()
+        except ValueError:
+            pass
 
-            soup = _fetch_page(client, page)
-            if not soup:
-                logger.warning("Could not fetch page %d, stopping.", page)
-                break
+    # Simpler pattern: "23 avril 2027"
+    match = re.search(
+        rf"(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
+        lower,
+    )
+    if match:
+        try:
+            return datetime(
+                int(match.group(3)),
+                FRENCH_MONTHS[match.group(2)],
+                int(match.group(1)), 20, 0,
+            ).isoformat()
+        except ValueError:
+            pass
 
-            # Find event cards — try multiple selectors for robustness
-            cards = soup.select("a[href*='/concerts/concert-']")
-            if not cards:
-                cards = soup.find_all("div", class_=re.compile(r"card|event|listing"))
-            if not cards:
-                # Fallback: look for containers holding concert links
-                containers = []
-                for link in soup.find_all("a", href=re.compile(r"/concerts?/")):
-                    parent = link.find_parent(["div", "article", "li"])
-                    if parent and parent not in containers:
-                        containers.append(parent)
-                cards = containers
-
-            if not cards:
-                logger.info("No event cards found on page %d, stopping.", page)
-                break
-
-            page_event_count = 0
-            for card in cards:
-                try:
-                    event = _parse_card(card)
-                    if not event:
-                        continue
-
-                    # Dedup within this run
-                    if event["source_id"] in seen_ids:
-                        continue
-                    seen_ids.add(event["source_id"])
-
-                    # Filter by date if we have one
-                    if event["start_date"]:
-                        try:
-                            event_dt = datetime.fromisoformat(event["start_date"])
-                            if event_dt > cutoff:
-                                continue
-                        except ValueError:
-                            pass
-
-                    yield event
-                    page_event_count += 1
-
-                except Exception:
-                    logger.exception("Error parsing event card on page %d", page)
-                    continue
-
-            logger.info("Page %d: extracted %d events", page, page_event_count)
-
-            # Polite delay between pages
-            if page < max_pages:
-                time.sleep(REQUEST_DELAY)
-
-    logger.info("InfoConcert scrape complete. Total unique events: %d", len(seen_ids))
+    return None
 
 
 if __name__ == "__main__":
@@ -412,7 +327,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
     print("Fetching InfoConcert events for Paris...")
-    for i, event in enumerate(fetch_events(max_pages=2)):
+    for i, event in enumerate(fetch_events(max_pages=3, days_ahead=90)):
         print(json.dumps(event, indent=2, ensure_ascii=False))
         if i >= 4:
             break

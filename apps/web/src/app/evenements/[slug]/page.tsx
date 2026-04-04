@@ -8,15 +8,17 @@ import { ShareButton } from '@/components/ui/share-button'
 import { Countdown } from '@/components/ui/countdown'
 import { ViewTracker } from '@/components/events/view-tracker'
 import { EventCard } from '@/components/events/event-card'
+import { StickyBookingCTA } from '@/components/events/sticky-booking-cta'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, ne, gte, desc } from 'drizzle-orm'
+import { cache } from 'react'
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
-async function getEvent(slug: string) {
+const getEvent = cache(async function getEvent(slug: string) {
   const result = await db
     .select({ event: events, venue: venues, category: categories })
     .from(events)
@@ -30,7 +32,7 @@ async function getEvent(slug: string) {
   const { event, venue, category } = result[0]
 
   return { ...event, venue, category, tags: [] as { slug: string; name: string }[], ambiances: [] as { slug: string; name: string; emoji: string | null }[] }
-}
+})
 
 async function getSimilarEvents(event: { id: string; categoryId: string | null }) {
   if (!event.categoryId) return []
@@ -212,7 +214,7 @@ export default async function EventPage({ params }: Props) {
           </div>
 
           {/* Actions */}
-          <div className="mt-5 flex gap-2">
+          <div id="inline-cta" className="mt-5 flex gap-2">
             {(event.bookingUrl || event.sourceUrl) ? (
               <a
                 href={event.bookingUrl ?? event.sourceUrl!}
@@ -289,19 +291,13 @@ export default async function EventPage({ params }: Props) {
         )}
       </article>
 
-      {/* Sticky mobile CTA */}
+      {/* Sticky mobile CTA — only visible when inline CTA scrolls out of view */}
       {(event.bookingUrl || event.sourceUrl) && (
-        <div className="fixed bottom-[4.5rem] left-0 right-0 z-40 border-t border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-lg md:hidden">
-          <a
-            href={event.bookingUrl ?? event.sourceUrl!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[14px] font-bold text-white shadow-lg shadow-accent/20 transition-all active:scale-[0.98]"
-          >
-            <ExternalLink className="h-4 w-4" />
-            {event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
-          </a>
-        </div>
+        <StickyBookingCTA
+          href={event.bookingUrl ?? event.sourceUrl!}
+          label={event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
+          targetId="inline-cta"
+        />
       )}
     </>
   )

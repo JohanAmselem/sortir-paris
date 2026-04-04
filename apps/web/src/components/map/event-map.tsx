@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { MapPin, Navigation, X } from 'lucide-react'
+import { MapPin, Navigation, X, Filter } from 'lucide-react'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { formatEventDate } from '@/lib/utils'
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
@@ -43,12 +44,65 @@ interface EventMapProps {
   events: MapEvent[]
 }
 
+const DATE_FILTERS = [
+  { id: 'all', label: 'Tout' },
+  { id: 'today', label: 'Ce soir' },
+  { id: 'weekend', label: 'Week-end' },
+  { id: 'week', label: 'Semaine' },
+] as const
+
+const CATEGORY_FILTERS = [
+  { slug: 'concert', icon: '🎵', label: 'Concerts' },
+  { slug: 'expo', icon: '🎨', label: 'Expos' },
+  { slug: 'theatre', icon: '🎭', label: 'Théâtre' },
+  { slug: 'cinema', icon: '🎬', label: 'Cinéma' },
+  { slug: 'festival', icon: '🎪', label: 'Festivals' },
+  { slug: 'danse', icon: '💃', label: 'Danse' },
+] as const
+
+function isToday(d: Date) {
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
+function isThisWeekend(d: Date) {
+  const now = new Date()
+  const day = now.getDay()
+  const sat = new Date(now); sat.setDate(now.getDate() + (6 - day)); sat.setHours(0, 0, 0, 0)
+  const sun = new Date(sat); sun.setDate(sat.getDate() + 1); sun.setHours(23, 59, 59, 999)
+  return d >= sat && d <= sun
+}
+
+function isThisWeek(d: Date) {
+  const now = new Date()
+  const end = new Date(now); end.setDate(now.getDate() + 7)
+  return d >= now && d <= end
+}
+
 export function EventMap({ events }: EventMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null)
   const [isLocating, setIsLocating] = useState(false)
   const markersRef = useRef<mapboxgl.Marker[]>([])
+  const [dateFilter, setDateFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [freeOnly, setFreeOnly] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((e) => {
+      if (freeOnly && !e.isFree) return false
+      if (categoryFilter && e.categorySlug !== categoryFilter) return false
+      if (dateFilter !== 'all' && e.startDate) {
+        const d = new Date(e.startDate)
+        if (dateFilter === 'today' && !isToday(d)) return false
+        if (dateFilter === 'weekend' && !isThisWeekend(d)) return false
+        if (dateFilter === 'week' && !isThisWeek(d)) return false
+      }
+      return true
+    })
+  }, [events, dateFilter, categoryFilter, freeOnly])
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => m.remove())
@@ -79,29 +133,36 @@ export function EventMap({ events }: EventMapProps) {
     }
   }, [clearMarkers])
 
-  // Add markers when events change
+  // Add markers when filtered events change
   useEffect(() => {
     if (!map.current) return
 
     clearMarkers()
 
-    events.forEach((event) => {
+    filteredEvents.forEach((event) => {
       const color = CATEGORY_COLORS[event.categorySlug || ''] || '#7C3AED'
 
       // Create custom marker element
       const el = document.createElement('div')
       el.className = 'map-marker'
       el.style.cssText = `
-        width: 28px; height: 28px; border-radius: 50%;
+        width: 32px; height: 32px; border-radius: 50%;
         background: ${color}; border: 3px solid white;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer; transition: transform 0.15s;
+        cursor: pointer; transition: transform 0.15s ease;
         display: flex; align-items: center; justify-content: center;
-        font-size: 12px;
+        font-size: 13px; pointer-events: auto;
       `
-      el.innerHTML = event.categoryIcon || '📍'
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.3)' })
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)' })
+      // Inner hit area — prevents hover flicker when marker scales up
+      const inner = document.createElement('div')
+      inner.style.cssText = `
+        position: absolute; inset: -6px; border-radius: 50%;
+        pointer-events: auto;
+      `
+      el.appendChild(inner)
+      el.insertAdjacentHTML('afterbegin', event.categoryIcon || '📍')
+      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.3)'; el.style.zIndex = '10' })
+      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; el.style.zIndex = '' })
       el.addEventListener('click', (e) => {
         e.stopPropagation()
         setSelectedEvent(event)
@@ -114,7 +175,7 @@ export function EventMap({ events }: EventMapProps) {
 
       markersRef.current.push(marker)
     })
-  }, [events, clearMarkers])
+  }, [filteredEvents, clearMarkers])
 
   // Close popup when clicking on map
   useEffect(() => {
@@ -164,14 +225,98 @@ export function EventMap({ events }: EventMapProps) {
         <Navigation className={`h-5 w-5 text-accent ${isLocating ? 'animate-pulse' : ''}`} />
       </button>
 
-      {/* Event count badge */}
-      <div className="absolute top-4 left-4 z-10 rounded-lg bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow-sm border border-border/40">
-        <div className="flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-accent" />
-          <span className="text-[12px] font-semibold text-text-primary">
-            {events.length} événement{events.length !== 1 ? 's' : ''}
-          </span>
+      {/* Filter bar */}
+      <div className="absolute top-3 left-3 right-14 z-10 flex flex-col gap-2">
+        {/* Top row: count + filter toggle */}
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow-sm border border-border/40">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-accent" />
+              <span className="text-[12px] font-semibold text-text-primary">
+                {filteredEvents.length} événement{filteredEvents.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold shadow-sm border transition-colors',
+              showFilters || dateFilter !== 'all' || categoryFilter || freeOnly
+                ? 'bg-accent text-white border-accent'
+                : 'bg-white/90 backdrop-blur-sm text-text-primary border-border/40 hover:bg-white'
+            )}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Filtres
+            {(dateFilter !== 'all' || categoryFilter || freeOnly) && (
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px]">
+                {(dateFilter !== 'all' ? 1 : 0) + (categoryFilter ? 1 : 0) + (freeOnly ? 1 : 0)}
+              </span>
+            )}
+          </button>
         </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="rounded-xl bg-white/95 backdrop-blur-md shadow-lg border border-border/40 p-3 space-y-3 animate-slide-up">
+            {/* Date filters */}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+              {DATE_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setDateFilter(f.id)}
+                  className={cn(
+                    'whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                    dateFilter === f.id
+                      ? 'bg-accent text-white'
+                      : 'bg-surface-hover text-text-secondary hover:bg-surface-hover/80'
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+              <button
+                onClick={() => setFreeOnly(!freeOnly)}
+                className={cn(
+                  'whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                  freeOnly
+                    ? 'bg-free text-white'
+                    : 'bg-surface-hover text-text-secondary hover:bg-surface-hover/80'
+                )}
+              >
+                🆓 Gratuit
+              </button>
+            </div>
+
+            {/* Category filters */}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+              {CATEGORY_FILTERS.map((c) => (
+                <button
+                  key={c.slug}
+                  onClick={() => setCategoryFilter(categoryFilter === c.slug ? null : c.slug)}
+                  className={cn(
+                    'whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors',
+                    categoryFilter === c.slug
+                      ? 'bg-accent text-white'
+                      : 'bg-surface-hover text-text-secondary hover:bg-surface-hover/80'
+                  )}
+                >
+                  {c.icon} {c.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Reset */}
+            {(dateFilter !== 'all' || categoryFilter || freeOnly) && (
+              <button
+                onClick={() => { setDateFilter('all'); setCategoryFilter(null); setFreeOnly(false) }}
+                className="text-[11px] font-medium text-accent hover:underline"
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Selected event card */}

@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { meiliAdmin, isMeilisearchEnabled, EVENTS_INDEX } from '@/lib/meilisearch'
+import { db, events, venues, categories } from '@sortir/db'
+import { eq, and, gte, ilike, or, desc, sql } from 'drizzle-orm'
 
-// GET /api/events/search — Meilisearch-powered search
+// GET /api/events/search — Meilisearch-powered search with SQL fallback
 export async function GET(request: NextRequest) {
-  // If Meilisearch is not configured, return empty results
+  // If Meilisearch is not configured, use SQL fallback
   if (!isMeilisearchEnabled || !meiliAdmin) {
-    return NextResponse.json({
-      data: [],
-      total: 0,
-      facets: {},
-      page: 1,
-      limit: 20,
-      hasMore: false,
-      processingTimeMs: 0,
-      message: 'Search not available — Meilisearch not configured',
-    })
+    return sqlFallbackSearch(request)
   }
 
   const { searchParams } = request.nextUrl
@@ -82,5 +75,67 @@ export async function GET(request: NextRequest) {
     limit,
     hasMore: (page - 1) * limit + limit < (results.estimatedTotalHits ?? 0),
     processingTimeMs: results.processingTimeMs,
+  })
+}
+
+// SQL fallback with ILIKE fuzzy matching when Meilisearch is unavailable
+async function sqlFallbackSearch(request: NextRequest) {
+  const { searchParams } = request.nextUrl
+  const query = searchParams.get('q') ?? ''
+  const page = parseInt(searchParams.get('page') ?? '1')
+  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20'), 50)
+  const offset = (page - 1) * limit
+
+  if (!query.trim()) {
+    return NextResponse.json({ data: [], total: 0, facets: {}, page, limit, hasMore: false, processingTimeMs: 0 })
+  }
+
+  const start = Date.now()
+
+  // Build fuzzy-ish SQL search: split query into words, match each with ILIKE
+  const words = query.trim().split(/\s+/).filter(w => w.length >= 2)
+  const conditions = words.map(word => {
+    const pattern = `%${word}%`
+    return or(
+      ilike(events.title, pattern),
+      ilike(events.description, pattern),
+    )
+  })
+
+  const where = and(
+    eq(events.status, 'active'),
+    gte(events.startDate, new Date()),
+    ...conditions.filter((c): c is NonNullable<typeof c> => c != null),
+  )
+
+  const results = await db
+    .select({
+      id: events.id,
+      title: events.title,
+      slug: events.slug,
+      imageUrl: events.imageUrl,
+      startDate: events.startDate,
+      isFree: events.isFree,
+      priceMin: events.priceMin,
+      categorySlug: categories.slug,
+      category: categories.name,
+      venueName: venues.name,
+    })
+    .from(events)
+    .leftJoin(venues, eq(events.venueId, venues.id))
+    .leftJoin(categories, eq(events.categoryId, categories.id))
+    .where(where)
+    .orderBy(desc(events.qualityScore))
+    .limit(limit)
+    .offset(offset)
+
+  return NextResponse.json({
+    data: results,
+    total: results.length,
+    facets: {},
+    page,
+    limit,
+    hasMore: results.length === limit,
+    processingTimeMs: Date.now() - start,
   })
 }

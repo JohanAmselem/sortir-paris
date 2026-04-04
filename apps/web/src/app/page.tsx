@@ -72,6 +72,7 @@ export default async function HomePage() {
 
   // Check if user is logged in and onboarded for personalized section
   let currentUserId: string | null = null
+  let isLoggedInNotOnboarded = false
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -81,6 +82,8 @@ export default async function HomePage() {
       })
       if (dbUser?.onboarded) {
         currentUserId = user.id
+      } else {
+        isLoggedInNotOnboarded = true
       }
     }
   } catch {
@@ -124,6 +127,25 @@ export default async function HomePage() {
         </div>
         <MoodSelector />
       </section>
+
+      {/* Onboarding prompt for logged-in but not onboarded users */}
+      {isLoggedInNotOnboarded && (
+        <section className="px-4 pb-4">
+          <Link
+            href="/onboarding"
+            className="flex items-center gap-4 rounded-2xl border-2 border-dashed border-accent/30 bg-accent/5 p-4 transition-all hover:border-accent/50 hover:bg-accent/10"
+          >
+            <span className="text-3xl">🎯</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-bold text-text-primary">Personnalise tes sorties</p>
+              <p className="text-[12px] text-text-secondary">
+                30 secondes pour nous dire ce que tu aimes — on te trouve les meilleurs plans
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 flex-shrink-0 text-accent" />
+          </Link>
+        </section>
+      )}
 
       {/* Personalized section */}
       {currentUserId && (
@@ -203,13 +225,22 @@ export default async function HomePage() {
           <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-white/35">
             Crée ton compte, dis-nous ce que tu aimes, et on te trouve les meilleurs plans chaque jour.
           </p>
-          <Link
-            href="/login"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-[13px] font-bold text-primary transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
-          >
-            Rejoindre le club
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-[13px] font-bold text-primary transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
+            >
+              Rejoindre le club
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              href="/onboarding"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-6 py-2.5 text-[13px] font-medium text-white/70 transition-all hover:text-white hover:border-white/40"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Personnaliser mes sorties
+            </Link>
+          </div>
         </div>
       </section>
 

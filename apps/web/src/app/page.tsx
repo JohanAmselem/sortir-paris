@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { db, events, venues, categories, users } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
 
 export const metadata = {
   title: 'Paname Club — Sorties culturelles à Paris',
@@ -26,7 +26,7 @@ async function getHomeData() {
   const nextWeek = new Date(now)
   nextWeek.setDate(now.getDate() + 7)
 
-  const [tonight, upcoming, free, allCategories] = await Promise.all([
+  const [tonight, upcoming, free, trending, allCategories] = await Promise.all([
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -51,10 +51,18 @@ async function getHomeData() {
       .where(and(eq(events.status, 'active'), eq(events.isFree, true), gte(events.startDate, now)))
       .orderBy(desc(events.qualityScore))
       .limit(20),
+    db
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(and(eq(events.status, 'active'), gte(events.startDate, now)))
+      .orderBy(desc(sql`${events.saveCount} + ${events.viewCount}`))
+      .limit(12),
     db.select().from(categories).orderBy(asc(categories.position)),
   ])
 
-  return { tonight, upcoming, free, categories: allCategories }
+  return { tonight, upcoming, free, trending, categories: allCategories }
 }
 
 function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeof venues.$inferSelect | null; category: typeof categories.$inferSelect | null }>) {
@@ -68,7 +76,7 @@ function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeo
 }
 
 export default async function HomePage() {
-  const { tonight, upcoming, free, categories: cats } = await getHomeData()
+  const { tonight, upcoming, free, trending, categories: cats } = await getHomeData()
 
   // Check if user is logged in and onboarded for personalized section
   let currentUserId: string | null = null
@@ -205,6 +213,9 @@ export default async function HomePage() {
           )}
           {upcoming.length > 0 && (
             <SectionRow title="Cette semaine" icon="🔥" href="/evenements" events={mapEvents(upcoming)} />
+          )}
+          {trending.length > 0 && (
+            <SectionRow title="Tendances" icon="📈" href="/evenements" events={mapEvents(trending)} />
           )}
           {free.length > 0 && (
             <SectionRow title="Bons plans gratuits" icon="✨" href="/evenements?free=true" events={mapEvents(free)} />

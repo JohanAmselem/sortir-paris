@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn, formatPriceRange, formatEventDate } from '@/lib/utils'
 import { Countdown } from '@/components/ui/countdown'
-import { MapPin } from 'lucide-react'
+import { MapPin, Heart } from 'lucide-react'
 import type { EventWithRelations } from '@sortir/shared'
 
 interface EventCardProps {
@@ -209,12 +209,20 @@ export function EventCard({ event, className, variant = 'default' }: EventCardPr
           </p>
         )}
 
-        <p className={cn(
-          'mt-2 text-[13px] font-bold',
-          event.isFree ? 'text-free' : 'text-text-primary'
-        )}>
-          {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
-        </p>
+        <div className="mt-2 flex items-center justify-between">
+          <p className={cn(
+            'text-[13px] font-bold',
+            event.isFree ? 'text-free' : 'text-text-primary'
+          )}>
+            {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
+          </p>
+          {event.saveCount > 2 && (
+            <span className="flex items-center gap-1 text-[10px] text-text-muted">
+              <Heart className="h-2.5 w-2.5" />
+              {event.saveCount}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   )

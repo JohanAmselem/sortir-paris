@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Calendar, MapPin, ExternalLink, Euro, ArrowLeft, Clock } from 'lucide-react'
+import { Calendar, MapPin, ExternalLink, Euro, ArrowLeft, Clock, CalendarPlus, Heart, Users } from 'lucide-react'
 import { SaveButton } from '@/components/events/save-button'
 import { ShareButton } from '@/components/ui/share-button'
 import { Countdown } from '@/components/ui/countdown'
@@ -10,7 +10,7 @@ import { ViewTracker } from '@/components/events/view-tracker'
 import { EventCard } from '@/components/events/event-card'
 import { StickyBookingCTA } from '@/components/events/sticky-booking-cta'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
-import { db, events, venues, categories } from '@sortir/db'
+import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
 import { eq, and, ne, gte, desc } from 'drizzle-orm'
 import { cache } from 'react'
 
@@ -31,7 +31,25 @@ const getEvent = cache(async function getEvent(slug: string) {
 
   const { event, venue, category } = result[0]
 
-  return { ...event, venue, category, tags: [] as { slug: string; name: string }[], ambiances: [] as { slug: string; name: string; emoji: string | null }[] }
+  // Fetch tags and ambiances in parallel
+  const [eventTagsList, eventAmbiancesList] = await Promise.all([
+    db.select({ tag: tags })
+      .from(eventTags)
+      .innerJoin(tags, eq(eventTags.tagId, tags.id))
+      .where(eq(eventTags.eventId, event.id)),
+    db.select({ ambiance: ambiances })
+      .from(eventAmbiances)
+      .innerJoin(ambiances, eq(eventAmbiances.ambianceId, ambiances.id))
+      .where(eq(eventAmbiances.eventId, event.id)),
+  ])
+
+  return {
+    ...event,
+    venue,
+    category,
+    tags: eventTagsList.map(t => t.tag),
+    ambiances: eventAmbiancesList.map(a => a.ambiance),
+  }
 })
 
 async function getSimilarEvents(event: { id: string; categoryId: string | null }) {
@@ -157,7 +175,20 @@ export default async function EventPage({ params }: Props) {
                 Gratuit
               </span>
             )}
+            {event.ambiances.map(a => (
+              <span key={a.slug} className="rounded-lg bg-surface-hover px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                {a.emoji} {a.name}
+              </span>
+            ))}
           </div>
+
+          {/* Social proof */}
+          {event.saveCount > 0 && (
+            <div className="mt-2 flex items-center gap-1.5 text-[12px] text-text-muted">
+              <Users className="h-3 w-3" />
+              <span>{event.saveCount} personne{event.saveCount > 1 ? 's' : ''} intéressée{event.saveCount > 1 ? 's' : ''}</span>
+            </div>
+          )}
 
           {/* Title */}
           <h1 className="mt-3 text-2xl font-bold leading-tight text-text-primary md:text-3xl">
@@ -231,6 +262,32 @@ export default async function EventPage({ params }: Props) {
             <SaveButton eventId={event.id} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all" />
             <ShareButton title={event.title} text={event.shortDesc ?? event.title} className="h-11 w-11" />
           </div>
+
+          {/* Add to calendar */}
+          {startDate && (
+            <div className="mt-3">
+              <a
+                href={`https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}${endDate ? `/${endDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}` : `/${new Date(startDate.getTime() + 2 * 3600000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`}&details=${encodeURIComponent(event.shortDesc ?? '')}&location=${encodeURIComponent(event.venue?.name ?? '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-[13px] font-medium text-text-secondary hover:text-text-primary hover:border-accent/30 transition-all"
+              >
+                <CalendarPlus className="h-4 w-4 text-accent" />
+                Ajouter au calendrier
+              </a>
+            </div>
+          )}
+
+          {/* Tags */}
+          {event.tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {event.tags.map(tag => (
+                <span key={tag.slug} className="rounded-full bg-surface-hover px-3 py-1 text-[11px] font-medium text-text-muted">
+                  #{tag.name}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Description */}
           {event.description && (

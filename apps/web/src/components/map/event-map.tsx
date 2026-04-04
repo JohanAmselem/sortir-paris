@@ -79,6 +79,14 @@ function isThisWeek(d: Date) {
   return d >= now && d <= end
 }
 
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371 // km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export function EventMap({ events }: EventMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
@@ -89,6 +97,31 @@ export function EventMap({ events }: EventMapProps) {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [freeOnly, setFreeOnly] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [nearbyRadius, setNearbyRadius] = useState<number | null>(null) // km
+
+  const handleGeolocate = () => {
+    if (userLocation) {
+      // Toggle off
+      setUserLocation(null)
+      setNearbyRadius(null)
+      return
+    }
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setUserLocation(loc)
+        setNearbyRadius(2) // default 2km
+        setIsLocating(false)
+        if (map.current) {
+          map.current.flyTo({ center: [loc.lng, loc.lat], zoom: 14 })
+        }
+      },
+      () => setIsLocating(false),
+      { enableHighAccuracy: true }
+    )
+  }
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
@@ -100,9 +133,13 @@ export function EventMap({ events }: EventMapProps) {
         if (dateFilter === 'weekend' && !isThisWeekend(d)) return false
         if (dateFilter === 'week' && !isThisWeek(d)) return false
       }
+      if (userLocation && nearbyRadius) {
+        const dist = haversine(userLocation.lat, userLocation.lng, e.lat, e.lng)
+        if (dist > nearbyRadius) return false
+      }
       return true
     })
-  }, [events, dateFilter, categoryFilter, freeOnly])
+  }, [events, dateFilter, categoryFilter, freeOnly, userLocation, nearbyRadius])
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => m.remove())
@@ -248,9 +285,9 @@ export function EventMap({ events }: EventMapProps) {
           >
             <Filter className="h-3.5 w-3.5" />
             Filtres
-            {(dateFilter !== 'all' || categoryFilter || freeOnly) && (
+            {(dateFilter !== 'all' || categoryFilter || freeOnly || userLocation) && (
               <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px]">
-                {(dateFilter !== 'all' ? 1 : 0) + (categoryFilter ? 1 : 0) + (freeOnly ? 1 : 0)}
+                {(dateFilter !== 'all' ? 1 : 0) + (categoryFilter ? 1 : 0) + (freeOnly ? 1 : 0) + (userLocation ? 1 : 0)}
               </span>
             )}
           </button>
@@ -306,10 +343,38 @@ export function EventMap({ events }: EventMapProps) {
               ))}
             </div>
 
-            {/* Reset */}
-            {(dateFilter !== 'all' || categoryFilter || freeOnly) && (
+            {/* Geolocation */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => { setDateFilter('all'); setCategoryFilter(null); setFreeOnly(false) }}
+                onClick={handleGeolocate}
+                className={cn(
+                  'flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                  userLocation
+                    ? 'bg-neon text-white'
+                    : 'bg-surface-hover text-text-secondary hover:bg-surface-hover/80'
+                )}
+              >
+                <Navigation className="h-3 w-3" />
+                {isLocating ? 'Localisation...' : userLocation ? 'Autour de moi' : 'Autour de moi'}
+              </button>
+              {userLocation && nearbyRadius && (
+                <select
+                  value={nearbyRadius}
+                  onChange={(e) => setNearbyRadius(Number(e.target.value))}
+                  className="rounded-lg border border-border bg-white px-2 py-1.5 text-[11px] font-medium text-text-secondary"
+                >
+                  <option value={1}>1 km</option>
+                  <option value={2}>2 km</option>
+                  <option value={5}>5 km</option>
+                  <option value={10}>10 km</option>
+                </select>
+              )}
+            </div>
+
+            {/* Reset */}
+            {(dateFilter !== 'all' || categoryFilter || freeOnly || userLocation) && (
+              <button
+                onClick={() => { setDateFilter('all'); setCategoryFilter(null); setFreeOnly(false); setUserLocation(null); setNearbyRadius(null) }}
                 className="text-[11px] font-medium text-accent hover:underline"
               >
                 Réinitialiser les filtres

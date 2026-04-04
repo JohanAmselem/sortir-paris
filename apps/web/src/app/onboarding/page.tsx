@@ -331,7 +331,7 @@ export default function OnboardingPage() {
         {/* Selection count hint */}
         {step === 0 && selectedCategories.length > 0 && selectedCategories.length < 2 && (
           <p className="mt-3 text-center text-xs text-accent">
-            Encore {2 - selectedCategories.length} catégorie{2 - selectedCategories.length > 1 ? 's' : ''} minimum
+            Encore {2 - selectedCategories.length} catégorie{(2 - selectedCategories.length) > 1 ? 's' : ''} minimum
           </p>
         )}
       </div>

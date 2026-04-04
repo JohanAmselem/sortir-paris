@@ -86,6 +86,9 @@ export function SearchBar({ className }: { className?: string }) {
             )}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {isLoading && !isAIQuery && (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            )}
             {isAIQuery && (
               <button
                 type="submit"
@@ -95,7 +98,7 @@ export function SearchBar({ className }: { className?: string }) {
                 Recherche IA
               </button>
             )}
-            {query && !isAIQuery && (
+            {query && (
               <button
                 type="button"
                 onClick={() => {

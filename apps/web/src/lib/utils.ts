@@ -16,7 +16,7 @@ export function formatPriceRange(
   isFree: boolean | null | undefined
 ): string {
   if (isFree) return 'Gratuit'
-  if (!min && !max) return 'Prix non communiqué'
+  if (!min && !max) return 'Tarif sur place'
   if (!min || !max || min === max) return formatPrice(min || max)
   return `${formatPrice(min)} — ${formatPrice(max)}`
 }

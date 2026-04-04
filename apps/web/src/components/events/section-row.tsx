@@ -26,7 +26,7 @@ export function SectionRow({ title, icon, href, events }: SectionRowProps) {
             href={href}
             className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[13px] font-medium text-accent hover:bg-accent/5 transition-colors"
           >
-            Tout voir
+            Voir tout
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         )}

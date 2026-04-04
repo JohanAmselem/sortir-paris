@@ -42,6 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${data.category.name} à Paris`,
     description: `Découvrez les ${data.category.name.toLowerCase()} à Paris. ${data.events.length} événements disponibles.`,
+    alternates: { canonical: `/categories/${slug}` },
   }
 }
 

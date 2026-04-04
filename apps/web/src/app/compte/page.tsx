@@ -61,13 +61,7 @@ export default function ComptePage() {
           className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 hover:bg-accent/90 transition-all active:scale-[0.98]"
         >
           <Sparkles className="h-4 w-4" />
-          Créer mon compte
-        </Link>
-        <Link
-          href="/login"
-          className="mt-3 text-sm font-medium text-text-muted hover:text-accent transition-colors"
-        >
-          J&apos;ai déjà un compte
+          Se connecter / Créer un compte
         </Link>
       </div>
     )

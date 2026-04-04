@@ -47,6 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${venue.name} — Événements — Paname Club`,
     description: `Tous les événements à venir à ${venue.name}${venue.address ? `, ${venue.address}` : ''}, Paris.`,
+    alternates: { canonical: `/lieux/${slug}` },
     openGraph: {
       title: `${venue.name} — Paname Club`,
       description: `Découvrez les prochains événements à ${venue.name}.`,

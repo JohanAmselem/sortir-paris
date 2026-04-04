@@ -17,7 +17,7 @@ export const metadata = {
   description: 'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.',
 }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 async function getHomeData() {
   const now = new Date()
@@ -94,8 +94,22 @@ export default async function HomePage() {
   const featuredEvents = tonight.length > 0 ? tonight.slice(0, 2) : upcoming.slice(0, 2)
   const regularTonight = tonight.length > 2 ? tonight.slice(2) : tonight
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Paname Club',
+    url: 'https://panameclub.com',
+    description: 'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://panameclub.com/evenements?q={search_term_string}',
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
   return (
     <div className="min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Hero */}
       <section className="relative overflow-hidden bg-primary px-4 pb-16 pt-12 md:pb-24 md:pt-20">
         {/* Background effects */}

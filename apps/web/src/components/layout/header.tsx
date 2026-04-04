@@ -24,6 +24,23 @@ export function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Keyboard shortcut "/" to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault()
+        const searchInput = document.querySelector<HTMLInputElement>('input[type="search"]')
+        if (searchInput) {
+          searchInput.focus()
+        } else {
+          window.location.href = '/evenements'
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
@@ -54,7 +71,8 @@ export function Header() {
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 md:flex">
           {NAV_LINKS.map((link) => {
-            const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href.split('?')[0]))
+            const linkPath = link.href.split('?')[0]
+            const isActive = pathname === linkPath || (linkPath !== '/' && linkPath.length > 1 && pathname.startsWith(linkPath + '/'))
             return (
               <Link
                 key={link.href}

@@ -23,7 +23,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 bg-white/90 backdrop-blur-xl md:hidden safe-area-bottom">
       <div className="flex h-14 items-center justify-around px-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/' && pathname.startsWith(href))
+          const isActive = pathname === href || (href !== '/' && href.length > 1 && pathname.startsWith(href + '/'))
 
           return (
             <Link

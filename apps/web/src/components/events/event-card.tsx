@@ -16,7 +16,7 @@ interface EventCardProps {
 export function EventCard({ event, className, variant = 'default' }: EventCardProps) {
   const startDate = event.startDate ? new Date(event.startDate) : null
   const isToday = startDate && startDate.toDateString() === new Date().toDateString()
-  const isSoon = startDate && (startDate.getTime() - Date.now()) < 6 * 60 * 60 * 1000 && startDate.getTime() > Date.now()
+  const isSoon = startDate && (startDate.getTime() - Date.now()) < 12 * 60 * 60 * 1000 && startDate.getTime() > Date.now()
 
   if (variant === 'compact') {
     return (
@@ -120,7 +120,7 @@ export function EventCard({ event, className, variant = 'default' }: EventCardPr
             <div className="mt-2 flex items-center justify-between">
               <span className={cn(
                 'text-[13px] font-bold',
-                event.isFree ? 'text-green-400' : 'text-white'
+                event.isFree ? 'text-free' : 'text-white'
               )}>
                 {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
               </span>

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/ce-week-end' },
 }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 async function getWeekendData() {
   const now = new Date()

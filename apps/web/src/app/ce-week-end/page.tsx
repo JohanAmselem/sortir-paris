@@ -13,9 +13,13 @@ export const metadata: Metadata = {
   alternates: { canonical: '/ce-week-end' },
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
-async function getWeekendData() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}
+
+async function getWeekendData(searchParams: { [key: string]: string | undefined }) {
   const now = new Date()
   const dayOfWeek = now.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
 
@@ -35,11 +39,26 @@ async function getWeekendData() {
   sunday.setDate(saturday.getDate() + 1)
   sunday.setHours(23, 59, 59, 999)
 
-  const weekendCondition = and(
+  const conditions = [
     eq(events.status, 'active'),
     gte(events.startDate, saturday),
-    lte(events.startDate, sunday)
-  )
+    lte(events.startDate, sunday),
+  ]
+
+  // Category filter
+  if (searchParams.category) {
+    const cat = await db.query.categories?.findFirst({
+      where: eq(categories.slug, searchParams.category),
+    })
+    if (cat) conditions.push(eq(events.categoryId, cat.id))
+  }
+
+  // Free filter
+  if (searchParams.free === 'true') {
+    conditions.push(eq(events.isFree, true))
+  }
+
+  const weekendCondition = and(...conditions)
 
   const [weekendEvents, allCategories, totalCount] = await Promise.all([
     db
@@ -57,8 +76,13 @@ async function getWeekendData() {
   return { events: weekendEvents, categories: allCategories, total: Number(totalCount[0].value) }
 }
 
-export default async function WeekEndPage() {
-  const { events: weekendEvents, categories: cats, total } = await getWeekendData()
+export default async function WeekEndPage({ searchParams }: Props) {
+  const params = await searchParams
+  const { events: weekendEvents, categories: cats, total } = await getWeekendData(params)
+
+  const apiParams: Record<string, string> = { date: 'weekend' }
+  if (params.category) apiParams.category = params.category
+  if (params.free === 'true') apiParams.free = 'true'
 
   return (
     <div className="px-4 py-6">
@@ -83,7 +107,7 @@ export default async function WeekEndPage() {
               tags: [],
               ambiances: [],
             } as never))}
-            apiParams={{ date: 'weekend' }}
+            apiParams={apiParams}
             sort="quality"
           />
         </div>

@@ -93,12 +93,21 @@ async function sqlFallbackSearch(request: NextRequest) {
   const start = Date.now()
 
   // Build fuzzy-ish SQL search: split query into words, match each with ILIKE
+  // Searches across title, description, short_desc, venue name, and tags
   const words = query.trim().split(/\s+/).filter(w => w.length >= 2)
   const conditions = words.map(word => {
     const pattern = `%${word}%`
     return or(
       ilike(events.title, pattern),
       ilike(events.description, pattern),
+      ilike(events.shortDesc, pattern),
+      ilike(venues.name, pattern),
+      ilike(events.keywords, pattern),
+      sql`${events.id} IN (
+        SELECT et.event_id FROM event_tags et
+        INNER JOIN tags t ON t.id = et.tag_id
+        WHERE t.name ILIKE ${pattern}
+      )`,
     )
   })
 

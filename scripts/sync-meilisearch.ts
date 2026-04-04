@@ -7,6 +7,8 @@ import { resolve } from 'path'
 
 config({ path: resolve(__dirname, '../.env.local') })
 
+import { extractKeywords, keywordsToSearchString } from './lib/keyword-extractor'
+
 async function sync() {
   const { MeiliSearch } = await import('meilisearch')
   const { default: postgres } = await import('postgres')
@@ -59,43 +61,83 @@ async function sync() {
 
   console.log(`Found ${events.length} active events`)
 
-  // 2. Transform for Meilisearch
-  const documents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    slug: e.slug,
-    shortDesc: e.shortDesc,
-    description: e.description?.substring(0, 500) || null, // truncate for index size
-    imageUrl: e.imageUrl,
-    startDate: Math.floor(new Date(e.startDate).getTime() / 1000), // unix timestamp for filtering
-    startDateISO: new Date(e.startDate).toISOString(),
-    endDate: e.endDate ? Math.floor(new Date(e.endDate).getTime() / 1000) : null,
-    endDateISO: e.endDate ? new Date(e.endDate).toISOString() : null,
-    priceMin: e.priceMin ?? 0,
-    priceMax: e.priceMax ?? 0,
-    isFree: e.isFree ?? false,
-    bookingUrl: e.bookingUrl,
-    saveCount: e.saveCount ?? 0,
-    viewCount: e.viewCount ?? 0,
-    qualityScore: e.qualityScore ?? 0,
-    source: e.source,
-    sourceUrl: e.sourceUrl,
-    category: e.categoryName,
-    categorySlug: e.categorySlug,
-    categoryIcon: e.categoryIcon,
-    venueName: e.venueName,
-    venueAddress: e.venueAddress,
-    arrondissement: e.arrondissement,
-    city: e.city,
-    _geo: e.lat && e.lng ? { lat: e.lat, lng: e.lng } : undefined,
-  }))
+  // 1b. Fetch tags from event_tags table
+  const eventTagRows = await sql`
+    SELECT et.event_id AS "eventId", t.name AS "tagName"
+    FROM event_tags et
+    INNER JOIN tags t ON t.id = et.tag_id
+  `
+  const eventTagsMap = new Map<string, string[]>()
+  for (const row of eventTagRows) {
+    const existing = eventTagsMap.get(row.eventId) || []
+    existing.push(row.tagName)
+    eventTagsMap.set(row.eventId, existing)
+  }
+  console.log(`Loaded tags for ${eventTagsMap.size} events`)
+
+  // 2. Transform for Meilisearch — with auto-generated keywords
+  const documents = events.map((e) => {
+    // Auto-generate keywords from event content
+    const keywords = extractKeywords({
+      title: e.title,
+      description: e.description,
+      shortDesc: e.shortDesc,
+      categorySlug: e.categorySlug,
+      categoryName: e.categoryName,
+      venueName: e.venueName,
+      venueAddress: e.venueAddress,
+    })
+
+    // Get tags from DB (if generated)
+    const dbTags = eventTagsMap.get(e.id) || []
+
+    return {
+      id: e.id,
+      title: e.title,
+      slug: e.slug,
+      shortDesc: e.shortDesc,
+      description: e.description?.substring(0, 500) || null, // truncate for index size
+      imageUrl: e.imageUrl,
+      startDate: Math.floor(new Date(e.startDate).getTime() / 1000), // unix timestamp for filtering
+      startDateISO: new Date(e.startDate).toISOString(),
+      endDate: e.endDate ? Math.floor(new Date(e.endDate).getTime() / 1000) : null,
+      endDateISO: e.endDate ? new Date(e.endDate).toISOString() : null,
+      priceMin: e.priceMin ?? 0,
+      priceMax: e.priceMax ?? 0,
+      isFree: e.isFree ?? false,
+      bookingUrl: e.bookingUrl,
+      saveCount: e.saveCount ?? 0,
+      viewCount: e.viewCount ?? 0,
+      qualityScore: e.qualityScore ?? 0,
+      source: e.source,
+      sourceUrl: e.sourceUrl,
+      category: e.categoryName,
+      categorySlug: e.categorySlug,
+      categoryIcon: e.categoryIcon,
+      venueName: e.venueName,
+      venueAddress: e.venueAddress,
+      arrondissement: e.arrondissement,
+      city: e.city,
+      tags: dbTags,
+      keywords: keywordsToSearchString(keywords), // rich auto-generated keywords for search
+      _geo: e.lat && e.lng ? { lat: e.lat, lng: e.lng } : undefined,
+    }
+  })
 
   // 3. Configure index settings
   console.log('Configuring index settings...')
   const index = meili.index('events')
 
   await index.updateSettings({
-    searchableAttributes: ['title', 'venueName', 'shortDesc', 'description', 'category'],
+    searchableAttributes: [
+      'title',         // highest priority
+      'keywords',      // auto-generated rich keywords
+      'tags',          // DB tags
+      'venueName',
+      'shortDesc',
+      'description',
+      'category',
+    ],
     filterableAttributes: [
       'categorySlug',
       'arrondissement',
@@ -103,6 +145,7 @@ async function sync() {
       'priceMin',
       'priceMax',
       'startDate',
+      'tags',
       'city',
       '_geo',
     ],
@@ -118,6 +161,22 @@ async function sync() {
     typoTolerance: {
       enabled: true,
       minWordSizeForTypos: { oneTypo: 3, twoTypos: 6 },
+    },
+    synonyms: {
+      'concert': ['live', 'show', 'musique', 'spectacle musical'],
+      'expo': ['exposition', 'galerie', 'musée'],
+      'gratuit': ['free', 'entrée libre', 'bon plan'],
+      'theatre': ['théâtre', 'pièce', 'représentation'],
+      'danse': ['ballet', 'chorégraphie', 'danseur'],
+      'cinema': ['cinéma', 'film', 'projection'],
+      'soirée': ['party', 'fête', 'clubbing', 'nuit'],
+      'enfants': ['famille', 'jeune public', 'kids'],
+      'classique': ['orchestre', 'symphonique', 'opéra'],
+      'electro': ['techno', 'house', 'electronic'],
+      'hip-hop': ['rap', 'hip hop', 'trap'],
+      'jazz': ['swing', 'manouche', 'blues'],
+      'contemporain': ['moderne', 'actuel'],
+      'stand-up': ['humour', 'one man show', 'comédie'],
     },
     faceting: { maxValuesPerFacet: 100 },
     pagination: { maxTotalHits: 5000 },

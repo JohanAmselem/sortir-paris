@@ -136,6 +136,7 @@ export interface MeiliEvent {
   arrondissement: string | null
   _geo: { lat: number; lng: number } | null
   tags: string[]
+  keywords: string | null
   ambiances: string[]
   saveCount: number
   qualityScore: number

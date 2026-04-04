@@ -31,6 +31,9 @@ export const events = pgTable(
     categoryId: uuid('category_id').references(() => categories.id),
     venueId: uuid('venue_id').references(() => venues.id),
 
+    // Auto-generated keywords for search (space-separated)
+    keywords: text('keywords'),
+
     // Source tracking
     source: text('source').notNull(),
     sourceUrl: text('source_url'),

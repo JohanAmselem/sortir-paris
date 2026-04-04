@@ -13,18 +13,37 @@ export const metadata: Metadata = {
   alternates: { canonical: '/ce-soir' },
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
-async function getTonightData() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}
+
+async function getTonightData(searchParams: { [key: string]: string | undefined }) {
   const now = new Date()
   const endOfDay = new Date(now)
   endOfDay.setHours(23, 59, 59, 999)
 
-  const tonightCondition = and(
+  const conditions = [
     eq(events.status, 'active'),
     gte(events.startDate, now),
-    lte(events.startDate, endOfDay)
-  )
+    lte(events.startDate, endOfDay),
+  ]
+
+  // Category filter
+  if (searchParams.category) {
+    const cat = await db.query.categories?.findFirst({
+      where: eq(categories.slug, searchParams.category),
+    })
+    if (cat) conditions.push(eq(events.categoryId, cat.id))
+  }
+
+  // Free filter
+  if (searchParams.free === 'true') {
+    conditions.push(eq(events.isFree, true))
+  }
+
+  const tonightCondition = and(...conditions)
 
   const [tonightEvents, allCategories, totalCount] = await Promise.all([
     db
@@ -42,8 +61,13 @@ async function getTonightData() {
   return { events: tonightEvents, categories: allCategories, total: Number(totalCount[0].value) }
 }
 
-export default async function CeSoirPage() {
-  const { events: tonightEvents, categories: cats, total } = await getTonightData()
+export default async function CeSoirPage({ searchParams }: Props) {
+  const params = await searchParams
+  const { events: tonightEvents, categories: cats, total } = await getTonightData(params)
+
+  const apiParams: Record<string, string> = { date: 'today' }
+  if (params.category) apiParams.category = params.category
+  if (params.free === 'true') apiParams.free = 'true'
 
   return (
     <div className="px-4 py-6">
@@ -68,7 +92,7 @@ export default async function CeSoirPage() {
               tags: [],
               ambiances: [],
             } as never))}
-            apiParams={{ date: 'today' }}
+            apiParams={apiParams}
             sort="popular"
           />
         </div>

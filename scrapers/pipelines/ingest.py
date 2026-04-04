@@ -15,6 +15,7 @@ import httpx
 from datetime import datetime
 from typing import Optional, List, Tuple
 from dotenv import load_dotenv
+from utils.keywords import extract_keywords, keywords_to_search_string
 
 load_dotenv()
 
@@ -217,6 +218,15 @@ def run_pipeline(events: list[dict], source_name: str):
                     except (ValueError, TypeError):
                         pass
 
+                # Auto-generate rich keywords for search
+                event_keywords = extract_keywords(
+                    title=event["title"],
+                    description=event.get("description"),
+                    short_desc=event.get("short_desc"),
+                    category_slug=event.get("category_slug"),
+                    venue_name=event.get("venue_name"),
+                )
+
                 meili_batch.append({
                     "id": event_id,
                     "title": event["title"],
@@ -233,6 +243,7 @@ def run_pipeline(events: list[dict], source_name: str):
                     "saveCount": 0,
                     "qualityScore": event.get("quality_score", 0),
                     "tags": event.get("tags_raw", []),
+                    "keywords": keywords_to_search_string(event_keywords),
                     "ambiances": [],
                 })
 

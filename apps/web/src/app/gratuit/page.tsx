@@ -4,7 +4,7 @@ import { EventCard } from '@/components/events/event-card'
 import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
 import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, desc, asc, count } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, asc, count } from 'drizzle-orm'
 
 export const metadata: Metadata = {
   title: 'Sorties gratuites à Paris — Expos, Concerts, Événements',
@@ -13,16 +13,57 @@ export const metadata: Metadata = {
   alternates: { canonical: '/gratuit' },
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
-async function getFreeData() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}
+
+async function getFreeData(searchParams: { [key: string]: string | undefined }) {
   const now = new Date()
 
-  const freeCondition = and(
+  const conditions = [
     eq(events.status, 'active'),
     eq(events.isFree, true),
-    gte(events.startDate, now)
-  )
+    gte(events.startDate, now),
+  ]
+
+  // Category filter
+  if (searchParams.category) {
+    const cat = await db.query.categories?.findFirst({
+      where: eq(categories.slug, searchParams.category),
+    })
+    if (cat) conditions.push(eq(events.categoryId, cat.id))
+  }
+
+  // Date filter
+  if (searchParams.date === 'today') {
+    const endOfDay = new Date(now)
+    endOfDay.setHours(23, 59, 59, 999)
+    conditions.push(lte(events.startDate, endOfDay))
+  } else if (searchParams.date === 'weekend') {
+    const dayOfWeek = now.getDay()
+    const saturday = new Date(now)
+    if (dayOfWeek === 0) saturday.setDate(now.getDate() - 1)
+    else if (dayOfWeek !== 6) saturday.setDate(now.getDate() + (6 - dayOfWeek))
+    saturday.setHours(0, 0, 0, 0)
+    const sunday = new Date(saturday)
+    sunday.setDate(saturday.getDate() + 1)
+    sunday.setHours(23, 59, 59, 999)
+    conditions.push(gte(events.startDate, saturday))
+    conditions.push(lte(events.startDate, sunday))
+  } else if (searchParams.date === 'week') {
+    const endOfWeek = new Date(now)
+    endOfWeek.setDate(now.getDate() + 7)
+    conditions.push(lte(events.startDate, endOfWeek))
+  } else if (searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)) {
+    const target = new Date(searchParams.date + 'T00:00:00')
+    const endOfTarget = new Date(searchParams.date + 'T23:59:59.999')
+    conditions.push(gte(events.startDate, target))
+    conditions.push(lte(events.startDate, endOfTarget))
+  }
+
+  const freeCondition = and(...conditions)
 
   const [freeEvents, allCategories, totalCount] = await Promise.all([
     db
@@ -40,8 +81,13 @@ async function getFreeData() {
   return { events: freeEvents, categories: allCategories, total: Number(totalCount[0].value) }
 }
 
-export default async function GratuitPage() {
-  const { events: freeEvents, categories: cats, total } = await getFreeData()
+export default async function GratuitPage({ searchParams }: Props) {
+  const params = await searchParams
+  const { events: freeEvents, categories: cats, total } = await getFreeData(params)
+
+  const apiParams: Record<string, string> = { free: 'true' }
+  if (params.category) apiParams.category = params.category
+  if (params.date) apiParams.date = params.date
 
   return (
     <div className="px-4 py-6">
@@ -66,7 +112,7 @@ export default async function GratuitPage() {
               tags: [],
               ambiances: [],
             } as never))}
-            apiParams={{ free: 'true' }}
+            apiParams={apiParams}
             sort="quality"
           />
         </div>

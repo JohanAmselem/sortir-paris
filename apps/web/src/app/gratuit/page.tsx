@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { EventCard } from '@/components/events/event-card'
 import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { FilterBar } from '@/components/search/filter-bar'
+import { SearchBar } from '@/components/search/search-bar'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc, count } from 'drizzle-orm'
 
@@ -95,6 +96,10 @@ export default async function GratuitPage({ searchParams }: Props) {
       <p className="mt-1 text-sm text-text-secondary">
         {total.toLocaleString('fr-FR')} événement{total !== 1 ? 's' : ''} gratuit{total !== 1 ? 's' : ''}
       </p>
+
+      <div className="mt-3">
+        <SearchBar className="max-w-lg" />
+      </div>
 
       <div className="mt-4">
         <Suspense fallback={<div className="h-10" />}>

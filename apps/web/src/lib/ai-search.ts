@@ -15,22 +15,27 @@ import { meiliAdmin, isMeilisearchEnabled, EVENTS_INDEX } from './meilisearch'
 
 // ─── Types ───
 
+// DB category slugs — mix of singular and plural, must match exactly
 const VALID_CATEGORIES = [
-  'concert', 'expo', 'theatre', 'cinema', 'festival',
-  'conference', 'danse', 'spectacle', 'atelier', 'visite', 'sport',
+  'concerts', 'expos', 'theatre', 'cinema', 'festivals',
+  'conferences', 'danse', 'spectacles', 'ateliers', 'visites',
 ] as const
 
 const CATEGORY_ALIASES: Record<string, string> = {
-  concerts: 'concert', expos: 'expo', expositions: 'expo',
-  theatres: 'theatre', cinemas: 'cinema', festivals: 'festival',
-  conferences: 'conference', danses: 'danse', spectacles: 'spectacle',
-  ateliers: 'atelier', visites: 'visite', sports: 'sport',
-  musique: 'concert', live: 'concert', 'stand-up': 'spectacle',
-  humour: 'spectacle', comedie: 'spectacle', 'comédie': 'spectacle',
-  photo: 'expo', photographie: 'expo', peinture: 'expo',
-  sculpture: 'expo', 'street-art': 'expo', ballet: 'danse',
-  'comédie musicale': 'spectacle', opéra: 'concert', opera: 'concert',
-  cirque: 'spectacle', magie: 'spectacle',
+  // Singular → DB slug
+  concert: 'concerts', expo: 'expos', festival: 'festivals',
+  conference: 'conferences', spectacle: 'spectacles',
+  atelier: 'ateliers', visite: 'visites',
+  // Alternate forms → DB slug
+  exposition: 'expos', expositions: 'expos',
+  theatres: 'theatre', cinemas: 'cinema', danses: 'danse',
+  musique: 'concerts', live: 'concerts', 'stand-up': 'spectacles',
+  humour: 'spectacles', comedie: 'spectacles', 'comédie': 'spectacles',
+  photo: 'expos', photographie: 'expos', peinture: 'expos',
+  sculpture: 'expos', 'street-art': 'expos', ballet: 'danse',
+  'comédie musicale': 'spectacles', opéra: 'concerts', opera: 'concerts',
+  cirque: 'spectacles', magie: 'spectacles',
+  sport: 'spectacles', sports: 'spectacles',
 }
 
 export interface AIIntent {
@@ -90,7 +95,7 @@ RÈGLES D'ANALYSE :
 10. Si c'est très vague → isVague: true + plusieurs interprétations
 
 CATÉGORIES VALIDES : ${VALID_CATEGORIES.join(', ')}
-Note: stand-up/humour/one-man-show → "spectacle". Musique/live → "concert". Photo/peinture → "expo".
+Note: stand-up/humour/one-man-show → "spectacles". Musique/live → "concerts". Photo/peinture → "expos". Les slugs sont tels quels dans la base (certains au pluriel, certains au singulier).
 
 AMBIANCES : romantique, festif, chill, familial, underground, chic, culturel, sportif, pleinair, immersif
 
@@ -135,17 +140,17 @@ function parseQueryFallback(query: string): AIIntent {
   // Category detection
   let category: string | null = null
   const categoryMap: [RegExp, string][] = [
-    [/stand[- ]?up|humour|one[- ]man|sketch|comedie|comique/, 'spectacle'],
-    [/jazz|musique|rock|rap|electro|techno|concert|live|dj/, 'concert'],
-    [/photo|exposition|galerie|expo|peinture|sculpture|art|vernissage/, 'expo'],
+    [/stand[- ]?up|humour|one[- ]man|sketch|comedie|comique/, 'spectacles'],
+    [/jazz|musique|rock|rap|electro|techno|concert|live|dj/, 'concerts'],
+    [/photo|exposition|galerie|expo|peinture|sculpture|art|vernissage/, 'expos'],
     [/piece|theatre|mise en scene/, 'theatre'],
     [/film|cinema|projection|seance/, 'cinema'],
-    [/festival|fest\b/, 'festival'],
+    [/festival|fest\b/, 'festivals'],
     [/danse|ballet|choregraphie/, 'danse'],
-    [/sport|yoga|fitness|running|course/, 'sport'],
-    [/atelier|workshop|stage|cours|creatif/, 'atelier'],
-    [/visite|balade|patrimoine|parcours|architecture/, 'visite'],
-    [/conference|debat|rencontre|table ronde|masterclass/, 'conference'],
+    [/sport|yoga|fitness|running|course/, 'spectacles'],
+    [/atelier|workshop|stage|cours|creatif/, 'ateliers'],
+    [/visite|balade|patrimoine|parcours|architecture/, 'visites'],
+    [/conference|debat|rencontre|table ronde|masterclass/, 'conferences'],
   ]
   for (const [re, cat] of categoryMap) {
     if (re.test(q)) { category = cat; break }
@@ -491,8 +496,9 @@ async function searchDB(intent: AIIntent): Promise<{ results: SearchResult[]; st
   // Category
   let categoryId: string | null = null
   if (intent.category) {
-    const slugsToTry = [intent.category, intent.category + 's', CATEGORY_ALIASES[intent.category] || ''].filter(Boolean)
-    for (const slug of slugsToTry) {
+    // intent.category should already be a valid DB slug, but try alias as fallback
+    const slugsToTry = [intent.category, CATEGORY_ALIASES[intent.category] || ''].filter(Boolean)
+    for (const slug of [...new Set(slugsToTry)]) {
       const cat = await db.query.categories?.findFirst({ where: eq(categories.slug, slug) })
       if (cat) { categoryId = cat.id; baseConds.push(eq(events.categoryId, cat.id)); break }
     }
@@ -669,7 +675,8 @@ async function fetchAlternatives(intent: AIIntent, mainResultIds: Set<string>): 
 
   // If we searched a specific category, get alternatives from OTHER categories
   if (intent.category) {
-    const cat = await db.query.categories?.findFirst({ where: eq(categories.slug, intent.category) })
+    const slug = CATEGORY_ALIASES[intent.category] || intent.category
+    const cat = await db.query.categories?.findFirst({ where: eq(categories.slug, slug) })
     if (cat) {
       conds.push(sql`${events.categoryId} != ${cat.id}`)
     }

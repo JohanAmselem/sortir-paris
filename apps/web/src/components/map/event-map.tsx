@@ -10,18 +10,18 @@ import { formatEventDate } from '@/lib/utils'
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
-// Category → color mapping
+// Category → color mapping (DB slugs — mix of singular/plural)
 const CATEGORY_COLORS: Record<string, string> = {
-  concert: '#7C3AED',
-  expo: '#F43F5E',
+  concerts: '#7C3AED', concert: '#7C3AED',
+  expos: '#F43F5E', expo: '#F43F5E',
   theatre: '#EF4444',
   cinema: '#F59E0B',
-  festival: '#10B981',
-  conference: '#6366F1',
+  festivals: '#10B981', festival: '#10B981',
+  conferences: '#6366F1', conference: '#6366F1',
   danse: '#EC4899',
-  spectacle: '#F97316',
-  atelier: '#14B8A6',
-  visite: '#8B5CF6',
+  spectacles: '#F97316', spectacle: '#F97316',
+  ateliers: '#14B8A6', atelier: '#14B8A6',
+  visites: '#8B5CF6', visite: '#8B5CF6',
   sport: '#22C55E',
 }
 
@@ -52,12 +52,14 @@ const DATE_FILTERS = [
 ] as const
 
 const CATEGORY_FILTERS = [
-  { slug: 'concert', icon: '🎵', label: 'Concerts' },
-  { slug: 'expo', icon: '🎨', label: 'Expos' },
+  { slug: 'concerts', icon: '🎵', label: 'Concerts' },
+  { slug: 'expos', icon: '🎨', label: 'Expos' },
   { slug: 'theatre', icon: '🎭', label: 'Théâtre' },
   { slug: 'cinema', icon: '🎬', label: 'Cinéma' },
-  { slug: 'festival', icon: '🎪', label: 'Festivals' },
+  { slug: 'festivals', icon: '🎪', label: 'Festivals' },
   { slug: 'danse', icon: '💃', label: 'Danse' },
+  { slug: 'spectacles', icon: '🎪', label: 'Spectacles' },
+  { slug: 'ateliers', icon: '🛠️', label: 'Ateliers' },
 ] as const
 
 function isToday(d: Date) {
@@ -92,6 +94,7 @@ export function EventMap({ events }: EventMapProps) {
   const map = useRef<mapboxgl.Map | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null)
   const [isLocating, setIsLocating] = useState(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -146,6 +149,9 @@ export function EventMap({ events }: EventMapProps) {
     markersRef.current = []
   }, [])
 
+  // Store event lookup for click handling
+  const eventLookupRef = useRef<Map<string, MapEvent>>(new Map())
+
   useEffect(() => {
     if (!mapContainer.current || !MAPBOX_TOKEN) return
 
@@ -164,55 +170,144 @@ export function EventMap({ events }: EventMapProps) {
 
     map.current = m
 
+    const initMap = () => {
+      if (m.getSource('events')) return // Already initialized
+      // Add empty source — will be updated when filteredEvents change
+      m.addSource('events', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      })
+
+      // Cluster circles
+      m.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'events',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step', ['get', 'point_count'],
+            '#7C3AED',  // < 10: purple
+            10, '#E94560', // 10-30: accent red
+            30, '#F59E0B', // 30+: amber
+          ],
+          'circle-radius': [
+            'step', ['get', 'point_count'],
+            20,   // < 10
+            10, 25, // 10-30
+            30, 32, // 30+
+          ],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
+
+      // Cluster count text
+      m.addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'events',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 13,
+        },
+        paint: {
+          'text-color': '#ffffff',
+        },
+      })
+
+      // Individual event points
+      m.addLayer({
+        id: 'unclustered-point',
+        type: 'circle',
+        source: 'events',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': 10,
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
+
+      // Click on cluster → zoom in
+      m.on('click', 'clusters', (e) => {
+        const features = m.queryRenderedFeatures(e.point, { layers: ['clusters'] })
+        if (!features.length) return
+        const clusterId = features[0].properties?.cluster_id
+        const source = m.getSource('events') as mapboxgl.GeoJSONSource
+        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (err || !features[0].geometry || features[0].geometry.type !== 'Point') return
+          m.easeTo({
+            center: features[0].geometry.coordinates as [number, number],
+            zoom: zoom ?? 14,
+          })
+        })
+      })
+
+      // Click on individual point → show event card
+      m.on('click', 'unclustered-point', (e) => {
+        if (!e.features?.length) return
+        const eventId = e.features[0].properties?.eventId
+        const ev = eventLookupRef.current.get(eventId)
+        if (ev) {
+          setSelectedEvent(ev)
+          m.flyTo({ center: [ev.lng, ev.lat], zoom: 15, duration: 500 })
+        }
+      })
+
+      // Cursor pointer on hover
+      m.on('mouseenter', 'clusters', () => { m.getCanvas().style.cursor = 'pointer' })
+      m.on('mouseleave', 'clusters', () => { m.getCanvas().style.cursor = '' })
+      m.on('mouseenter', 'unclustered-point', () => { m.getCanvas().style.cursor = 'pointer' })
+      m.on('mouseleave', 'unclustered-point', () => { m.getCanvas().style.cursor = '' })
+
+      setMapLoaded(true)
+    }
+
+    // Try on 'load' (full tiles) and 'style.load' (style parsed, may fire even with token issues)
+    m.on('load', initMap)
+    m.on('style.load', initMap)
+
     return () => {
       clearMarkers()
       m.remove()
     }
   }, [clearMarkers])
 
-  // Add markers when filtered events change
+  // Update GeoJSON source when filtered events change
   useEffect(() => {
-    if (!map.current) return
+    if (!map.current || !mapLoaded) return
 
-    clearMarkers()
+    const source = map.current.getSource('events') as mapboxgl.GeoJSONSource | undefined
+    if (!source) return
 
-    filteredEvents.forEach((event) => {
-      const color = CATEGORY_COLORS[event.categorySlug || ''] || '#7C3AED'
-
-      // Create custom marker element
-      const el = document.createElement('div')
-      el.className = 'map-marker'
-      el.style.cssText = `
-        width: 32px; height: 32px; border-radius: 50%;
-        background: ${color}; border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer; transition: transform 0.15s ease;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 13px; pointer-events: auto;
-      `
-      // Inner hit area — prevents hover flicker when marker scales up
-      const inner = document.createElement('div')
-      inner.style.cssText = `
-        position: absolute; inset: -6px; border-radius: 50%;
-        pointer-events: auto;
-      `
-      el.appendChild(inner)
-      el.insertAdjacentHTML('afterbegin', event.categoryIcon || '📍')
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.3)'; el.style.zIndex = '10' })
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; el.style.zIndex = '' })
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        setSelectedEvent(event)
-        map.current?.flyTo({ center: [event.lng, event.lat], zoom: 15, duration: 500 })
-      })
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([event.lng, event.lat])
-        .addTo(map.current!)
-
-      markersRef.current.push(marker)
+    // Build lookup
+    const lookup = new Map<string, MapEvent>()
+    const features = filteredEvents.map((event) => {
+      lookup.set(event.id, event)
+      return {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [event.lng, event.lat],
+        },
+        properties: {
+          eventId: event.id,
+          color: CATEGORY_COLORS[event.categorySlug || ''] || '#7C3AED',
+          icon: event.categoryIcon || '📍',
+        },
+      }
     })
-  }, [filteredEvents, clearMarkers])
+
+    eventLookupRef.current = lookup
+    source.setData({ type: 'FeatureCollection', features })
+  }, [filteredEvents, mapLoaded])
 
   // Close popup when clicking on map
   useEffect(() => {
@@ -225,14 +320,18 @@ export function EventMap({ events }: EventMapProps) {
 
   const handleLocateMe = () => {
     if (!navigator.geolocation || !map.current) return
+    // If already located with geofence, just re-center
+    if (userLocation) {
+      map.current.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: 14, duration: 1000 })
+      return
+    }
     setIsLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        map.current?.flyTo({
-          center: [pos.coords.longitude, pos.coords.latitude],
-          zoom: 14,
-          duration: 1000,
-        })
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setUserLocation(loc)
+        setNearbyRadius(2)
+        map.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14, duration: 1000 })
         setIsLocating(false)
       },
       () => setIsLocating(false),

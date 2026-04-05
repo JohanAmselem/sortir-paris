@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn, formatPriceRange, formatEventDate } from '@/lib/utils'
 import { Countdown } from '@/components/ui/countdown'
+import { SaveButton } from './save-button'
 import { MapPin, Heart } from 'lucide-react'
 import type { EventWithRelations } from '@sortir/shared'
 
@@ -11,9 +12,10 @@ interface EventCardProps {
   event: EventWithRelations
   className?: string
   variant?: 'default' | 'compact' | 'featured'
+  showSave?: boolean
 }
 
-export function EventCard({ event, className, variant = 'default' }: EventCardProps) {
+export function EventCard({ event, className, variant = 'default', showSave = true }: EventCardProps) {
   const startDate = event.startDate ? new Date(event.startDate) : null
   const isToday = startDate && startDate.toDateString() === new Date().toDateString()
   const isSoon = startDate && (startDate.getTime() - Date.now()) < 12 * 60 * 60 * 1000 && startDate.getTime() > Date.now()
@@ -174,6 +176,16 @@ export function EventCard({ event, className, variant = 'default' }: EventCardPr
             </span>
           )}
         </div>
+
+        {/* Save button */}
+        {showSave && (
+          <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+            <SaveButton
+              eventId={event.id}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-white"
+            />
+          </div>
+        )}
 
         {/* Countdown badge */}
         {isSoon && startDate && (

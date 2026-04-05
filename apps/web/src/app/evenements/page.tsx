@@ -4,6 +4,7 @@ import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
 import { EventCard } from '@/components/events/event-card'
 import { FilterBar } from '@/components/search/filter-bar'
 import { SearchBar } from '@/components/search/search-bar'
+import { EventGridSkeleton, FilterBarSkeleton } from '@/components/ui/skeleton'
 import { db, events, venues, categories } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm'
 import { aiSearch, type AIIntent, type SearchResult } from '@/lib/ai-search'
@@ -80,9 +81,11 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
-  concert: '🎵', expo: '🎨', theatre: '🎭', cinema: '🎬',
-  festival: '🎪', conference: '🎤', danse: '💃', spectacle: '🎪',
-  atelier: '🛠️', visite: '🏛️', sport: '⚽',
+  concerts: '🎵', concert: '🎵', expos: '🎨', expo: '🎨',
+  theatre: '🎭', cinema: '🎬', festivals: '🎪', festival: '🎪',
+  conferences: '🎤', conference: '🎤', danse: '💃',
+  spectacles: '🎪', spectacle: '🎪', ateliers: '🛠️', atelier: '🛠️',
+  visites: '🏛️', visite: '🏛️', sport: '⚽',
 }
 
 const DATE_LABELS: Record<string, string> = {
@@ -354,7 +357,7 @@ export default async function EvenementsPage({ searchParams }: Props) {
 
       {/* Filters */}
       <div className="mt-4">
-        <Suspense fallback={<div className="h-9" />}>
+        <Suspense fallback={<FilterBarSkeleton />}>
           <FilterBar categories={cats} />
         </Suspense>
       </div>

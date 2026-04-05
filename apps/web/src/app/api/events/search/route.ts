@@ -47,8 +47,9 @@ export async function GET(request: NextRequest) {
     filters.push(`startDate <= ${Math.floor(sunday.getTime() / 1000)}`)
   }
 
-  const ambiance = searchParams.get('ambiance')
-  if (ambiance) filters.push(`ambiances = "${ambiance}"`)
+  // Note: ambiances is not currently a filterable attribute in Meilisearch
+  // const ambiance = searchParams.get('ambiance')
+  // if (ambiance) filters.push(`ambiances = "${ambiance}"`)
 
   // Sort
   const sort = searchParams.get('sort')
@@ -56,26 +57,31 @@ export async function GET(request: NextRequest) {
   if (sort === 'date') sortBy.push('startDate:asc')
   else if (sort === 'popular') sortBy.push('saveCount:desc')
 
-  const index = meiliAdmin.index(EVENTS_INDEX)
+  try {
+    const index = meiliAdmin.index(EVENTS_INDEX)
 
-  const results = await index.search(query, {
-    filter: filters.length > 0 ? filters.join(' AND ') : undefined,
-    sort: sortBy.length > 0 ? sortBy : undefined,
-    limit,
-    offset: (page - 1) * limit,
-    attributesToHighlight: ['title'],
-    facets: ['categorySlug', 'arrondissement', 'isFree', 'ambiances'],
-  })
+    const results = await index.search(query, {
+      filter: filters.length > 0 ? filters.join(' AND ') : undefined,
+      sort: sortBy.length > 0 ? sortBy : undefined,
+      limit,
+      offset: (page - 1) * limit,
+      attributesToHighlight: ['title'],
+      facets: ['categorySlug', 'arrondissement', 'isFree', 'tags'],
+    })
 
-  return NextResponse.json({
-    data: results.hits,
-    total: results.estimatedTotalHits,
-    facets: results.facetDistribution,
-    page,
-    limit,
-    hasMore: (page - 1) * limit + limit < (results.estimatedTotalHits ?? 0),
-    processingTimeMs: results.processingTimeMs,
-  })
+    return NextResponse.json({
+      data: results.hits,
+      total: results.estimatedTotalHits,
+      facets: results.facetDistribution,
+      page,
+      limit,
+      hasMore: (page - 1) * limit + limit < (results.estimatedTotalHits ?? 0),
+      processingTimeMs: results.processingTimeMs,
+    })
+  } catch (error) {
+    console.error('[Search API] Meilisearch error, falling back to SQL:', error)
+    return sqlFallbackSearch(request)
+  }
 }
 
 // SQL fallback with ILIKE fuzzy matching when Meilisearch is unavailable
@@ -92,29 +98,46 @@ async function sqlFallbackSearch(request: NextRequest) {
 
   const start = Date.now()
 
-  // Build fuzzy-ish SQL search: split query into words, match each with ILIKE
-  // Searches across title, description, short_desc, venue name, and tags
+  // Build fuzzy-ish SQL search: split query into words, match ANY with ILIKE
+  // For short queries (autocomplete), OR logic gives better results
+  // For multi-word queries, require ALL words to match
   const words = query.trim().split(/\s+/).filter(w => w.length >= 2)
-  const conditions = words.map(word => {
+
+  const wordConditions = words.map(word => {
     const pattern = `%${word}%`
     return or(
       ilike(events.title, pattern),
-      ilike(events.description, pattern),
       ilike(events.shortDesc, pattern),
       ilike(venues.name, pattern),
       ilike(events.keywords, pattern),
-      sql`${events.id} IN (
-        SELECT et.event_id FROM event_tags et
-        INNER JOIN tags t ON t.id = et.tag_id
-        WHERE t.name ILIKE ${pattern}
-      )`,
     )
   })
+
+  // For single-word queries, also search tags and description
+  if (words.length === 1) {
+    const pattern = `%${words[0]}%`
+    wordConditions.push(
+      or(
+        ilike(events.description, pattern),
+        sql`${events.id} IN (
+          SELECT et.event_id FROM event_tags et
+          INNER JOIN tags t ON t.id = et.tag_id
+          WHERE t.name ILIKE ${pattern}
+        )`,
+      )
+    )
+  }
+
+  // For multi-word: all words must match somewhere (AND)
+  // For single-word: any match is fine (already handled by OR within each word)
+  const searchCondition = words.length > 1
+    ? and(...wordConditions.filter((c): c is NonNullable<typeof c> => c != null))
+    : or(...wordConditions.filter((c): c is NonNullable<typeof c> => c != null))
 
   const where = and(
     eq(events.status, 'active'),
     gte(events.startDate, new Date()),
-    ...conditions.filter((c): c is NonNullable<typeof c> => c != null),
+    searchCondition ?? undefined,
   )
 
   const results = await db

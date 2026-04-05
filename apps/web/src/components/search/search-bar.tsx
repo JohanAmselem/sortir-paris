@@ -9,8 +9,9 @@ interface SearchResult {
   id: string
   title: string
   slug: string
-  category: string | null
-  venueName: string | null
+  category?: string | null
+  categorySlug?: string | null
+  venueName?: string | null
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -224,7 +225,7 @@ export function SearchBar({ className }: { className?: string }) {
               className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-hover transition-colors"
             >
               <span className="text-sm">
-                {CATEGORY_EMOJI[result.category ?? ''] || '📌'}
+                {CATEGORY_EMOJI[result.category ?? result.categorySlug ?? ''] || '📌'}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-text-primary">{result.title}</p>

@@ -25,7 +25,7 @@ async function generateTags() {
   console.log('Connecting to database...')
   const sql = postgres(databaseUrl, { prepare: false })
 
-  // 1. Fetch all active events with venue + category info
+  // 1. Fetch all active events
   const events = await sql`
     SELECT
       e.id,
@@ -45,8 +45,9 @@ async function generateTags() {
   console.log(`Found ${events.length} active events`)
 
   // 2. Generate tags for each event
-  const allTagNames = new Set<string>()
-  const eventTagMap = new Map<string, string[]>()
+  const allTagSlugs = new Map<string, string>() // slug -> name
+  const eventTagMap = new Map<string, string[]>() // eventId -> tag slugs
+  const eventKeywords = new Map<string, string>() // eventId -> keywords string
 
   for (const event of events) {
     const tagNames = getTagCandidates({
@@ -59,104 +60,114 @@ async function generateTags() {
       venueAddress: event.venueAddress,
     })
 
-    eventTagMap.set(event.id, tagNames)
+    const slugs: string[] = []
     for (const name of tagNames) {
-      allTagNames.add(name)
-    }
-  }
-
-  console.log(`Generated ${allTagNames.size} unique tags`)
-
-  // 3. Upsert all tags into the tags table
-  const tagNameToId = new Map<string, string>()
-  const tagBatch = Array.from(allTagNames).map(name => ({
-    name,
-    slug: slugify(name),
-  }))
-
-  // Process in batches of 100
-  const TAG_BATCH_SIZE = 100
-  for (let i = 0; i < tagBatch.length; i += TAG_BATCH_SIZE) {
-    const batch = tagBatch.slice(i, i + TAG_BATCH_SIZE)
-
-    for (const tag of batch) {
-      const result = await sql`
-        INSERT INTO tags (name, slug)
-        VALUES (${tag.name}, ${tag.slug})
-        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id, name
-      `
-      if (result.length > 0) {
-        tagNameToId.set(tag.name, result[0].id)
+      const slug = slugify(name)
+      if (slug.length >= 2) {
+        allTagSlugs.set(slug, name)
+        slugs.push(slug)
       }
     }
+    eventTagMap.set(event.id, slugs)
 
-    console.log(`Upserted tags: ${Math.min(i + TAG_BATCH_SIZE, tagBatch.length)}/${tagBatch.length}`)
+    // Also generate keywords
+    const keywords = extractKeywords({
+      title: event.title,
+      description: event.description,
+      shortDesc: event.shortDesc,
+      categorySlug: event.categorySlug,
+      categoryName: event.categoryName,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+    })
+    eventKeywords.set(event.id, keywordsToSearchString(keywords))
   }
 
-  // 4. Clear existing event_tags and repopulate
+  console.log(`Generated ${allTagSlugs.size} unique tags`)
+
+  // 3. Batch upsert all tags using VALUES list
+  const tagEntries = Array.from(allTagSlugs.entries())
+  const BATCH = 500
+  const slugToId = new Map<string, string>()
+
+  for (let i = 0; i < tagEntries.length; i += BATCH) {
+    const batch = tagEntries.slice(i, i + BATCH)
+    // Use individual upserts but in a transaction for speed
+    await sql.begin(async (tx) => {
+      for (const [slug, name] of batch) {
+        const result = await tx`
+          INSERT INTO tags (name, slug)
+          VALUES (${name}, ${slug})
+          ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+          RETURNING id, slug
+        `
+        if (result.length > 0) {
+          slugToId.set(result[0].slug, result[0].id)
+        }
+      }
+    })
+    console.log(`Upserted tags: ${Math.min(i + BATCH, tagEntries.length)}/${tagEntries.length}`)
+  }
+
+  // 4. Clear existing event_tags
   console.log('Clearing existing event_tags...')
   await sql`DELETE FROM event_tags`
 
-  // 5. Insert event_tags in batches
+  // 5. Batch insert event_tags using raw SQL for speed
   let totalLinks = 0
-  const EVENT_BATCH_SIZE = 50
-
   const eventIds = Array.from(eventTagMap.keys())
-  for (let i = 0; i < eventIds.length; i += EVENT_BATCH_SIZE) {
-    const batchIds = eventIds.slice(i, i + EVENT_BATCH_SIZE)
+  const EVENT_BATCH = 200
 
+  for (let i = 0; i < eventIds.length; i += EVENT_BATCH) {
+    const batchIds = eventIds.slice(i, i + EVENT_BATCH)
+
+    // Collect all (event_id, tag_id) pairs for this batch
+    const pairs: Array<{ eventId: string; tagId: string }> = []
     for (const eventId of batchIds) {
-      const tagNames = eventTagMap.get(eventId) || []
-      for (const tagName of tagNames) {
-        const tagId = tagNameToId.get(tagName)
+      const tagSlugs = eventTagMap.get(eventId) || []
+      for (const slug of tagSlugs) {
+        const tagId = slugToId.get(slug)
         if (tagId) {
-          try {
-            await sql`
-              INSERT INTO event_tags (event_id, tag_id)
-              VALUES (${eventId}, ${tagId})
-              ON CONFLICT DO NOTHING
-            `
-            totalLinks++
-          } catch {
-            // Skip duplicates
-          }
+          pairs.push({ eventId, tagId })
         }
       }
     }
 
-    console.log(`Linked events: ${Math.min(i + EVENT_BATCH_SIZE, eventIds.length)}/${eventIds.length} (${totalLinks} links)`)
-  }
+    if (pairs.length > 0) {
+      // Insert in sub-batches of 1000 to avoid query size limits
+      const SUB_BATCH = 1000
+      for (let j = 0; j < pairs.length; j += SUB_BATCH) {
+        const subBatch = pairs.slice(j, j + SUB_BATCH)
+        const values = subBatch.map(p => sql`(${p.eventId}::uuid, ${p.tagId}::uuid)`)
 
-  // 6. Update the keywords column on each event for full-text search fallback
-  console.log('\nUpdating keywords column on events...')
-  let keywordUpdates = 0
-  for (let i = 0; i < events.length; i += EVENT_BATCH_SIZE) {
-    const batch = events.slice(i, i + EVENT_BATCH_SIZE)
-
-    for (const event of batch) {
-      const keywords = extractKeywords({
-        title: event.title,
-        description: event.description,
-        shortDesc: event.shortDesc,
-        categorySlug: event.categorySlug,
-        categoryName: event.categoryName,
-        venueName: event.venueName,
-        venueAddress: event.venueAddress,
-      })
-
-      const keywordsStr = keywordsToSearchString(keywords)
-      await sql`
-        UPDATE events SET keywords = ${keywordsStr}
-        WHERE id = ${event.id}
-      `
-      keywordUpdates++
+        await sql`
+          INSERT INTO event_tags (event_id, tag_id)
+          VALUES ${sql.unsafe(subBatch.map(p => `('${p.eventId}','${p.tagId}')`).join(','))}
+          ON CONFLICT DO NOTHING
+        `
+        totalLinks += subBatch.length
+      }
     }
 
-    console.log(`Updated keywords: ${Math.min(i + EVENT_BATCH_SIZE, events.length)}/${events.length}`)
+    console.log(`Linked events: ${Math.min(i + EVENT_BATCH, eventIds.length)}/${eventIds.length} (${totalLinks} links)`)
   }
 
-  console.log(`\nDone! Created ${tagNameToId.size} tags, ${totalLinks} event-tag links, updated ${keywordUpdates} event keywords.`)
+  // 6. Batch update keywords column
+  console.log('\nUpdating keywords column on events...')
+  const kwEntries = Array.from(eventKeywords.entries())
+  for (let i = 0; i < kwEntries.length; i += EVENT_BATCH) {
+    const batch = kwEntries.slice(i, i + EVENT_BATCH)
+
+    await sql.begin(async (tx) => {
+      for (const [eventId, kw] of batch) {
+        await tx`UPDATE events SET keywords = ${kw} WHERE id = ${eventId}`
+      }
+    })
+
+    console.log(`Updated keywords: ${Math.min(i + EVENT_BATCH, kwEntries.length)}/${kwEntries.length}`)
+  }
+
+  console.log(`\nDone! Created ${slugToId.size} tags, ${totalLinks} event-tag links.`)
   console.log(`Average tags per event: ${(totalLinks / events.length).toFixed(1)}`)
 
   await sql.end()

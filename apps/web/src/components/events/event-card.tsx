@@ -177,9 +177,13 @@ export function EventCard({ event, className, variant = 'default', showSave = tr
           )}
         </div>
 
-        {/* Save button */}
+        {/* Save button — stopPropagation prevents Link navigation */}
         {showSave && (
-          <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+          <div
+            className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+            onClick={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <SaveButton
               eventId={event.id}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-white"

@@ -82,11 +82,105 @@ function isThisWeek(d: Date) {
 }
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371 // km
+  const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLon = (lon2 - lon1) * Math.PI / 180
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// ─── Create DOM marker element ───
+function createMarkerEl(event: MapEvent): HTMLDivElement {
+  const color = CATEGORY_COLORS[event.categorySlug || ''] || '#7C3AED'
+  const icon = event.categoryIcon || '📍'
+
+  const el = document.createElement('div')
+  el.className = 'map-marker-wrapper'
+  el.style.cssText = `
+    width: 36px; height: 36px; position: relative;
+    cursor: pointer; z-index: 1;
+  `
+
+  const dot = document.createElement('div')
+  dot.className = 'map-marker-dot'
+  dot.style.cssText = `
+    width: 36px; height: 36px; border-radius: 50%;
+    background: ${color}; border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; line-height: 1;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    pointer-events: none;
+  `
+  dot.textContent = icon
+
+  el.appendChild(dot)
+
+  // Hover — scale up the inner dot (no flicker since events are on the wrapper)
+  el.addEventListener('mouseenter', () => {
+    dot.style.transform = 'scale(1.35)'
+    dot.style.boxShadow = '0 4px 14px rgba(0,0,0,0.35)'
+    el.style.zIndex = '10'
+  })
+  el.addEventListener('mouseleave', () => {
+    dot.style.transform = 'scale(1)'
+    dot.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)'
+    el.style.zIndex = '1'
+  })
+
+  return el
+}
+
+// ─── Create cluster marker ───
+function createClusterEl(count: number): HTMLDivElement {
+  const el = document.createElement('div')
+  const size = count < 10 ? 40 : count < 30 ? 48 : 56
+  const color = count < 10 ? '#7C3AED' : count < 30 ? '#E94560' : '#F59E0B'
+
+  el.style.cssText = `
+    width: ${size}px; height: ${size}px; border-radius: 50%;
+    background: ${color}; border: 3px solid white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: ${count < 10 ? 14 : 15}px;
+    cursor: pointer; transition: transform 0.15s ease;
+    font-family: system-ui, -apple-system, sans-serif;
+  `
+  el.textContent = count >= 1000 ? `${Math.round(count / 100) / 10}k` : String(count)
+
+  el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.15)' })
+  el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)' })
+
+  return el
+}
+
+// ─── Tooltip on hover ───
+function createTooltip(event: MapEvent): HTMLDivElement {
+  const tip = document.createElement('div')
+  tip.style.cssText = `
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); white-space: nowrap;
+    background: white; border-radius: 10px; padding: 6px 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    border: 1px solid rgba(0,0,0,0.06);
+    pointer-events: none; z-index: 100;
+    font-family: system-ui, -apple-system, sans-serif;
+    max-width: 220px;
+  `
+  tip.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:#1a1a2e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${event.title}</div>
+    ${event.venueName ? `<div style="font-size:10px;color:#71717a;margin-top:2px">${event.venueName}</div>` : ''}
+  `
+  // Arrow
+  const arrow = document.createElement('div')
+  arrow.style.cssText = `
+    position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 10px; height: 10px; background: white;
+    border-right: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  `
+  tip.appendChild(arrow)
+  return tip
 }
 
 export function EventMap({ events }: EventMapProps) {
@@ -94,18 +188,18 @@ export function EventMap({ events }: EventMapProps) {
   const map = useRef<mapboxgl.Map | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null)
   const [isLocating, setIsLocating] = useState(false)
-  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
   const markersRef = useRef<mapboxgl.Marker[]>([])
+  const clusterMarkersRef = useRef<mapboxgl.Marker[]>([])
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [freeOnly, setFreeOnly] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
-  const [nearbyRadius, setNearbyRadius] = useState<number | null>(null) // km
+  const [nearbyRadius, setNearbyRadius] = useState<number | null>(null)
 
   const handleGeolocate = () => {
     if (userLocation) {
-      // Toggle off
       setUserLocation(null)
       setNearbyRadius(null)
       return
@@ -115,7 +209,7 @@ export function EventMap({ events }: EventMapProps) {
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setUserLocation(loc)
-        setNearbyRadius(2) // default 2km
+        setNearbyRadius(2)
         setIsLocating(false)
         if (map.current) {
           map.current.flyTo({ center: [loc.lng, loc.lat], zoom: 14 })
@@ -147,11 +241,11 @@ export function EventMap({ events }: EventMapProps) {
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
+    clusterMarkersRef.current.forEach(m => m.remove())
+    clusterMarkersRef.current = []
   }, [])
 
-  // Store event lookup for click handling
-  const eventLookupRef = useRef<Map<string, MapEvent>>(new Map())
-
+  // Initialize Mapbox
   useEffect(() => {
     if (!mapContainer.current || !MAPBOX_TOKEN) return
 
@@ -160,119 +254,40 @@ export function EventMap({ events }: EventMapProps) {
     const m = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
-      center: [2.3522, 48.8566], // Paris center
+      center: [2.3522, 48.8566],
       zoom: 12,
       minZoom: 10,
       maxZoom: 18,
     })
 
     m.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
-
     map.current = m
 
-    const initMap = () => {
-      if (m.getSource('events')) return // Already initialized
-      // Add empty source — will be updated when filteredEvents change
-      m.addSource('events', {
+    const initSource = () => {
+      if (m.getSource('events-cluster')) return
+      m.addSource('events-cluster', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
         cluster: true,
         clusterMaxZoom: 14,
-        clusterRadius: 50,
+        clusterRadius: 60,
       })
-
-      // Cluster circles
-      m.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'events',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': [
-            'step', ['get', 'point_count'],
-            '#7C3AED',  // < 10: purple
-            10, '#E94560', // 10-30: accent red
-            30, '#F59E0B', // 30+: amber
-          ],
-          'circle-radius': [
-            'step', ['get', 'point_count'],
-            20,   // < 10
-            10, 25, // 10-30
-            30, 32, // 30+
-          ],
-          'circle-stroke-width': 3,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
-      // Cluster count text
-      m.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'events',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-          'text-size': 13,
-        },
-        paint: {
-          'text-color': '#ffffff',
-        },
-      })
-
-      // Individual event points
-      m.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: 'events',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': ['get', 'color'],
-          'circle-radius': 10,
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
-      // Click on cluster → zoom in
-      m.on('click', 'clusters', (e) => {
-        const features = m.queryRenderedFeatures(e.point, { layers: ['clusters'] })
-        if (!features.length) return
-        const clusterId = features[0].properties?.cluster_id
-        const source = m.getSource('events') as mapboxgl.GeoJSONSource
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err || !features[0].geometry || features[0].geometry.type !== 'Point') return
-          m.easeTo({
-            center: features[0].geometry.coordinates as [number, number],
-            zoom: zoom ?? 14,
-          })
-        })
-      })
-
-      // Click on individual point → show event card
-      m.on('click', 'unclustered-point', (e) => {
-        if (!e.features?.length) return
-        const eventId = e.features[0].properties?.eventId
-        const ev = eventLookupRef.current.get(eventId)
-        if (ev) {
-          setSelectedEvent(ev)
-          m.flyTo({ center: [ev.lng, ev.lat], zoom: 15, duration: 500 })
-        }
-      })
-
-      // Cursor pointer on hover
-      m.on('mouseenter', 'clusters', () => { m.getCanvas().style.cursor = 'pointer' })
-      m.on('mouseleave', 'clusters', () => { m.getCanvas().style.cursor = '' })
-      m.on('mouseenter', 'unclustered-point', () => { m.getCanvas().style.cursor = 'pointer' })
-      m.on('mouseleave', 'unclustered-point', () => { m.getCanvas().style.cursor = '' })
-
-      setMapLoaded(true)
+      setMapReady(true)
     }
 
-    // Try on 'load' (full tiles) and 'style.load' (style parsed, may fire even with token issues)
-    m.on('load', initMap)
-    m.on('style.load', initMap)
+    m.on('load', initSource)
+    m.on('style.load', initSource)
+
+    // Dismiss popup on map click (only if no marker was clicked)
+    m.on('click', () => {
+      // Small delay to let marker click fire first
+      setTimeout(() => {
+        if (!(window as unknown as Record<string, boolean>).__markerClicked) {
+          setSelectedEvent(null)
+        }
+        (window as unknown as Record<string, boolean>).__markerClicked = false
+      }, 50)
+    })
 
     return () => {
       clearMarkers()
@@ -280,47 +295,138 @@ export function EventMap({ events }: EventMapProps) {
     }
   }, [clearMarkers])
 
-  // Update GeoJSON source when filtered events change
+  // ─── Render markers from GeoJSON source (clusters + points) ───
   useEffect(() => {
-    if (!map.current || !mapLoaded) return
+    if (!map.current || !mapReady) return
+    const m = map.current
 
-    const source = map.current.getSource('events') as mapboxgl.GeoJSONSource | undefined
+    const source = m.getSource('events-cluster') as mapboxgl.GeoJSONSource | undefined
     if (!source) return
 
-    // Build lookup
-    const lookup = new Map<string, MapEvent>()
+    // Build event lookup
+    const eventLookup = new Map<string, MapEvent>()
     const features = filteredEvents.map((event) => {
-      lookup.set(event.id, event)
+      eventLookup.set(event.id, event)
       return {
         type: 'Feature' as const,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [event.lng, event.lat],
-        },
-        properties: {
-          eventId: event.id,
-          color: CATEGORY_COLORS[event.categorySlug || ''] || '#7C3AED',
-          icon: event.categoryIcon || '📍',
-        },
+        geometry: { type: 'Point' as const, coordinates: [event.lng, event.lat] },
+        properties: { eventId: event.id },
       }
     })
 
-    eventLookupRef.current = lookup
     source.setData({ type: 'FeatureCollection', features })
-  }, [filteredEvents, mapLoaded])
 
-  // Close popup when clicking on map
-  useEffect(() => {
-    if (!map.current) return
-    const m = map.current
-    const handler = () => setSelectedEvent(null)
-    m.on('click', handler)
-    return () => { m.off('click', handler) }
-  }, [])
+    // Debounced render of DOM markers based on what Mapbox renders
+    let renderTimeout: ReturnType<typeof setTimeout>
+
+    const renderMarkers = () => {
+      clearTimeout(renderTimeout)
+      renderTimeout = setTimeout(() => {
+        // Clear previous markers
+        markersRef.current.forEach(mk => mk.remove())
+        markersRef.current = []
+        clusterMarkersRef.current.forEach(mk => mk.remove())
+        clusterMarkersRef.current = []
+
+        // Query all rendered features from the source
+        const renderedFeatures = m.querySourceFeatures('events-cluster')
+
+        // Separate clusters from individual points
+        const clusters: Array<{ id: number; count: number; lng: number; lat: number }> = []
+        const points: Array<{ eventId: string; lng: number; lat: number }> = []
+        const seenClusters = new Set<number>()
+        const seenPoints = new Set<string>()
+
+        for (const f of renderedFeatures) {
+          if (f.geometry.type !== 'Point') continue
+          const [lng, lat] = f.geometry.coordinates
+
+          if (f.properties?.cluster) {
+            const clusterId = f.properties.cluster_id as number
+            if (!seenClusters.has(clusterId)) {
+              seenClusters.add(clusterId)
+              clusters.push({ id: clusterId, count: f.properties.point_count as number, lng, lat })
+            }
+          } else {
+            const eventId = f.properties?.eventId as string
+            if (eventId && !seenPoints.has(eventId)) {
+              seenPoints.add(eventId)
+              points.push({ eventId, lng, lat })
+            }
+          }
+        }
+
+        // Render cluster markers
+        for (const cluster of clusters) {
+          const el = createClusterEl(cluster.count)
+          el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            ;(source as mapboxgl.GeoJSONSource).getClusterExpansionZoom(cluster.id, (err, zoom) => {
+              if (err) return
+              m.easeTo({ center: [cluster.lng, cluster.lat], zoom: zoom ?? 14 })
+            })
+          })
+
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([cluster.lng, cluster.lat])
+            .addTo(m)
+          clusterMarkersRef.current.push(marker)
+        }
+
+        // Render individual event markers
+        for (const point of points) {
+          const event = eventLookup.get(point.eventId)
+          if (!event) continue
+
+          const el = createMarkerEl(event)
+          let tooltip: HTMLDivElement | null = null
+
+          // Hover tooltip
+          el.addEventListener('mouseenter', () => {
+            tooltip = createTooltip(event)
+            el.appendChild(tooltip)
+          })
+          el.addEventListener('mouseleave', () => {
+            if (tooltip) { tooltip.remove(); tooltip = null }
+          })
+
+          // Click → show event card
+          el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            ;(window as unknown as Record<string, boolean>).__markerClicked = true
+            setSelectedEvent(event)
+            m.flyTo({ center: [event.lng, event.lat], zoom: 15, duration: 500 })
+            if (tooltip) { tooltip.remove(); tooltip = null }
+          })
+
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([event.lng, event.lat])
+            .addTo(m)
+          markersRef.current.push(marker)
+        }
+      }, 100) // Debounce 100ms
+    }
+
+    // Re-render markers when the map moves/zooms (clusters change)
+    m.on('moveend', renderMarkers)
+    m.on('zoomend', renderMarkers)
+
+    // Initial render after data is set
+    renderMarkers()
+
+    return () => {
+      clearTimeout(renderTimeout)
+      m.off('moveend', renderMarkers)
+      m.off('zoomend', renderMarkers)
+      markersRef.current.forEach(mk => mk.remove())
+      markersRef.current = []
+      clusterMarkersRef.current.forEach(mk => mk.remove())
+      clusterMarkersRef.current = []
+    }
+  }, [filteredEvents, mapReady, clearMarkers])
 
   const handleLocateMe = () => {
     if (!navigator.geolocation || !map.current) return
-    // If already located with geofence, just re-center
     if (userLocation) {
       map.current.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: 14, duration: 1000 })
       return
@@ -363,7 +469,6 @@ export function EventMap({ events }: EventMapProps) {
 
       {/* Filter bar */}
       <div className="absolute top-3 left-3 right-14 z-10 flex flex-col gap-2">
-        {/* Top row: count + filter toggle */}
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow-sm border border-border/40">
             <div className="flex items-center gap-1.5">
@@ -392,10 +497,8 @@ export function EventMap({ events }: EventMapProps) {
           </button>
         </div>
 
-        {/* Filter panel */}
         {showFilters && (
           <div className="rounded-xl bg-white/95 backdrop-blur-md shadow-lg border border-border/40 p-3 space-y-3 animate-slide-up">
-            {/* Date filters */}
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {DATE_FILTERS.map((f) => (
                 <button
@@ -424,7 +527,6 @@ export function EventMap({ events }: EventMapProps) {
               </button>
             </div>
 
-            {/* Category filters */}
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {CATEGORY_FILTERS.map((c) => (
                 <button
@@ -442,7 +544,6 @@ export function EventMap({ events }: EventMapProps) {
               ))}
             </div>
 
-            {/* Geolocation */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleGeolocate}
@@ -454,7 +555,7 @@ export function EventMap({ events }: EventMapProps) {
                 )}
               >
                 <Navigation className="h-3 w-3" />
-                {isLocating ? 'Localisation...' : userLocation ? 'Autour de moi' : 'Autour de moi'}
+                {isLocating ? 'Localisation...' : 'Autour de moi'}
               </button>
               {userLocation && nearbyRadius && (
                 <select
@@ -470,7 +571,6 @@ export function EventMap({ events }: EventMapProps) {
               )}
             </div>
 
-            {/* Reset */}
             {(dateFilter !== 'all' || categoryFilter || freeOnly || userLocation) && (
               <button
                 onClick={() => { setDateFilter('all'); setCategoryFilter(null); setFreeOnly(false); setUserLocation(null); setNearbyRadius(null) }}
@@ -497,11 +597,7 @@ export function EventMap({ events }: EventMapProps) {
             <Link href={`/evenements/${selectedEvent.slug}`} className="flex gap-3 p-3">
               {selectedEvent.imageUrl ? (
                 <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl bg-surface-hover">
-                  <img
-                    src={selectedEvent.imageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={selectedEvent.imageUrl} alt="" className="h-full w-full object-cover" />
                 </div>
               ) : (
                 <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-xl bg-surface-hover">

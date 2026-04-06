@@ -130,11 +130,11 @@ export default async function HomePage() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Paname Club',
-    url: 'https://panameclub.com',
+    url: 'https://www.panameclub.fr',
     description: 'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.',
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://panameclub.com/evenements?q={search_term_string}',
+      target: 'https://www.panameclub.fr/evenements?q={search_term_string}',
       'query-input': 'required name=search_term_string',
     },
   }

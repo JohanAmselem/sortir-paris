@@ -70,7 +70,7 @@ export default async function NewsPage({ searchParams }: Props) {
     '@type': 'CollectionPage',
     name: 'News culturelles — Paname Club',
     description: 'Toute l\'actualité culturelle à Paris.',
-    url: 'https://panameclub.com/news',
+    url: 'https://www.panameclub.fr/news',
   }
 
   return (

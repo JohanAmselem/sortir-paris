@@ -110,11 +110,11 @@ export default async function ArticlePage({ params }: Props) {
     publisher: {
       '@type': 'Organization',
       name: 'Paname Club',
-      url: 'https://panameclub.com',
+      url: 'https://www.panameclub.fr',
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://panameclub.com/news/${slug}`,
+      '@id': `https://www.panameclub.fr/news/${slug}`,
     },
   }
 

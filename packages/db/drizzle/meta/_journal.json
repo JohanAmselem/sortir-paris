@@ -15,6 +15,13 @@
       "when": 1775337581107,
       "tag": "0001_huge_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775470712196,
+      "tag": "0002_blue_masque",
+      "breakpoints": true
     }
   ]
 }

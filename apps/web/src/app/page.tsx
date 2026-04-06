@@ -9,7 +9,8 @@ import { PourToiSection } from '@/components/events/pour-toi-section'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ArrowRight, Sparkles } from 'lucide-react'
-import { db, events, venues, categories, users } from '@sortir/db'
+import { Clock } from 'lucide-react'
+import { db, events, venues, categories, users, articles } from '@sortir/db'
 import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
 
 export const metadata = {
@@ -29,7 +30,7 @@ async function getHomeData() {
   const in48h = new Date(now)
   in48h.setHours(now.getHours() + 48)
 
-  const [tonight, upcoming, free, trending, lastChance, allCategories] = await Promise.all([
+  const [tonight, upcoming, free, trending, lastChance, allCategories, latestNews] = await Promise.all([
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -76,9 +77,16 @@ async function getHomeData() {
       .orderBy(asc(events.endDate))
       .limit(12),
     db.select().from(categories).orderBy(asc(categories.position)),
+    // Latest news articles
+    db
+      .select()
+      .from(articles)
+      .where(eq(articles.status, 'published'))
+      .orderBy(desc(articles.priority), desc(articles.publishedAt))
+      .limit(4),
   ])
 
-  return { tonight, upcoming, free, trending, lastChance, categories: allCategories }
+  return { tonight, upcoming, free, trending, lastChance, categories: allCategories, latestNews }
 }
 
 function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeof venues.$inferSelect | null; category: typeof categories.$inferSelect | null }>) {
@@ -92,7 +100,7 @@ function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeo
 }
 
 export default async function HomePage() {
-  const { tonight, upcoming, free, trending, lastChance, categories: cats } = await getHomeData()
+  const { tonight, upcoming, free, trending, lastChance, categories: cats, latestNews } = await getHomeData()
 
   // Check if user is logged in and onboarded for personalized section
   let currentUserId: string | null = null
@@ -290,6 +298,42 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* News */}
+      {latestNews.length > 0 && (
+        <section className="px-4 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
+              <span>📰</span> News culturelles
+            </h2>
+            <Link href="/news" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
+              Voir tout <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {latestNews.map((article) => (
+              <Link
+                key={article.id}
+                href={`/news/${article.slug}`}
+                className="group flex gap-3 rounded-xl border border-border/60 bg-surface p-3 transition-all hover:shadow-md hover:-translate-y-0.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
+                    {article.type === 'actualite' ? '🔴 Actualité' : article.type === 'selection' ? '⭐ Sélection' : article.type === 'focus' ? '🔍 Focus' : article.type === 'tendance' ? '📈 Tendance' : '🎙️ Interview'}
+                  </span>
+                  <h3 className="mt-1 text-[13px] font-semibold text-text-primary leading-snug line-clamp-2 group-hover:text-accent transition-colors">
+                    {article.title}
+                  </h3>
+                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted">
+                    <Clock className="h-2.5 w-2.5" />
+                    {new Date(article.publishedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* CTA */}
       <section className="mx-4 mb-8 overflow-hidden rounded-2xl bg-primary relative">

@@ -6,7 +6,8 @@ import { FilterBar } from '@/components/search/filter-bar'
 import { SearchBar } from '@/components/search/search-bar'
 import { EventGridSkeleton, FilterBarSkeleton } from '@/components/ui/skeleton'
 import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, asc, sql, count, like, inArray } from 'drizzle-orm'
+import { eventAmbiances, ambiances } from '@sortir/db'
 import { aiSearch, type AIIntent, type SearchResult } from '@/lib/ai-search'
 
 export const metadata: Metadata = {
@@ -64,17 +65,52 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
     conditions.push(eq(events.isFree, true))
   }
 
+  // Ambiance filter — find events matching the ambiance
+  if (searchParams.ambiance) {
+    const amb = await db.query.ambiances?.findFirst({
+      where: eq(ambiances.slug, searchParams.ambiance),
+    })
+    if (amb) {
+      conditions.push(
+        sql`${events.id} IN (SELECT event_id FROM event_ambiances WHERE ambiance_id = ${amb.id})`
+      )
+    }
+  }
+
+  // Arrondissement join condition
+  const needsArrFilter = !!searchParams.arr
+
+  // Build venue conditions for arrondissement filter
+  const venueConditions = needsArrFilter
+    ? [like(venues.arrondissement, `%${searchParams.arr}%`)]
+    : []
+
   const [eventsList, allCategories, totalCount] = await Promise.all([
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(...conditions))
-      .orderBy(desc(events.qualityScore))
-      .limit(48),
+    needsArrFilter
+      ? db
+          .select({ event: events, venue: venues, category: categories })
+          .from(events)
+          .innerJoin(venues, eq(events.venueId, venues.id))
+          .leftJoin(categories, eq(events.categoryId, categories.id))
+          .where(and(...conditions, ...venueConditions))
+          .orderBy(desc(events.qualityScore))
+          .limit(48)
+      : db
+          .select({ event: events, venue: venues, category: categories })
+          .from(events)
+          .leftJoin(venues, eq(events.venueId, venues.id))
+          .leftJoin(categories, eq(events.categoryId, categories.id))
+          .where(and(...conditions))
+          .orderBy(desc(events.qualityScore))
+          .limit(48),
     db.select().from(categories).orderBy(asc(categories.position)),
-    db.select({ value: count() }).from(events).where(and(...conditions)),
+    needsArrFilter
+      ? db
+          .select({ value: count() })
+          .from(events)
+          .innerJoin(venues, eq(events.venueId, venues.id))
+          .where(and(...conditions, ...venueConditions))
+      : db.select({ value: count() }).from(events).where(and(...conditions)),
   ])
 
   return { events: eventsList, categories: allCategories, total: Number(totalCount[0].value) }
@@ -378,6 +414,10 @@ export default async function EvenementsPage({ searchParams }: Props) {
               ...(params.category ? { category: params.category } : {}),
               ...(params.date ? { date: params.date } : {}),
               ...(params.free === 'true' ? { free: 'true' } : {}),
+              ...(params.arr ? { arr: params.arr } : {}),
+              ...(params.lat ? { lat: params.lat } : {}),
+              ...(params.lng ? { lng: params.lng } : {}),
+              ...(params.ambiance ? { ambiance: params.ambiance } : {}),
             }}
             sort="quality"
           />

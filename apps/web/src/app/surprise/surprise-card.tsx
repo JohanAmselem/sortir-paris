@@ -1,15 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
-import { Calendar, MapPin, ExternalLink, RefreshCw } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Calendar, MapPin, ExternalLink, Shuffle } from 'lucide-react'
+import { formatPriceRange } from '@/lib/utils'
 import type { EventWithRelations } from '@sortir/shared'
 
 export function SurpriseCard({ event }: { event: EventWithRelations }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [revealed, setRevealed] = useState(false)
   const [spinning, setSpinning] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setRevealed(true), 100)
+    return () => clearTimeout(timer)
+  }, [event.id])
 
   const startDate = event.startDate ? new Date(event.startDate) : null
   const dateLabel = startDate
@@ -22,12 +30,14 @@ export function SurpriseCard({ event }: { event: EventWithRelations }) {
 
   const handleRefresh = () => {
     setSpinning(true)
-    router.refresh()
-    setTimeout(() => setSpinning(false), 600)
+    setRevealed(false)
+    setTimeout(() => {
+      router.push(`/surprise?${searchParams.toString()}&_t=${Date.now()}`)
+    }, 300)
   }
 
   return (
-    <div className="mt-8 w-full max-w-md">
+    <div className={`mt-8 w-full max-w-md transition-all duration-500 ${revealed ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'}`}>
       {/* Card */}
       <Link
         href={`/evenements/${event.slug}`}
@@ -59,11 +69,20 @@ export function SurpriseCard({ event }: { event: EventWithRelations }) {
             </div>
           )}
 
-          {event.isFree && (
-            <div className="absolute top-3 right-3 rounded-lg bg-free/90 px-2.5 py-1">
-              <span className="text-[11px] font-bold text-white">Gratuit</span>
-            </div>
-          )}
+          <div className="absolute top-3 right-3 flex gap-1.5">
+            {event.isFree && (
+              <div className="rounded-lg bg-free/90 px-2.5 py-1">
+                <span className="text-[11px] font-bold text-white">Gratuit</span>
+              </div>
+            )}
+          </div>
+
+          {/* Price overlay */}
+          <div className="absolute bottom-3 right-3 rounded-lg bg-black/60 px-2.5 py-1 backdrop-blur-sm">
+            <span className="text-[12px] font-bold text-white">
+              {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
+            </span>
+          </div>
         </div>
 
         {/* Info */}
@@ -105,8 +124,8 @@ export function SurpriseCard({ event }: { event: EventWithRelations }) {
         onClick={handleRefresh}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-[14px] font-semibold text-text-primary shadow-sm transition-all hover:bg-surface-hover hover:shadow-md active:scale-[0.98]"
       >
-        <RefreshCw className={`h-4 w-4 ${spinning ? 'animate-spin' : ''}`} />
-        Autre suggestion
+        <Shuffle className={`h-4 w-4 transition-transform duration-500 ${spinning ? 'rotate-180' : ''}`} />
+        Autre surprise
       </button>
     </div>
   )

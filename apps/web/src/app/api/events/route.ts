@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, lte, sql, desc } from 'drizzle-orm'
+import { eq, and, gte, lte, sql, desc, asc } from 'drizzle-orm'
 
 // GET /api/events — List events with filters
 export async function GET(request: NextRequest) {
@@ -11,10 +11,13 @@ export async function GET(request: NextRequest) {
   const offset = (page - 1) * limit
 
   const category = searchParams.get('category')
-  const zone = searchParams.get('zone')
+  const zone = searchParams.get('zone') ?? searchParams.get('arr')
   const isFree = searchParams.get('free')
   const dateFilter = searchParams.get('date')
   const sort = searchParams.get('sort') ?? 'date'
+  const userLat = searchParams.get('lat')
+  const userLng = searchParams.get('lng')
+  const ambiance = searchParams.get('ambiance')
 
   // Build conditions
   const conditions = [eq(events.status, 'active')]
@@ -28,12 +31,22 @@ export async function GET(request: NextRequest) {
 
   if (zone) {
     conditions.push(
-      sql`${events.venueId} IN (SELECT id FROM venues WHERE arrondissement = ${zone})`
+      sql`${events.venueId} IN (SELECT id FROM venues WHERE arrondissement ILIKE ${'%' + zone + '%'})`
     )
   }
 
   if (isFree === 'true') {
     conditions.push(eq(events.isFree, true))
+  }
+
+  if (ambiance) {
+    conditions.push(
+      sql`${events.id} IN (
+        SELECT ea.event_id FROM event_ambiances ea
+        JOIN ambiances a ON a.id = ea.ambiance_id
+        WHERE a.slug = ${ambiance}
+      )`
+    )
   }
 
   // Date filters
@@ -68,9 +81,15 @@ export async function GET(request: NextRequest) {
     conditions.push(gte(events.startDate, now))
   }
 
-  // Sort
-  const orderBy =
-    sort === 'popular' ? desc(events.saveCount) : sort === 'quality' ? desc(events.qualityScore) : desc(events.startDate)
+  // Sort — if user provided geolocation, sort by distance
+  const hasGeo = userLat && userLng && !isNaN(parseFloat(userLat)) && !isNaN(parseFloat(userLng))
+  const distanceExpr = hasGeo
+    ? sql`(${venues.lat} - ${parseFloat(userLat!)}) * (${venues.lat} - ${parseFloat(userLat!)}) + (${venues.lng} - ${parseFloat(userLng!)}) * (${venues.lng} - ${parseFloat(userLng!)})`
+    : null
+
+  const orderBy = hasGeo && distanceExpr
+    ? asc(distanceExpr)
+    : sort === 'popular' ? desc(events.saveCount) : sort === 'quality' ? desc(events.qualityScore) : desc(events.startDate)
 
   // Query
   const [results, countResult] = await Promise.all([

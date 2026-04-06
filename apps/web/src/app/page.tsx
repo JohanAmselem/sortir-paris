@@ -26,7 +26,10 @@ async function getHomeData() {
   const nextWeek = new Date(now)
   nextWeek.setDate(now.getDate() + 7)
 
-  const [tonight, upcoming, free, trending, allCategories] = await Promise.all([
+  const in48h = new Date(now)
+  in48h.setHours(now.getHours() + 48)
+
+  const [tonight, upcoming, free, trending, lastChance, allCategories] = await Promise.all([
     db
       .select({ event: events, venue: venues, category: categories })
       .from(events)
@@ -59,10 +62,23 @@ async function getHomeData() {
       .where(and(eq(events.status, 'active'), gte(events.startDate, now)))
       .orderBy(desc(sql`${events.saveCount} + ${events.viewCount}`))
       .limit(12),
+    // Last chance — events ending within 48h
+    db
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(and(
+        eq(events.status, 'active'),
+        gte(events.endDate, now),
+        lte(events.endDate, in48h),
+      ))
+      .orderBy(asc(events.endDate))
+      .limit(12),
     db.select().from(categories).orderBy(asc(categories.position)),
   ])
 
-  return { tonight, upcoming, free, trending, categories: allCategories }
+  return { tonight, upcoming, free, trending, lastChance, categories: allCategories }
 }
 
 function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeof venues.$inferSelect | null; category: typeof categories.$inferSelect | null }>) {
@@ -76,7 +92,7 @@ function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeo
 }
 
 export default async function HomePage() {
-  const { tonight, upcoming, free, trending, categories: cats } = await getHomeData()
+  const { tonight, upcoming, free, trending, lastChance, categories: cats } = await getHomeData()
 
   // Check if user is logged in and onboarded for personalized section
   let currentUserId: string | null = null
@@ -217,11 +233,46 @@ export default async function HomePage() {
           {trending.length > 0 && (
             <SectionRow title="Tendances" icon="📈" href="/evenements" events={mapEvents(trending)} />
           )}
+          {lastChance.length > 0 && (
+            <SectionRow title="Dernière chance" icon="⏳" href="/evenements" events={mapEvents(lastChance)} />
+          )}
           {free.length > 0 && (
             <SectionRow title="Bons plans gratuits" icon="✨" href="/evenements?free=true" events={mapEvents(free)} />
           )}
         </div>
       </Suspense>
+
+      {/* Collections */}
+      <section className="px-4 py-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
+            <span>📚</span> Collections
+          </h2>
+          <Link href="/collections" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
+            Voir tout <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="scrollbar-hide flex gap-3 overflow-x-auto snap-x snap-mandatory">
+          {[
+            { slug: 'expos-printemps', emoji: '🖼️', title: 'Les expos du moment', gradient: 'from-amber-500/20 to-orange-500/20' },
+            { slug: 'sorties-gratuites', emoji: '🆓', title: 'Bons plans gratuits', gradient: 'from-emerald-500/20 to-teal-500/20' },
+            { slug: 'concerts-jazz', emoji: '🎷', title: 'Jazz à Paris', gradient: 'from-indigo-500/20 to-purple-500/20' },
+            { slug: 'theatre-comedie', emoji: '🎭', title: 'Théâtre & Comédie', gradient: 'from-red-500/20 to-pink-500/20' },
+            { slug: 'sorties-en-famille', emoji: '👨‍👩‍👧‍👦', title: 'En famille', gradient: 'from-sky-500/20 to-cyan-500/20' },
+            { slug: 'soirees-dansantes', emoji: '💃', title: 'On danse ce soir', gradient: 'from-fuchsia-500/20 to-violet-500/20' },
+          ].map((col) => (
+            <Link
+              key={col.slug}
+              href={`/collections/${col.slug}`}
+              className={`group flex-shrink-0 snap-start w-[180px] rounded-2xl border border-border/60 bg-gradient-to-br ${col.gradient} p-4 transition-all hover:shadow-md hover:-translate-y-0.5`}
+            >
+              <span className="text-3xl">{col.emoji}</span>
+              <p className="mt-2 text-[13px] font-bold text-text-primary group-hover:text-accent transition-colors line-clamp-2">{col.title}</p>
+            </Link>
+          ))}
+          <div className="w-1 flex-shrink-0" />
+        </div>
+      </section>
 
       {/* Categories */}
       <section className="px-4 py-10">

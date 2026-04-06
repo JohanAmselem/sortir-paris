@@ -303,17 +303,38 @@ export default async function EventPage({ params }: Props) {
           {event.venue && (
             <div className="mt-8">
               <h2 className="text-[15px] font-bold text-text-primary">Lieu</h2>
-              <div className="mt-3 rounded-2xl border border-border/60 bg-surface p-4">
-                <p className="font-semibold text-text-primary">{event.venue.name}</p>
-                {event.venue.address && <p className="mt-1 text-[13px] text-text-secondary">{event.venue.address}</p>}
-                {event.venue.city && (
-                  <p className="text-[13px] text-text-muted">{event.venue.city}{event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}</p>
+              <div className="mt-3 rounded-2xl border border-border/60 bg-surface overflow-hidden">
+                {/* Mini-map */}
+                {event.venue.lat && event.venue.lng && (
+                  <Link
+                    href={`/carte?lat=${event.venue.lat}&lng=${event.venue.lng}&zoom=15`}
+                    className="block relative aspect-[2.5/1] w-full bg-surface-hover overflow-hidden group"
+                  >
+                    <Image
+                      src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-s+e94560(${event.venue.lng},${event.venue.lat})/${event.venue.lng},${event.venue.lat},14,0/600x240@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`}
+                      alt={`Carte — ${event.venue.name}`}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width: 768px) 100vw, 600px"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                    <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                      <MapPin className="h-3 w-3" /> Voir sur la carte
+                    </span>
+                  </Link>
                 )}
-                {event.venue.website && (
-                  <a href={event.venue.website} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
-                    <ExternalLink className="h-3.5 w-3.5" /> Site du lieu
-                  </a>
-                )}
+                <div className="p-4">
+                  <p className="font-semibold text-text-primary">{event.venue.name}</p>
+                  {event.venue.address && <p className="mt-1 text-[13px] text-text-secondary">{event.venue.address}</p>}
+                  {event.venue.city && (
+                    <p className="text-[13px] text-text-muted">{event.venue.city}{event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}</p>
+                  )}
+                  {event.venue.website && (
+                    <a href={event.venue.website} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
+                      <ExternalLink className="h-3.5 w-3.5" /> Site du lieu
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           )}

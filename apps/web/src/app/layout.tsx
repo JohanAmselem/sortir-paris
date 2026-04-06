@@ -17,6 +17,9 @@ export const metadata: Metadata = {
     locale: 'fr_FR',
     siteName: 'Paname Club',
   },
+  verification: {
+    google: 'X1NKo4arOgih-em9dFreJ4wnXL_uNek-dlbYomcNmes',
+  },
 }
 
 export const viewport: Viewport = {

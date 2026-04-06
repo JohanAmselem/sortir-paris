@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   },
   description:
     'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic. Trouve ta sortie à Paris.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://sortir-paris.vercel.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.panameclub.fr'),
   openGraph: {
     type: 'website',
     locale: 'fr_FR',

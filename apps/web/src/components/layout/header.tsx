@@ -15,6 +15,8 @@ const NAV_LINKS = [
   { href: '/gratuit', label: 'Gratuit' },
   { href: '/carte', label: 'Carte' },
   { href: '/evenements', label: 'Explorer' },
+  { href: '/news', label: 'News' },
+  { href: '/collections', label: 'Collections' },
   { href: '/surprise', label: '🎲 Surprise' },
 ]
 

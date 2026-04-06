@@ -57,8 +57,8 @@ async function getGeocodedEvents(): Promise<MapEvent[]> {
       categoryName: r.categoryName,
       categoryIcon: r.categoryIcon,
       venueName: r.venueName,
-      lat: r.lat!,
-      lng: r.lng!,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
     }))
 }
 

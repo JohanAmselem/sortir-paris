@@ -10,6 +10,7 @@ import * as tagsSchema from './schema/tags'
 import * as interactionsSchema from './schema/interactions'
 import * as ingestionSchema from './schema/ingestion'
 import * as articlesSchema from './schema/articles'
+import * as reviewsSchema from './schema/reviews'
 
 // Schema exports
 export * from './schema/users'
@@ -20,6 +21,7 @@ export * from './schema/tags'
 export * from './schema/interactions'
 export * from './schema/ingestion'
 export * from './schema/articles'
+export * from './schema/reviews'
 
 // DB client with full schema for query builder
 const connectionString = process.env.DATABASE_URL!
@@ -33,6 +35,7 @@ const schema = {
   ...interactionsSchema,
   ...ingestionSchema,
   ...articlesSchema,
+  ...reviewsSchema,
 }
 
 const client = postgres(connectionString, {

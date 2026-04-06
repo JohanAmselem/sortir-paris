@@ -8,6 +8,7 @@ import { ShareButton } from '@/components/ui/share-button'
 import { Countdown } from '@/components/ui/countdown'
 import { ViewTracker } from '@/components/events/view-tracker'
 import { EventCard } from '@/components/events/event-card'
+import { EventReviews } from '@/components/events/event-reviews'
 import { StickyBookingCTA } from '@/components/events/sticky-booking-cta'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
 import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
@@ -338,6 +339,9 @@ export default async function EventPage({ params }: Props) {
               </div>
             </div>
           )}
+
+          {/* Reviews */}
+          <EventReviews eventId={event.id} />
 
           {/* Source */}
           {event.sourceUrl && (

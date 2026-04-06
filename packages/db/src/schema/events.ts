@@ -48,6 +48,7 @@ export const events = pgTable(
     // Denormalized counters
     saveCount: integer('save_count').default(0).notNull(),
     viewCount: integer('view_count').default(0).notNull(),
+    attendanceCount: integer('attendance_count').default(0).notNull(),
 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -15,10 +15,10 @@ const NAV_LINKS = [
   { href: '/gratuit', label: 'Gratuit' },
   { href: '/carte', label: 'Carte' },
   { href: '/evenements', label: 'Explorer' },
+  { href: '/match', label: '❤️ Match' },
+  { href: '/drop', label: '🔥 Drop' },
   { href: '/top', label: '🏆 Top' },
   { href: '/news', label: 'News' },
-  { href: '/collections', label: 'Collections' },
-  { href: '/surprise', label: '🎲 Surprise' },
 ]
 
 export function Header() {

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, userSaves, events, venues, categories } from '@sortir/db'
+import { db, userSaves, events, venues, categories, users } from '@sortir/db'
 import { eq, and, sql, desc } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
+import { XP_REWARDS } from '@/lib/gamification'
 
 // GET /api/saves — Get user's saved events with full event data
 export async function GET() {
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
     .update(events)
     .set({ saveCount: sql`${events.saveCount} + 1` })
     .where(eq(events.id, eventId))
+
+  // Award XP
+  await db
+    .update(users)
+    .set({ xp: sql`${users.xp} + ${XP_REWARDS.SAVE}` })
+    .where(eq(users.id, user.id))
 
   return NextResponse.json({ saved: true })
 }

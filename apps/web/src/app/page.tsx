@@ -250,6 +250,30 @@ export default async function HomePage() {
         </div>
       </Suspense>
 
+      {/* Match + Drop CTA */}
+      <section className="px-4 py-6">
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            href="/match"
+            className="group relative overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/10 to-neon/5 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
+          >
+            <span className="text-3xl">❤️</span>
+            <h3 className="mt-2 text-[14px] font-bold text-text-primary group-hover:text-accent transition-colors">Match Culturel</h3>
+            <p className="mt-0.5 text-[11px] text-text-muted">Swipe pour découvrir</p>
+            <div className="absolute -bottom-4 -right-4 text-6xl opacity-10 group-hover:opacity-20 transition-opacity">❤️</div>
+          </Link>
+          <Link
+            href="/drop"
+            className="group relative overflow-hidden rounded-2xl border border-neon/20 bg-gradient-to-br from-neon/10 to-amber-500/5 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
+          >
+            <span className="text-3xl">🔥</span>
+            <h3 className="mt-2 text-[14px] font-bold text-text-primary group-hover:text-neon transition-colors">Drop du lundi</h3>
+            <p className="mt-0.5 text-[11px] text-text-muted">5 sorties perso / semaine</p>
+            <div className="absolute -bottom-4 -right-4 text-6xl opacity-10 group-hover:opacity-20 transition-opacity">🔥</div>
+          </Link>
+        </div>
+      </section>
+
       {/* Collections */}
       <section className="px-4 py-6">
         <div className="flex items-center justify-between mb-4">

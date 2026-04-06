@@ -9,6 +9,7 @@ import { Countdown } from '@/components/ui/countdown'
 import { ViewTracker } from '@/components/events/view-tracker'
 import { EventCard } from '@/components/events/event-card'
 import { EventReviews } from '@/components/events/event-reviews'
+import { AttendButton } from '@/components/events/attend-button'
 import { StickyBookingCTA } from '@/components/events/sticky-booking-cta'
 import { formatPriceRange, formatEventDate } from '@/lib/utils'
 import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
@@ -262,6 +263,11 @@ export default async function EventPage({ params }: Props) {
             )}
             <SaveButton eventId={event.id} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all" />
             <ShareButton title={event.title} text={event.shortDesc ?? event.title} className="h-11 w-11" />
+          </div>
+
+          {/* J'y vais */}
+          <div className="mt-4">
+            <AttendButton eventId={event.id} />
           </div>
 
           {/* Add to calendar */}

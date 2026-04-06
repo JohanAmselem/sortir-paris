@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, integer, smallint, timestamp } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -6,6 +6,10 @@ export const users = pgTable('users', {
   name: text('name'),
   avatarUrl: text('avatar_url'),
   onboarded: boolean('onboarded').default(false).notNull(),
+  // Gamification
+  xp: integer('xp').default(0).notNull(),
+  level: smallint('level').default(1).notNull(),
+  badges: text('badges').default('').notNull(), // comma-separated badge slugs
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

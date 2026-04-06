@@ -13,6 +13,10 @@ import {
   User,
   Sparkles,
   Heart,
+  Dna,
+  Gift,
+  Zap,
+  Trophy,
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -77,18 +81,39 @@ export default function ComptePage() {
 
   const MENU_ITEMS = [
     {
+      href: '/compte/adn',
+      icon: Dna,
+      label: 'Mon ADN Paname',
+      desc: 'Profil culturel, badges, XP',
+      color: 'text-accent',
+    },
+    {
       href: '/compte/sauvegardes',
       icon: Bookmark,
       label: 'Mes favoris',
       desc: 'Événements sauvegardés',
-      color: 'text-accent',
+      color: 'text-blue-500',
+    },
+    {
+      href: '/drop',
+      icon: Gift,
+      label: 'Mon Drop hebdo',
+      desc: '5 sorties choisies pour toi',
+      color: 'text-neon',
+    },
+    {
+      href: '/match',
+      icon: Heart,
+      label: 'Match Culturel',
+      desc: 'Swipe et découvre',
+      color: 'text-pink-500',
     },
     {
       href: '/onboarding',
-      icon: Heart,
+      icon: Sparkles,
       label: 'Mes goûts',
       desc: 'Modifier mes préférences',
-      color: 'text-pink-500',
+      color: 'text-amber-500',
     },
     {
       href: '/compte/parametres',

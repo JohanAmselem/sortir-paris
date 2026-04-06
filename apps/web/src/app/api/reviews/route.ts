@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, eventReviews, users } from '@sortir/db'
 import { eq, and, desc, sql, avg, count } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
+import { XP_REWARDS } from '@/lib/gamification'
 
 // GET /api/reviews?eventId=xxx — Get reviews for an event
 export async function GET(request: NextRequest) {
@@ -101,6 +102,13 @@ export async function POST(request: NextRequest) {
       rating,
       comment: comment?.trim() || null,
     })
+
+    // Award XP for new review
+    const xpGain = XP_REWARDS.REVIEW + (comment?.trim() ? XP_REWARDS.COMMENT : 0)
+    await db
+      .update(users)
+      .set({ xp: sql`${users.xp} + ${xpGain}` })
+      .where(eq(users.id, user.id))
   }
 
   return NextResponse.json({ success: true })

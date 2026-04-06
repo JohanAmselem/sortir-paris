@@ -263,24 +263,10 @@ export function EventMap({ events }: EventMapProps) {
     m.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
     map.current = m
 
-    const initSource = () => {
-      if (m.getSource('events-cluster')) return
-      m.addSource('events-cluster', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-        cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 60,
-      })
-      setMapReady(true)
-    }
-
-    m.on('load', initSource)
-    m.on('style.load', initSource)
+    m.on('load', () => setMapReady(true))
 
     // Dismiss popup on map click (only if no marker was clicked)
     m.on('click', () => {
-      // Small delay to let marker click fire first
       setTimeout(() => {
         if (!(window as unknown as Record<string, boolean>).__markerClicked) {
           setSelectedEvent(null)
@@ -295,93 +281,47 @@ export function EventMap({ events }: EventMapProps) {
     }
   }, [clearMarkers])
 
-  // ─── Render markers from GeoJSON source (clusters + points) ───
+  // ─── Render markers directly as DOM markers (no querySourceFeatures) ───
   useEffect(() => {
     if (!map.current || !mapReady) return
     const m = map.current
 
-    const source = m.getSource('events-cluster') as mapboxgl.GeoJSONSource | undefined
-    if (!source) return
+    // Clear previous markers
+    markersRef.current.forEach(mk => mk.remove())
+    markersRef.current = []
+    clusterMarkersRef.current.forEach(mk => mk.remove())
+    clusterMarkersRef.current = []
 
-    // Build event lookup
-    const eventLookup = new Map<string, MapEvent>()
-    const features = filteredEvents.map((event) => {
-      eventLookup.set(event.id, event)
-      return {
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [event.lng, event.lat] },
-        properties: { eventId: event.id },
-      }
-    })
-
-    source.setData({ type: 'FeatureCollection', features })
-
-    // Debounced render of DOM markers based on what Mapbox renders
-    let renderTimeout: ReturnType<typeof setTimeout>
+    // Simple grid-based clustering
+    const getClusterKey = (lat: number, lng: number, zoom: number) => {
+      const gridSize = 0.02 / Math.pow(2, zoom - 12) // Smaller grid at higher zoom
+      const gridLat = Math.floor(lat / gridSize)
+      const gridLng = Math.floor(lng / gridSize)
+      return `${gridLat}_${gridLng}`
+    }
 
     const renderMarkers = () => {
-      clearTimeout(renderTimeout)
-      renderTimeout = setTimeout(() => {
-        // Clear previous markers
-        markersRef.current.forEach(mk => mk.remove())
-        markersRef.current = []
-        clusterMarkersRef.current.forEach(mk => mk.remove())
-        clusterMarkersRef.current = []
+      // Clear previous
+      markersRef.current.forEach(mk => mk.remove())
+      markersRef.current = []
+      clusterMarkersRef.current.forEach(mk => mk.remove())
+      clusterMarkersRef.current = []
 
-        // Query all rendered features from the source
-        const renderedFeatures = m.querySourceFeatures('events-cluster')
+      const zoom = m.getZoom()
+      const bounds = m.getBounds()
+      if (!bounds) return
 
-        // Separate clusters from individual points
-        const clusters: Array<{ id: number; count: number; lng: number; lat: number }> = []
-        const points: Array<{ eventId: string; lng: number; lat: number }> = []
-        const seenClusters = new Set<number>()
-        const seenPoints = new Set<string>()
+      // Filter to visible events in viewport
+      const visibleEvents = filteredEvents.filter((e) =>
+        bounds.contains([e.lng, e.lat])
+      )
 
-        for (const f of renderedFeatures) {
-          if (f.geometry.type !== 'Point') continue
-          const [lng, lat] = f.geometry.coordinates
-
-          if (f.properties?.cluster) {
-            const clusterId = f.properties.cluster_id as number
-            if (!seenClusters.has(clusterId)) {
-              seenClusters.add(clusterId)
-              clusters.push({ id: clusterId, count: f.properties.point_count as number, lng, lat })
-            }
-          } else {
-            const eventId = f.properties?.eventId as string
-            if (eventId && !seenPoints.has(eventId)) {
-              seenPoints.add(eventId)
-              points.push({ eventId, lng, lat })
-            }
-          }
-        }
-
-        // Render cluster markers
-        for (const cluster of clusters) {
-          const el = createClusterEl(cluster.count)
-          el.addEventListener('click', (e) => {
-            e.stopPropagation()
-            ;(source as mapboxgl.GeoJSONSource).getClusterExpansionZoom(cluster.id, (err, zoom) => {
-              if (err) return
-              m.easeTo({ center: [cluster.lng, cluster.lat], zoom: zoom ?? 14 })
-            })
-          })
-
-          const marker = new mapboxgl.Marker({ element: el })
-            .setLngLat([cluster.lng, cluster.lat])
-            .addTo(m)
-          clusterMarkersRef.current.push(marker)
-        }
-
-        // Render individual event markers
-        for (const point of points) {
-          const event = eventLookup.get(point.eventId)
-          if (!event) continue
-
+      // At high zoom (>= 14), show individual markers
+      if (zoom >= 14) {
+        for (const event of visibleEvents) {
           const el = createMarkerEl(event)
           let tooltip: HTMLDivElement | null = null
 
-          // Hover tooltip
           el.addEventListener('mouseenter', () => {
             tooltip = createTooltip(event)
             el.appendChild(tooltip)
@@ -389,8 +329,6 @@ export function EventMap({ events }: EventMapProps) {
           el.addEventListener('mouseleave', () => {
             if (tooltip) { tooltip.remove(); tooltip = null }
           })
-
-          // Click → show event card
           el.addEventListener('click', (e) => {
             e.stopPropagation()
             ;(window as unknown as Record<string, boolean>).__markerClicked = true
@@ -404,29 +342,80 @@ export function EventMap({ events }: EventMapProps) {
             .addTo(m)
           markersRef.current.push(marker)
         }
-      }, 100) // Debounce 100ms
-    }
+        return
+      }
 
-    // Re-render markers when the map moves/zooms (clusters change)
-    m.on('moveend', renderMarkers)
-    m.on('zoomend', renderMarkers)
+      // At lower zoom, cluster nearby events
+      const clusters = new Map<string, MapEvent[]>()
+      for (const event of visibleEvents) {
+        const key = getClusterKey(event.lat, event.lng, zoom)
+        if (!clusters.has(key)) clusters.set(key, [])
+        clusters.get(key)!.push(event)
+      }
 
-    // Wait for source data to be loaded before initial render
-    const onSourceData = (e: mapboxgl.MapSourceDataEvent) => {
-      if (e.sourceId === 'events-cluster' && e.isSourceLoaded) {
-        renderMarkers()
+      for (const [, clusterEvents] of clusters) {
+        if (clusterEvents.length === 1) {
+          // Single event — show marker
+          const event = clusterEvents[0]
+          const el = createMarkerEl(event)
+          let tooltip: HTMLDivElement | null = null
+
+          el.addEventListener('mouseenter', () => {
+            tooltip = createTooltip(event)
+            el.appendChild(tooltip)
+          })
+          el.addEventListener('mouseleave', () => {
+            if (tooltip) { tooltip.remove(); tooltip = null }
+          })
+          el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            ;(window as unknown as Record<string, boolean>).__markerClicked = true
+            setSelectedEvent(event)
+            m.flyTo({ center: [event.lng, event.lat], zoom: 15, duration: 500 })
+            if (tooltip) { tooltip.remove(); tooltip = null }
+          })
+
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([event.lng, event.lat])
+            .addTo(m)
+          markersRef.current.push(marker)
+        } else {
+          // Cluster — show count
+          const avgLat = clusterEvents.reduce((s, e) => s + e.lat, 0) / clusterEvents.length
+          const avgLng = clusterEvents.reduce((s, e) => s + e.lng, 0) / clusterEvents.length
+          const el = createClusterEl(clusterEvents.length)
+
+          el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            ;(window as unknown as Record<string, boolean>).__markerClicked = true
+            m.easeTo({ center: [avgLng, avgLat], zoom: zoom + 2 })
+          })
+
+          const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([avgLng, avgLat])
+            .addTo(m)
+          clusterMarkersRef.current.push(marker)
+        }
       }
     }
-    m.on('sourcedata', onSourceData)
 
-    // Also try initial render (in case source is already loaded)
+    // Debounced render
+    let renderTimeout: ReturnType<typeof setTimeout>
+    const debouncedRender = () => {
+      clearTimeout(renderTimeout)
+      renderTimeout = setTimeout(renderMarkers, 80)
+    }
+
+    m.on('moveend', debouncedRender)
+    m.on('zoomend', debouncedRender)
+
+    // Initial render
     renderMarkers()
 
     return () => {
       clearTimeout(renderTimeout)
-      m.off('moveend', renderMarkers)
-      m.off('zoomend', renderMarkers)
-      m.off('sourcedata', onSourceData)
+      m.off('moveend', debouncedRender)
+      m.off('zoomend', debouncedRender)
       markersRef.current.forEach(mk => mk.remove())
       markersRef.current = []
       clusterMarkersRef.current.forEach(mk => mk.remove())

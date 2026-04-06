@@ -411,13 +411,22 @@ export function EventMap({ events }: EventMapProps) {
     m.on('moveend', renderMarkers)
     m.on('zoomend', renderMarkers)
 
-    // Initial render after data is set
+    // Wait for source data to be loaded before initial render
+    const onSourceData = (e: mapboxgl.MapSourceDataEvent) => {
+      if (e.sourceId === 'events-cluster' && e.isSourceLoaded) {
+        renderMarkers()
+      }
+    }
+    m.on('sourcedata', onSourceData)
+
+    // Also try initial render (in case source is already loaded)
     renderMarkers()
 
     return () => {
       clearTimeout(renderTimeout)
       m.off('moveend', renderMarkers)
       m.off('zoomend', renderMarkers)
+      m.off('sourcedata', onSourceData)
       markersRef.current.forEach(mk => mk.remove())
       markersRef.current = []
       clusterMarkersRef.current.forEach(mk => mk.remove())

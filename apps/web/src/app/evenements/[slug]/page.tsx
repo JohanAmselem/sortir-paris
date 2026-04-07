@@ -109,20 +109,63 @@ export default async function EventPage({ params }: Props) {
 
   const similarEvents = await getSimilarEvents({ id: event.id, categoryId: event.categoryId })
 
-  const jsonLd = {
+  const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: event.title,
-    description: event.shortDesc ?? '',
-    startDate: event.startDate?.toString(),
-    endDate: event.endDate?.toString(),
+    description: event.shortDesc ?? event.description?.slice(0, 300) ?? '',
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString() ?? (startDate ? new Date(startDate.getTime() + 2 * 3600000).toISOString() : undefined),
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     location: event.venue ? {
       '@type': 'Place',
       name: event.venue.name,
-      address: { '@type': 'PostalAddress', streetAddress: event.venue.address ?? '', addressLocality: event.venue.city ?? 'Paris', postalCode: event.venue.zipCode ?? '', addressCountry: 'FR' },
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: event.venue.address ?? '',
+        addressLocality: event.venue.city ?? 'Paris',
+        postalCode: event.venue.zipCode ?? '',
+        addressCountry: 'FR',
+      },
+      ...(event.venue.lat && event.venue.lng ? {
+        geo: {
+          '@type': 'GeoCoordinates',
+          latitude: Number(event.venue.lat),
+          longitude: Number(event.venue.lng),
+        },
+      } : {}),
+    } : {
+      '@type': 'Place',
+      name: 'Paris',
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Paris',
+        addressCountry: 'FR',
+      },
+    },
+    offers: {
+      '@type': 'Offer',
+      url: event.bookingUrl ?? event.sourceUrl ?? `https://www.panameclub.fr/evenements/${event.slug}`,
+      price: event.priceMin ? (event.priceMin / 100).toFixed(2) : '0',
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      validFrom: event.createdAt?.toISOString() ?? startDate?.toISOString(),
+    },
+    performer: event.category ? {
+      '@type': 'PerformingGroup',
+      name: event.title,
     } : undefined,
-    offers: { '@type': 'Offer', price: event.priceMin ? event.priceMin / 100 : 0, priceCurrency: 'EUR' },
-    image: event.imageUrl ?? '',
+    organizer: event.venue ? {
+      '@type': 'Organization',
+      name: event.venue.name,
+      url: event.venue.website ?? undefined,
+    } : {
+      '@type': 'Organization',
+      name: 'Paname Club',
+      url: 'https://www.panameclub.fr',
+    },
+    image: event.imageUrl ? [event.imageUrl] : ['https://www.panameclub.fr/og-default.png'],
   }
 
   return (

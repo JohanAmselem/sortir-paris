@@ -24,26 +24,40 @@ async function getWeekendData(searchParams: { [key: string]: string | undefined 
   const now = new Date()
   const dayOfWeek = now.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
 
-  // Calculate next Saturday (or today if Saturday/Sunday)
-  const saturday = new Date(now)
-  if (dayOfWeek === 0) {
-    // Sunday: show today
-    saturday.setDate(now.getDate() - 1)
-  } else if (dayOfWeek === 6) {
-    // Saturday: show today
-  } else {
-    saturday.setDate(now.getDate() + (6 - dayOfWeek))
-  }
-  saturday.setHours(0, 0, 0, 0)
+  // Calculate the weekend window (Saturday 00:00 → Sunday 23:59)
+  // On Sunday: show today (Sunday) only — from now to end of day
+  // On Saturday: show Saturday + Sunday
+  // On weekdays: show next Saturday + Sunday
+  let weekendStart: Date
+  let weekendEnd: Date
 
-  const sunday = new Date(saturday)
-  sunday.setDate(saturday.getDate() + 1)
-  sunday.setHours(23, 59, 59, 999)
+  if (dayOfWeek === 0) {
+    // Sunday: show remaining Sunday events
+    weekendStart = now
+    weekendEnd = new Date(now)
+    weekendEnd.setHours(23, 59, 59, 999)
+  } else if (dayOfWeek === 6) {
+    // Saturday: show Saturday + Sunday
+    weekendStart = new Date(now)
+    weekendStart.setHours(0, 0, 0, 0)
+    weekendEnd = new Date(now)
+    weekendEnd.setDate(now.getDate() + 1)
+    weekendEnd.setHours(23, 59, 59, 999)
+  } else {
+    // Weekday: show next Saturday + Sunday
+    const daysUntilSaturday = 6 - dayOfWeek
+    weekendStart = new Date(now)
+    weekendStart.setDate(now.getDate() + daysUntilSaturday)
+    weekendStart.setHours(0, 0, 0, 0)
+    weekendEnd = new Date(weekendStart)
+    weekendEnd.setDate(weekendStart.getDate() + 1)
+    weekendEnd.setHours(23, 59, 59, 999)
+  }
 
   const conditions = [
     eq(events.status, 'active'),
-    gte(events.startDate, saturday),
-    lte(events.startDate, sunday),
+    gte(events.startDate, weekendStart),
+    lte(events.startDate, weekendEnd),
   ]
 
   // Category filter

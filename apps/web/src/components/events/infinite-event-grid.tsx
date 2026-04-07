@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EventCard } from './event-card'
 import type { EventWithRelations } from '@sortir/shared'
 
@@ -43,6 +43,13 @@ export function InfiniteEventGrid({
   const [loading, setLoading] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
+  // Stabilize apiParams to prevent infinite re-renders from object reference changes
+  const stableApiParams = useMemo(
+    () => JSON.stringify(apiParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(apiParams)]
+  )
+
   // Reset when initialEvents change (e.g. filters change)
   useEffect(() => {
     setEvents(initialEvents)
@@ -58,7 +65,7 @@ export function InfiniteEventGrid({
       page: String(page),
       limit: '24',
       sort,
-      ...apiParams,
+      ...JSON.parse(stableApiParams) as Record<string, string>,
     })
 
     try {
@@ -74,7 +81,7 @@ export function InfiniteEventGrid({
     } finally {
       setLoading(false)
     }
-  }, [loading, hasMore, page, sort, apiParams])
+  }, [loading, hasMore, page, sort, stableApiParams])
 
   useEffect(() => {
     const sentinel = sentinelRef.current

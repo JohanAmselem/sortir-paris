@@ -51,7 +51,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { eventId } = await request.json()
+  let body: { eventId?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const { eventId } = body
 
   if (!eventId) {
     return NextResponse.json({ error: 'eventId required' }, { status: 400 })
@@ -72,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     await db
       .update(events)
-      .set({ saveCount: sql`${events.saveCount} - 1` })
+      .set({ saveCount: sql`GREATEST(${events.saveCount} - 1, 0)` })
       .where(eq(events.id, eventId))
 
     return NextResponse.json({ saved: false })

@@ -12,20 +12,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email invalide' }, { status: 400 })
     }
 
-    // Upsert into a simple newsletter_subscribers approach using raw SQL
-    // Since we don't have a dedicated table yet, store in a lightweight way
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS newsletter_subscribers (
-        email TEXT PRIMARY KEY,
-        subscribed_at TIMESTAMPTZ DEFAULT NOW(),
-        unsubscribed BOOLEAN DEFAULT FALSE
-      )
-    `)
-
+    // Upsert into newsletter_subscribers
+    // Note: table must exist (created via migration or manually)
     await db.execute(sql`
       INSERT INTO newsletter_subscribers (email)
       VALUES (${email})
-      ON CONFLICT (email) DO UPDATE SET unsubscribed = FALSE
+      ON CONFLICT (email) DO UPDATE SET unsubscribed = FALSE, subscribed_at = NOW()
     `)
 
     return NextResponse.json({ success: true })

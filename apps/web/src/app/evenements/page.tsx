@@ -32,14 +32,29 @@ async function getEvents(searchParams: { [key: string]: string | undefined }) {
     conditions.push(lte(events.startDate, endOfDay))
   } else if (searchParams.date === 'weekend') {
     const dayOfWeek = now.getDay()
-    const saturday = new Date(now)
-    saturday.setDate(now.getDate() + (6 - dayOfWeek))
-    saturday.setHours(0, 0, 0, 0)
-    const sunday = new Date(saturday)
-    sunday.setDate(saturday.getDate() + 1)
-    sunday.setHours(23, 59, 59, 999)
-    conditions.push(gte(events.startDate, saturday))
-    conditions.push(lte(events.startDate, sunday))
+    let weekendStart: Date
+    let weekendEnd: Date
+    if (dayOfWeek === 0) {
+      // Sunday: show remaining Sunday events
+      weekendStart = now
+      weekendEnd = new Date(now)
+      weekendEnd.setHours(23, 59, 59, 999)
+    } else if (dayOfWeek === 6) {
+      weekendStart = new Date(now)
+      weekendStart.setHours(0, 0, 0, 0)
+      weekendEnd = new Date(now)
+      weekendEnd.setDate(now.getDate() + 1)
+      weekendEnd.setHours(23, 59, 59, 999)
+    } else {
+      weekendStart = new Date(now)
+      weekendStart.setDate(now.getDate() + (6 - dayOfWeek))
+      weekendStart.setHours(0, 0, 0, 0)
+      weekendEnd = new Date(weekendStart)
+      weekendEnd.setDate(weekendStart.getDate() + 1)
+      weekendEnd.setHours(23, 59, 59, 999)
+    }
+    conditions.push(gte(events.startDate, weekendStart))
+    conditions.push(lte(events.startDate, weekendEnd))
   } else if (searchParams.date === 'week') {
     const endOfWeek = new Date(now)
     endOfWeek.setDate(now.getDate() + 7)

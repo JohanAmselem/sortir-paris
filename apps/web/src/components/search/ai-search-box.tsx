@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Sparkles, ArrowRight, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,13 @@ export function AISearchBox({ className }: { className?: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParamsObj = useSearchParams()
+
+  // Reset isSubmitting when navigation completes (pathname or searchParams change)
+  useEffect(() => {
+    setIsSubmitting(false)
+  }, [pathname, searchParamsObj])
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()

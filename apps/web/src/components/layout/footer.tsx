@@ -21,8 +21,8 @@ export function Footer() {
             <ul className="mt-4 space-y-2.5">
               {[
                 { href: '/ce-soir', label: 'Ce soir' },
-                { href: '/evenements?date=weekend', label: 'Ce week-end' },
-                { href: '/evenements?free=true', label: 'Gratuit' },
+                { href: '/ce-week-end', label: 'Ce week-end' },
+                { href: '/gratuit', label: 'Gratuit' },
                 { href: '/evenements', label: 'Tous les événements' },
               ].map((link) => (
                 <li key={link.href}>

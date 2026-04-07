@@ -112,7 +112,7 @@ async function generateDrop(userId: string, monday: Date): Promise<string[]> {
     .orderBy(
       // Prefer events in user's categories
       preferredCategoryIds.length > 0
-        ? desc(sql`CASE WHEN ${events.categoryId} = ANY(ARRAY[${sql.raw(preferredCategoryIds.map(id => `'${id}'::uuid`).join(','))}]) THEN 1 ELSE 0 END`)
+        ? desc(sql`CASE WHEN ${events.categoryId} = ANY(${preferredCategoryIds}::uuid[]) THEN 1 ELSE 0 END`)
         : desc(events.qualityScore),
       desc(events.qualityScore),
       desc(sql`${events.saveCount} + ${events.viewCount}`)

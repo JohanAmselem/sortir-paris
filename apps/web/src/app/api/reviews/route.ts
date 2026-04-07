@@ -71,9 +71,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { eventId, rating, comment } = await request.json()
+  let body: { eventId?: string; rating?: number; comment?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-  if (!eventId || !rating || rating < 1 || rating > 5) {
+  const { eventId, rating, comment } = body
+
+  if (!eventId || !rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
     return NextResponse.json({ error: 'eventId and rating (1-5) required' }, { status: 400 })
   }
 

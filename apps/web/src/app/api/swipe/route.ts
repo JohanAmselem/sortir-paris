@@ -67,8 +67,16 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { eventId, direction } = await request.json()
-  if (!eventId || !['right', 'left'].includes(direction)) {
+  let body: { eventId?: string; direction?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const { eventId } = body
+  const direction = body.direction as 'right' | 'left' | undefined
+  if (!eventId || !direction || !['right', 'left'].includes(direction)) {
     return NextResponse.json({ error: 'eventId and direction (right/left) required' }, { status: 400 })
   }
 

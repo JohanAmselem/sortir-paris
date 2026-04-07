@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { href: '/evenements', label: 'Explorer' },
   { href: '/match', label: '❤️ Match' },
   { href: '/drop', label: '🔥 Drop' },
+  { href: '/quiz', label: '🎯 Quiz' },
   { href: '/top', label: '🏆 Top' },
   { href: '/news', label: 'News' },
 ]

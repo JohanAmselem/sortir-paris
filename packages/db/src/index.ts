@@ -12,6 +12,7 @@ import * as ingestionSchema from './schema/ingestion'
 import * as articlesSchema from './schema/articles'
 import * as reviewsSchema from './schema/reviews'
 import * as gamificationSchema from './schema/gamification'
+import * as tasteProfileSchema from './schema/taste-profile'
 
 // Schema exports
 export * from './schema/users'
@@ -24,6 +25,7 @@ export * from './schema/ingestion'
 export * from './schema/articles'
 export * from './schema/reviews'
 export * from './schema/gamification'
+export * from './schema/taste-profile'
 
 // DB client with full schema for query builder
 const connectionString = process.env.DATABASE_URL!
@@ -39,6 +41,7 @@ const schema = {
   ...articlesSchema,
   ...reviewsSchema,
   ...gamificationSchema,
+  ...tasteProfileSchema,
 }
 
 const client = postgres(connectionString, {

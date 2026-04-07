@@ -17,6 +17,7 @@ import {
   Gift,
   Zap,
   Trophy,
+  Target,
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -107,6 +108,13 @@ export default function ComptePage() {
       label: 'Match Culturel',
       desc: 'Swipe et découvre',
       color: 'text-pink-500',
+    },
+    {
+      href: '/quiz',
+      icon: Target,
+      label: 'Quiz — Tu préfères',
+      desc: 'Découvre ton profil culturel',
+      color: 'text-orange-500',
     },
     {
       href: '/onboarding',

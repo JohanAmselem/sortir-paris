@@ -159,7 +159,7 @@ export default async function EventPage({ params }: Props) {
     organizer: event.venue ? {
       '@type': 'Organization',
       name: event.venue.name,
-      url: event.venue.website ?? undefined,
+      url: event.venue.website || `https://www.panameclub.fr/lieux/${event.venue.slug}`,
     } : {
       '@type': 'Organization',
       name: 'Paname Club',

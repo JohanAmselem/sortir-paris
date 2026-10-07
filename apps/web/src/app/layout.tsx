@@ -64,8 +64,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         <Footer />
         <BottomNav />
-        <Analytics />
-        <SpeedInsights />
+        {/* Enable Web Analytics / Speed Insights in the Vercel dashboard, then set these flags. */}
+        {process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === '1' && <Analytics />}
+        {process.env.NEXT_PUBLIC_VERCEL_SPEED_INSIGHTS === '1' && <SpeedInsights />}
         {plausibleDomain && (
           <Script
             defer

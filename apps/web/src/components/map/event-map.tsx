@@ -317,7 +317,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
 
   return (
     <div className="relative h-full w-full">
-      <div ref={container} className="absolute inset-0" role="region" aria-label="Carte des sorties à Paris" />
+      <div ref={container} className="absolute inset-0 h-full w-full" role="region" aria-label="Carte des sorties à Paris" />
 
       {/* Filters */}
       <div className="absolute inset-x-0 top-0 z-10 p-3">

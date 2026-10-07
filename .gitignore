@@ -42,3 +42,4 @@ coverage/
 # playwright
 apps/web/test-results/
 apps/web/playwright-report/
+*.tsbuildinfo

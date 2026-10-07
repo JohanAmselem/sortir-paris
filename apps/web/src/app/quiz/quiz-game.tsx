@@ -1,463 +1,397 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, RotateCcw, Share2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { CATEGORY_BY_SLUG } from '@/lib/events/taxonomy'
 import {
-  QUIZ_QUESTIONS,
-  QUIZ_CATEGORIES,
   ARCHETYPES,
+  ARCHETYPE_AFFINITIES,
   DIMENSION_LABELS,
-  type Archetype,
+  DIMENSIONS,
+  QUICK_QUESTION_IDS,
+  QUIZ_CATEGORIES,
+  QUIZ_QUESTIONS,
+  scoreQuiz,
+  type QuizAnswer,
+  type QuizAnswers,
+  type TasteScores,
 } from '@/lib/taste-quiz-data'
-import { ChevronRight, Lock, Sparkles, RotateCcw, Share2, ArrowRight, Zap } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { readLocalQuiz, writeLocalQuiz } from '@/app/club/_lib/local'
 
-type Phase = 'intro' | 'playing' | 'computing' | 'result'
+type Phase = 'loading' | 'intro' | 'playing' | 'result'
 
-interface TasteProfile {
-  exploration: number
-  energy: number
-  social: number
-  budget: number
-  planning: number
-  mainstream: number
-  visual: number
-  depth: number
+interface Result {
   archetype: string
-  archetypeLabel?: string
-  aiSummary?: string
+  scores: TasteScores
+  answered: number
 }
 
+const QUESTION_BY_ID = new Map(QUIZ_QUESTIONS.map((q) => [q.id, q]))
+
 export function QuizGame() {
-  const supabase = useMemo(() => createClient(), [])
-  const [user, setUser] = useState<boolean | null>(null)
-  const [phase, setPhase] = useState<Phase>('intro')
-  const [answers, setAnswers] = useState<Record<string, 'a' | 'b'>>({})
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [profile, setProfile] = useState<TasteProfile | null>(null)
-  const [xpAwarded, setXpAwarded] = useState(0)
-  const [hasExisting, setHasExisting] = useState(false)
-  const [animating, setAnimating] = useState(false)
-  const [selectedSide, setSelectedSide] = useState<'a' | 'b' | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [phase, setPhase] = useState<Phase>('loading')
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [answers, setAnswers] = useState<QuizAnswers>({})
+  const [queue, setQueue] = useState<string[]>([])
+  const [position, setPosition] = useState(0)
+  const [result, setResult] = useState<Result | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [picked, setPicked] = useState<QuizAnswer | null>(null)
+  const [replace, setReplace] = useState(false)
 
-  const currentQuestion = QUIZ_QUESTIONS[currentIndex]
-  const currentCategory = QUIZ_CATEGORIES.find(c => c.id === currentQuestion?.category)
-  const progress = (currentIndex / QUIZ_QUESTIONS.length) * 100
-
-  // Check auth & existing profile
+  // Restore: account first, then this device.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(!!data.user)
-      if (data.user) {
-        fetch('/api/taste-quiz')
-          .then(r => r.json())
-          .then(d => {
-            if (d.completed && d.profile) {
-              setProfile(d.profile)
-              setHasExisting(true)
+    let cancelled = false
+    ;(async () => {
+      let restored: { answers: QuizAnswers; result: Result } | null = null
+      try {
+        const { data } = await createClient().auth.getSession()
+        const logged = Boolean(data.session)
+        if (!cancelled) setLoggedIn(logged)
+        if (logged) {
+          const res = await fetch('/api/taste-quiz', { cache: 'no-store' })
+          if (res.ok) {
+            const d = (await res.json()) as {
+              completed: boolean
+              profile: { archetype: string; scores: TasteScores } | null
+              answers: QuizAnswers
             }
-          })
-          .catch(() => {})
+            if (d.completed && d.profile) {
+              restored = {
+                answers: d.answers ?? {},
+                result: { archetype: d.profile.archetype, scores: d.profile.scores, answered: Object.keys(d.answers ?? {}).length },
+              }
+            }
+          }
+        }
+      } catch {
+        // offline / no session: fall back to local
       }
-    })
-  }, [supabase])
-
-  const handleAnswer = useCallback((choice: 'a' | 'b') => {
-    if (animating) return
-    setSelectedSide(choice)
-    setAnimating(true)
-
-    const newAnswers = { ...answers, [currentQuestion.id]: choice }
-    setAnswers(newAnswers)
-
-    setTimeout(() => {
-      if (currentIndex < QUIZ_QUESTIONS.length - 1) {
-        setCurrentIndex(i => i + 1)
-        setSelectedSide(null)
-        setAnimating(false)
+      if (!restored) {
+        const local = readLocalQuiz()
+        if (local) {
+          restored = {
+            answers: local.answers,
+            result: { archetype: local.archetype, scores: local.scores, answered: Object.keys(local.answers).length },
+          }
+        }
+      }
+      if (cancelled) return
+      if (restored) {
+        setAnswers(restored.answers)
+        setResult(restored.result)
+        setPhase('result')
       } else {
-        // Quiz complete → submit
-        setPhase('computing')
-        submitQuiz(newAnswers)
+        setPhase('intro')
       }
-    }, 400)
-  }, [animating, answers, currentIndex, currentQuestion])
-
-  const submitQuiz = async (finalAnswers: Record<string, 'a' | 'b'>) => {
-    try {
-      const res = await fetch('/api/taste-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: finalAnswers }),
-      })
-      const data = await res.json()
-      if (data.profile) {
-        setProfile(data.profile)
-        setXpAwarded(data.xpAwarded ?? 0)
-      }
-      // Dramatic reveal delay
-      setTimeout(() => setPhase('result'), 1500)
-    } catch {
-      setPhase('result')
+    })()
+    return () => {
+      cancelled = true
     }
+  }, [])
+
+  const start = useCallback(
+    (mode: 'quick' | 'more' | 'restart') => {
+      const base = mode === 'restart' ? {} : answers
+      const ids =
+        mode === 'more' ? QUIZ_QUESTIONS.map((q) => q.id).filter((id) => !(id in base)) : QUICK_QUESTION_IDS.filter((id) => !(id in base))
+      if (mode === 'restart') setAnswers({})
+      setReplace(mode === 'restart')
+      setQueue(ids.length ? ids : QUICK_QUESTION_IDS)
+      setPosition(0)
+      setSaveState('idle')
+      setPhase('playing')
+    },
+    [answers]
+  )
+
+  const finish = useCallback(
+    async (all: QuizAnswers) => {
+      const r = scoreQuiz(all)
+      const res: Result = { archetype: r.archetype, scores: r.scores, answered: r.answered }
+      setResult(res)
+      setPhase('result')
+      writeLocalQuiz({ answers: all, archetype: r.archetype, scores: r.scores, at: new Date().toISOString(), synced: false })
+      if (!loggedIn) return
+      setSaveState('saving')
+      try {
+        const resp = await fetch('/api/taste-quiz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: all, replace }),
+        })
+        if (!resp.ok) throw new Error(String(resp.status))
+        writeLocalQuiz({ answers: all, archetype: r.archetype, scores: r.scores, at: new Date().toISOString(), synced: true })
+        setSaveState('saved')
+      } catch {
+        setSaveState('error')
+      }
+    },
+    [loggedIn, replace]
+  )
+
+  const answer = useCallback(
+    (choice: QuizAnswer) => {
+      const id = queue[position]
+      if (!id || picked) return
+      setPicked(choice)
+      const next = { ...answers, [id]: choice }
+      setAnswers(next)
+      window.setTimeout(() => {
+        setPicked(null)
+        if (position + 1 >= queue.length) finish(next)
+        else setPosition((p) => p + 1)
+      }, 180)
+    },
+    [answers, finish, picked, position, queue]
+  )
+
+  // Keyboard: A / ← and B / →
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') answer('a')
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'b') answer('b')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [answer, phase])
+
+  if (phase === 'loading') {
+    return <div className="skeleton mx-auto mt-8 h-72 max-w-xl rounded-2xl" aria-busy="true" />
   }
 
-  const startQuiz = () => {
-    setAnswers({})
-    setCurrentIndex(0)
-    setProfile(null)
-    setSelectedSide(null)
-    setPhase('playing')
-  }
-
-  // ─── Not logged in ───
-  if (user === false) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-        <div className="rounded-2xl bg-surface-hover/50 p-6">
-          <Lock className="mx-auto h-10 w-10 text-text-muted" />
-          <h2 className="mt-4 text-lg font-bold text-text-primary">Connecte-toi pour jouer</h2>
-          <p className="mt-2 text-sm text-text-secondary">Découvre ton profil culturel unique</p>
-          <Link
-            href="/login"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white"
-          >
-            Se connecter <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Intro ───
   if (phase === 'intro') {
     return (
-      <div className="mx-auto max-w-lg px-4 py-8">
-        {/* Hero */}
-        <div className="text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-accent to-neon shadow-lg">
-            <span className="text-4xl">🎯</span>
-          </div>
-          <h1 className="mt-6 text-2xl font-black text-text-primary">
-            Tu préfères...
-          </h1>
-          <p className="mt-2 text-sm text-text-secondary leading-relaxed">
-            40 questions pour découvrir ton profil culturel unique.
-            <br />
-            Réponds vite, fais confiance à ton instinct !
-          </p>
-        </div>
-
-        {/* Categories preview */}
-        <div className="mt-8 grid grid-cols-2 gap-2">
-          {QUIZ_CATEGORIES.map(cat => (
-            <div key={cat.id} className="flex items-center gap-2 rounded-xl bg-surface-hover/50 px-3 py-2">
-              <span className="text-lg">{cat.icon}</span>
-              <span className="text-[12px] font-medium text-text-secondary">{cat.title}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-6 flex justify-center gap-6">
-          <div className="text-center">
-            <p className="text-2xl font-black text-accent">40</p>
-            <p className="text-[11px] text-text-muted">questions</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-black text-neon">5 min</p>
-            <p className="text-[11px] text-text-muted">chrono</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-black text-free">+50</p>
-            <p className="text-[11px] text-text-muted">XP</p>
-          </div>
-        </div>
-
-        {/* CTA */}
+      <div className="mx-auto mt-8 max-w-xl rounded-2xl bg-night p-6 text-paper sm:p-8">
+        <p className="font-display text-[2.4rem]">10 duels, 2 minutes.</p>
+        <p className="mt-3 text-[16px] leading-relaxed text-paper/80">
+          Concert en cave ou festival géant ? Vernissage confidentiel ou soirée d’ouverture ? Choisis à l’instinct : on en
+          déduit ton profil de sortant parisien, et ton Drop du lundi s’y adapte.
+        </p>
         <button
-          onClick={startQuiz}
-          className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-accent-hover py-4 text-[15px] font-bold text-white shadow-lg shadow-accent/25 transition-all hover:shadow-xl active:scale-[0.98]"
+          type="button"
+          onClick={() => start('quick')}
+          className="mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-paper px-6 text-[15px] font-semibold text-ink transition-colors hover:bg-accent-soft"
         >
-          <Sparkles className="h-5 w-5" />
-          {hasExisting ? 'Refaire le quiz' : 'Découvrir mon profil'}
+          C’est parti
+          <ArrowRight className="h-4 w-4" aria-hidden />
         </button>
+        <p className="mt-3 text-[13px] text-paper/70">Sans compte. Tu pourras affiner avec 30 questions de plus.</p>
+      </div>
+    )
+  }
 
-        {/* Existing result */}
-        {hasExisting && profile && (
+  if (phase === 'playing') {
+    const q = QUESTION_BY_ID.get(queue[position])
+    if (!q) return null
+    const cat = QUIZ_CATEGORIES.find((c) => c.id === q.category)
+    const progress = Math.round((position / queue.length) * 100)
+    return (
+      <div className="mx-auto mt-8 max-w-2xl">
+        <div className="flex items-center justify-between gap-3 text-[13px] font-semibold text-text-muted">
           <button
-            onClick={() => setPhase('result')}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-[13px] font-semibold text-text-secondary hover:bg-surface-hover transition-colors"
+            type="button"
+            onClick={() => setPosition((p) => Math.max(0, p - 1))}
+            disabled={position === 0}
+            className="inline-flex h-11 items-center gap-1 rounded-full px-2 hover:text-ink disabled:opacity-40"
           >
-            Voir mon profil actuel →
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Précédente
           </button>
-        )}
-      </div>
-    )
-  }
-
-  // ─── Computing ───
-  if (phase === 'computing') {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-        <div className="relative">
-          <div className="h-20 w-20 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
-          <span className="absolute inset-0 flex items-center justify-center text-3xl">🧬</span>
+          <span className="tabular-nums" aria-live="polite">
+            {position + 1} / {queue.length}
+          </span>
         </div>
-        <p className="mt-6 text-lg font-bold text-text-primary animate-pulse">
-          Analyse de ton ADN culturel...
-        </p>
-        <p className="mt-2 text-sm text-text-muted">
-          On croise tes réponses avec 8 dimensions de personnalité
-        </p>
-      </div>
-    )
-  }
-
-  // ─── Result ───
-  if (phase === 'result' && profile) {
-    const archetype = ARCHETYPES[profile.archetype] || ARCHETYPES['flaneur-curieux']
-    const dimensions = [
-      'exploration', 'energy', 'social', 'budget',
-      'planning', 'mainstream', 'visual', 'depth',
-    ] as const
-
-    return (
-      <div className="mx-auto max-w-lg px-4 py-8">
-        {/* XP toast */}
-        {xpAwarded > 0 && (
-          <div className="mb-6 flex items-center justify-center gap-2 rounded-xl bg-free/10 px-4 py-2.5 text-[13px] font-bold text-free animate-bounce-in">
-            <Zap className="h-4 w-4" />
-            +{xpAwarded} XP gagnés !
-          </div>
-        )}
-
-        {/* Archetype card */}
-        <div
-          className="rounded-3xl p-6 text-center text-white shadow-xl"
-          style={{ background: `linear-gradient(135deg, ${archetype.color}, ${archetype.color}dd)` }}
-        >
-          <span className="text-5xl">{archetype.emoji}</span>
-          <h2 className="mt-4 text-2xl font-black">{archetype.name}</h2>
-          <p className="mt-2 text-sm font-medium opacity-90">{archetype.tagline}</p>
-          <p className="mt-4 text-[13px] leading-relaxed opacity-80">{archetype.description}</p>
-
-          {/* Traits */}
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {archetype.traits.map(t => (
-              <span key={t} className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold backdrop-blur-sm">
-                {t}
-              </span>
-            ))}
-          </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-paper-deep" aria-hidden>
+          <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
 
-        {/* Dimension bars */}
-        <div className="mt-8">
-          <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
-            Tes 8 dimensions
-          </h3>
-          <div className="mt-4 space-y-3">
-            {dimensions.map(dim => {
-              const val = profile[dim]
-              const label = DIMENSION_LABELS[dim]
-              return (
-                <div key={dim}>
-                  <div className="flex items-center justify-between text-[12px]">
-                    <span className="font-medium text-text-secondary">
-                      {label.icon} {label.low}
-                    </span>
-                    <span className="font-medium text-text-secondary">
-                      {label.high}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-surface-hover">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${val}%`,
-                        background: `linear-gradient(90deg, ${archetype.color}88, ${archetype.color})`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <p className="mt-8 text-center text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">{cat?.title}</p>
+        <h2 className="font-display mt-2 text-center text-[2.6rem] text-ink">Tu préfères…</h2>
 
-        {/* Recommendations */}
-        <div className="mt-8">
-          <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
-            On te recommande
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {archetype.recommendations.map(rec => (
-              <span
-                key={rec}
-                className="rounded-xl border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-text-primary"
+        <div className="mt-6 grid gap-3 sm:grid-cols-2" role="group" aria-label="Choisis une option">
+          {(['a', 'b'] as const).map((side) => {
+            const opt = side === 'a' ? q.optionA : q.optionB
+            const selected = picked === side || (!picked && answers[q.id] === side)
+            return (
+              <button
+                key={side}
+                type="button"
+                onClick={() => answer(side)}
+                aria-pressed={selected}
+                className={cn(
+                  'flex min-h-[148px] flex-col items-start rounded-2xl border-2 p-5 text-left transition-colors',
+                  selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:border-ink'
+                )}
               >
-                {rec}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* AI Summary */}
-        {profile.aiSummary && (
-          <div className="mt-6 rounded-2xl bg-surface-hover/50 p-4">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-accent">
-              <Sparkles className="h-3.5 w-3.5" /> Résumé IA
-            </p>
-            <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-              {profile.aiSummary}
-            </p>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="mt-8 space-y-3">
-          <button
-            onClick={startQuiz}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-[13px] font-semibold text-text-secondary hover:bg-surface-hover transition-colors"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Refaire le quiz
-          </button>
-          <Link
-            href="/match"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-[13px] font-bold text-white"
-          >
-            <Sparkles className="h-4 w-4" />
-            Découvrir mes matchs
-          </Link>
+                <span className="text-[13px] font-bold uppercase text-text-muted">
+                  {side === 'a' ? 'A · ←' : 'B · →'}
+                </span>
+                <span className="mt-2 text-[18px] font-semibold leading-snug text-ink">
+                  <span aria-hidden className="mr-1.5">
+                    {opt.emoji}
+                  </span>
+                  {opt.text}
+                </span>
+                {opt.subtext && <span className="mt-1 text-[14px] text-text-secondary">{opt.subtext}</span>}
+              </button>
+            )
+          })}
         </div>
       </div>
     )
   }
 
-  // ─── Playing ───
-  if (!currentQuestion) return null
-
-  // Detect category transition
-  const prevCategory = currentIndex > 0 ? QUIZ_QUESTIONS[currentIndex - 1].category : null
-  const isNewCategory = currentQuestion.category !== prevCategory
+  // Result
+  if (!result) return null
+  const arch = ARCHETYPES[result.archetype] ?? ARCHETYPES['flaneur-curieux']
+  const affinity = ARCHETYPE_AFFINITIES[arch.slug]
+  const canRefine = result.answered < QUIZ_QUESTIONS.length
 
   return (
-    <div ref={containerRef} className="mx-auto max-w-lg px-4 py-6">
-      {/* Progress */}
-      <div className="mb-2 flex items-center justify-between text-[11px] text-text-muted">
-        <span className="font-semibold">{currentIndex + 1}/{QUIZ_QUESTIONS.length}</span>
-        <span>{currentCategory?.icon} {currentCategory?.title}</span>
-      </div>
-      <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-accent to-neon transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+    <div className="mx-auto mt-8 max-w-3xl">
+      <section className="rounded-2xl bg-night p-6 text-paper sm:p-8" aria-labelledby="result-title">
+        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent-glow">Ton profil culturel</p>
+        <h2 id="result-title" className="font-display mt-2 text-[3rem] sm:text-[3.8rem]">
+          {arch.name} <span aria-hidden className="text-[2rem] align-middle">{arch.emoji}</span>
+        </h2>
+        <p className="mt-1 text-[18px] font-semibold text-accent-glow">{arch.tagline}</p>
+        <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-paper/85">{arch.description}</p>
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {arch.traits.map((t) => (
+            <li key={t} className="rounded-full border border-paper/25 px-3 py-1 text-[13px] text-paper/90">
+              {t}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-5 text-[13px] text-paper/70">
+          Basé sur {result.answered} réponse{result.answered > 1 ? 's' : ''}.
+          {saveState === 'saving' && ' Enregistrement…'}
+          {saveState === 'saved' && ' Enregistré sur ton compte.'}
+          {saveState === 'error' && ' Pas pu l’enregistrer pour l’instant, on réessaiera.'}
+        </p>
+      </section>
 
-      {/* Category transition */}
-      {isNewCategory && currentCategory && (
-        <div
-          className="mb-6 rounded-2xl px-4 py-3 text-center animate-fade-in"
-          style={{ backgroundColor: `${currentCategory.color}10` }}
-        >
-          <span className="text-2xl">{currentCategory.icon}</span>
-          <p className="mt-1 text-[13px] font-bold" style={{ color: currentCategory.color }}>
-            {currentCategory.title}
+      <section className="mt-8" aria-labelledby="dims-title">
+        <h3 id="dims-title" className="font-display text-[1.8rem] text-ink">
+          Ton équilibre
+        </h3>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+          {DIMENSIONS.map((d) => {
+            const meta = DIMENSION_LABELS[d]
+            const v = result.scores[d]
+            return (
+              <li key={d}>
+                <div className="flex justify-between text-[13px] text-text-secondary">
+                  <span>{meta.low}</span>
+                  <span className="font-semibold text-ink">{meta.label}</span>
+                  <span>{meta.high}</span>
+                </div>
+                <div className="relative mt-1.5 h-2 rounded-full bg-paper-deep" role="img" aria-label={`${meta.label} : ${v} sur 100`}>
+                  <span
+                    className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper bg-accent shadow-sm"
+                    style={{ left: `${v}%` }}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section className="mt-8 rounded-2xl border border-border bg-surface p-5" aria-labelledby="next-title">
+        <h3 id="next-title" className="font-display text-[1.8rem] text-ink">
+          Ce qu’on va te proposer
+        </h3>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {affinity?.categories.map((slug) => (
+            <li key={slug}>
+              <Link
+                href={`/categories/${slug}`}
+                className="inline-flex h-11 items-center rounded-full border border-border-strong px-4 text-[14px] font-semibold text-ink hover:border-ink"
+              >
+                {CATEGORY_BY_SLUG[slug]?.plural ?? slug}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Link href="/drop" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-ink px-5 text-[15px] font-semibold text-paper">
+            Voir mon Drop de la semaine
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+          <Link
+            href="/match"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong px-5 text-[15px] font-semibold text-ink hover:border-ink"
+          >
+            Affiner avec Match
+          </Link>
+        </div>
+        {!loggedIn && (
+          <p className="mt-4 text-[14px] text-text-secondary">
+            Ton profil est gardé sur cet appareil.{' '}
+            <Link href="/login?next=/quiz" className="font-semibold text-accent underline underline-offset-2">
+              Crée ton compte
+            </Link>{' '}
+            pour le retrouver partout et recevoir ton Drop perso.
           </p>
-          <p className="text-[11px] text-text-muted">{currentCategory.subtitle}</p>
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* Question */}
-      <p className="mb-6 text-center text-lg font-black text-text-primary">
-        Tu préfères...
-      </p>
-
-      {/* Options */}
-      <div className="flex flex-col gap-3">
-        {/* Option A */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {canRefine && (
+          <button
+            type="button"
+            onClick={() => start('more')}
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold text-paper hover:bg-accent-hover"
+          >
+            <Check className="h-4 w-4" aria-hidden />
+            Affiner ({QUIZ_QUESTIONS.length - result.answered} questions de plus)
+          </button>
+        )}
+        <ShareButton name={arch.name} />
         <button
-          onClick={() => handleAnswer('a')}
-          disabled={animating}
-          className={cn(
-            'group relative overflow-hidden rounded-2xl border-2 p-5 text-left transition-all duration-300',
-            selectedSide === 'a'
-              ? 'border-accent bg-accent/5 scale-[1.02] shadow-lg shadow-accent/10'
-              : selectedSide === 'b'
-              ? 'border-border/30 opacity-40 scale-[0.97]'
-              : 'border-border/60 bg-surface hover:border-accent/40 hover:shadow-md active:scale-[0.98]',
-          )}
+          type="button"
+          onClick={() => start('restart')}
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong px-4 text-[14px] font-semibold text-ink hover:border-ink"
         >
-          <div className="flex items-start gap-3">
-            <span className="text-3xl">{currentQuestion.optionA.emoji}</span>
-            <div className="flex-1">
-              <p className="text-[15px] font-bold text-text-primary leading-snug">
-                {currentQuestion.optionA.text}
-              </p>
-              {currentQuestion.optionA.subtext && (
-                <p className="mt-1 text-[12px] text-text-muted italic">
-                  {currentQuestion.optionA.subtext}
-                </p>
-              )}
-            </div>
-          </div>
-          {selectedSide === 'a' && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white animate-scale-in">
-              ✓
-            </div>
-          )}
-        </button>
-
-        {/* VS divider */}
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-[12px] font-black text-text-muted">OU</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        {/* Option B */}
-        <button
-          onClick={() => handleAnswer('b')}
-          disabled={animating}
-          className={cn(
-            'group relative overflow-hidden rounded-2xl border-2 p-5 text-left transition-all duration-300',
-            selectedSide === 'b'
-              ? 'border-accent bg-accent/5 scale-[1.02] shadow-lg shadow-accent/10'
-              : selectedSide === 'a'
-              ? 'border-border/30 opacity-40 scale-[0.97]'
-              : 'border-border/60 bg-surface hover:border-accent/40 hover:shadow-md active:scale-[0.98]',
-          )}
-        >
-          <div className="flex items-start gap-3">
-            <span className="text-3xl">{currentQuestion.optionB.emoji}</span>
-            <div className="flex-1">
-              <p className="text-[15px] font-bold text-text-primary leading-snug">
-                {currentQuestion.optionB.text}
-              </p>
-              {currentQuestion.optionB.subtext && (
-                <p className="mt-1 text-[12px] text-text-muted italic">
-                  {currentQuestion.optionB.subtext}
-                </p>
-              )}
-            </div>
-          </div>
-          {selectedSide === 'b' && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white animate-scale-in">
-              ✓
-            </div>
-          )}
+          <RotateCcw className="h-4 w-4" aria-hidden />
+          Recommencer
         </button>
       </div>
-
-      {/* Skip hint */}
-      <p className="mt-4 text-center text-[11px] text-text-muted">
-        Fais confiance à ton premier instinct 💡
-      </p>
     </div>
+  )
+}
+
+function ShareButton({ name }: { name: string }) {
+  const [copied, setCopied] = useState(false)
+  const text = useMemo(() => `Je suis « ${name} » sur Paname Club. Et toi ?`, [name])
+  const share = async () => {
+    const url = `${window.location.origin}/quiz`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Tu préfères', text, url })
+        return
+      }
+      await navigator.clipboard.writeText(`${text} ${url}`)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // share cancelled
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={share}
+      className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong px-4 text-[14px] font-semibold text-ink hover:border-ink"
+    >
+      <Share2 className="h-4 w-4" aria-hidden />
+      {copied ? 'Lien copié' : 'Partager'}
+    </button>
   )
 }

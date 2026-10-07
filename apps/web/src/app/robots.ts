@@ -1,16 +1,16 @@
 import type { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/site'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.panameclub.fr'
-
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/compte/', '/login', '/onboarding', '/partage'],
+        // Search and filtered variants are noindex anyway; keep crawlers (and the LLM) off free-text queries.
+        disallow: ['/api/', '/compte', '/login', '/onboarding', '/partage', '/*?*q=', '/surprise?'],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/sitemap-events.xml`],
   }
 }

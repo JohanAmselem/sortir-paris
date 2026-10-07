@@ -1,143 +1,134 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, eventReviews, users } from '@sortir/db'
-import { eq, and, desc, sql, avg, count } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
-import { XP_REWARDS } from '@/lib/gamification'
+import { z } from 'zod'
+import { and, avg, count, desc, eq, sql } from 'drizzle-orm'
+import { db, eventReviews, events, users } from '@sortir/db'
+import { errors, ensureUserRow, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
+import { syncGamification } from '@/app/club/_lib/member'
 
-// GET /api/reviews?eventId=xxx — Get reviews for an event
-export async function GET(request: NextRequest) {
-  const eventId = request.nextUrl.searchParams.get('eventId')
-  if (!eventId) {
-    return NextResponse.json({ error: 'eventId required' }, { status: 400 })
-  }
+export const dynamic = 'force-dynamic'
 
-  const reviews = await db
-    .select({
-      id: eventReviews.id,
-      rating: eventReviews.rating,
-      comment: eventReviews.comment,
-      createdAt: eventReviews.createdAt,
-      userName: users.name,
-      userAvatar: users.avatarUrl,
-    })
-    .from(eventReviews)
-    .innerJoin(users, eq(eventReviews.userId, users.id))
-    .where(eq(eventReviews.eventId, eventId))
-    .orderBy(desc(eventReviews.createdAt))
-    .limit(50)
+const COMMENT_MAX = 1000
 
-  // Aggregate stats
-  const [stats] = await db
-    .select({
-      avgRating: avg(eventReviews.rating),
-      totalReviews: count(),
-    })
-    .from(eventReviews)
-    .where(eq(eventReviews.eventId, eventId))
-
-  // Check if current user has already reviewed
-  let userReview = null
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const existing = await db
-        .select()
-        .from(eventReviews)
-        .where(and(eq(eventReviews.userId, user.id), eq(eventReviews.eventId, eventId)))
-        .limit(1)
-      userReview = existing[0] ?? null
-    }
-  } catch {
-    // Not authenticated, that's fine
-  }
-
-  return NextResponse.json({
-    reviews,
-    stats: {
-      avgRating: stats.avgRating ? parseFloat(String(stats.avgRating)) : null,
-      totalReviews: Number(stats.totalReviews),
-    },
-    userReview,
-  })
-}
-
-// POST /api/reviews — Create or update a review
-export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  let body: { eventId?: string; rating?: number; comment?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const { eventId, rating, comment } = body
-
-  if (!eventId || !rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
-    return NextResponse.json({ error: 'eventId and rating (1-5) required' }, { status: 400 })
-  }
-
-  // Upsert review
-  const existing = await db
-    .select()
-    .from(eventReviews)
-    .where(and(eq(eventReviews.userId, user.id), eq(eventReviews.eventId, eventId)))
+/** Reviews open once the event has started. */
+async function eventState(eventId: string) {
+  const [ev] = await db
+    .select({ started: sql<boolean>`${events.startDate} <= now()` })
+    .from(events)
+    .where(eq(events.id, eventId))
     .limit(1)
-
-  if (existing.length > 0) {
-    // Update
-    await db
-      .update(eventReviews)
-      .set({
-        rating,
-        comment: comment?.trim() || null,
-        updatedAt: new Date(),
-      })
-      .where(eq(eventReviews.id, existing[0].id))
-  } else {
-    // Insert
-    await db.insert(eventReviews).values({
-      userId: user.id,
-      eventId,
-      rating,
-      comment: comment?.trim() || null,
-    })
-
-    // Award XP for new review
-    const xpGain = XP_REWARDS.REVIEW + (comment?.trim() ? XP_REWARDS.COMMENT : 0)
-    await db
-      .update(users)
-      .set({ xp: sql`${users.xp} + ${xpGain}` })
-      .where(eq(users.id, user.id))
-  }
-
-  return NextResponse.json({ success: true })
+  return ev ?? null
 }
 
-// DELETE /api/reviews?eventId=xxx — Delete user's review
+// GET /api/reviews?eventId= — reviews, stats, the member's own review.
+export async function GET(request: NextRequest) {
+  const eventId = parseIdParam(request.nextUrl.searchParams.get('eventId'))
+  if (!eventId) return errors.badRequest('Identifiant d’événement invalide.')
+  try {
+    const [ev, reviews, [stats], user] = await Promise.all([
+      eventState(eventId),
+      db
+        .select({
+          id: eventReviews.id,
+          rating: eventReviews.rating,
+          comment: eventReviews.comment,
+          createdAt: eventReviews.createdAt,
+          userName: users.name,
+          userAvatar: users.avatarUrl,
+          userId: eventReviews.userId,
+        })
+        .from(eventReviews)
+        .innerJoin(users, eq(eventReviews.userId, users.id))
+        .where(eq(eventReviews.eventId, eventId))
+        .orderBy(desc(eventReviews.createdAt))
+        .limit(50),
+      db.select({ avgRating: avg(eventReviews.rating), total: count() }).from(eventReviews).where(eq(eventReviews.eventId, eventId)),
+      getSessionUser(),
+    ])
+    if (!ev) return errors.notFound('Événement introuvable.')
+    const mine = user ? reviews.find((r) => r.userId === user.id) : undefined
+    return NextResponse.json(
+      {
+        reviews: reviews.map((r) => ({
+          id: r.id,
+          rating: r.rating,
+          comment: r.comment,
+          createdAt: r.createdAt,
+          userAvatar: r.userAvatar,
+          // First name only: reviews are public.
+          userName: r.userName ? r.userName.split(/\s+/)[0] : null,
+        })),
+        stats: {
+          avgRating: stats?.avgRating ? Math.round(parseFloat(String(stats.avgRating)) * 10) / 10 : null,
+          totalReviews: Number(stats?.total ?? 0),
+        },
+        userReview: mine ? { rating: mine.rating, comment: mine.comment } : null,
+        canReview: Boolean(ev.started),
+        loggedIn: Boolean(user),
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } }
+    )
+  } catch (err) {
+    console.error('[api/reviews] GET failed', err)
+    return errors.server()
+  }
+}
+
+const bodySchema = z.object({
+  eventId: idSchema,
+  rating: z.number({ message: 'Note invalide.' }).int('Note invalide.').min(1, 'Note entre 1 et 5.').max(5, 'Note entre 1 et 5.'),
+  comment: z
+    .string()
+    .max(COMMENT_MAX, `Ton commentaire dépasse ${COMMENT_MAX} caractères.`)
+    .nullish()
+    .transform((c) => (c && c.trim() ? c.trim() : null)),
+})
+
+// POST /api/reviews — create or update the member's review (event must have started).
+export async function POST(request: NextRequest) {
+  const user = await getSessionUser()
+  if (!user) return errors.unauthorized()
+  const limited = limit(request, 'reviews', 10, 60_000, user.id)
+  if (limited) return limited
+  const body = await parseBody(request, bodySchema)
+  if (!body.ok) return body.response
+  const { eventId, rating, comment } = body.data
+
+  try {
+    const ev = await eventState(eventId)
+    if (!ev) return errors.notFound('Événement introuvable.')
+    if (!ev.started) {
+      return NextResponse.json({ error: 'Tu pourras noter cette sortie une fois qu’elle aura commencé.' }, { status: 409 })
+    }
+    await ensureUserRow(user)
+    await db
+      .insert(eventReviews)
+      .values({ userId: user.id, eventId, rating, comment })
+      .onConflictDoUpdate({
+        target: [eventReviews.userId, eventReviews.eventId],
+        set: { rating, comment, updatedAt: new Date() },
+      })
+    const g = await syncGamification(user.id)
+    return NextResponse.json({ success: true, xp: g?.xp ?? null, level: g?.level ?? null, newBadges: g?.newBadges ?? [] })
+  } catch (err) {
+    console.error('[api/reviews] POST failed', err)
+    return errors.server()
+  }
+}
+
+// DELETE /api/reviews?eventId= — delete the member's review (its XP goes with it).
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await getSessionUser()
+  if (!user) return errors.unauthorized()
+  const limited = limit(request, 'reviews-delete', 10, 60_000, user.id)
+  if (limited) return limited
+  const eventId = parseIdParam(request.nextUrl.searchParams.get('eventId'))
+  if (!eventId) return errors.badRequest('Identifiant d’événement invalide.')
+  try {
+    await db.delete(eventReviews).where(and(eq(eventReviews.userId, user.id), eq(eventReviews.eventId, eventId)))
+    const g = await syncGamification(user.id)
+    return NextResponse.json({ success: true, xp: g?.xp ?? null })
+  } catch (err) {
+    console.error('[api/reviews] DELETE failed', err)
+    return errors.server()
   }
-
-  const eventId = request.nextUrl.searchParams.get('eventId')
-  if (!eventId) {
-    return NextResponse.json({ error: 'eventId required' }, { status: 400 })
-  }
-
-  await db
-    .delete(eventReviews)
-    .where(and(eq(eventReviews.userId, user.id), eq(eventReviews.eventId, eventId)))
-
-  return NextResponse.json({ success: true })
 }

@@ -1,3 +1,4 @@
+import { safeJsonLd } from '@/lib/json-ld'
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -75,7 +76,7 @@ export default async function NewsPage({ searchParams }: Props) {
 
   return (
     <div className="px-4 py-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

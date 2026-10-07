@@ -1,81 +1,39 @@
-import { Metadata } from 'next'
 import { MapWrapper } from '@/components/map/map-wrapper'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, isNotNull, desc } from 'drizzle-orm'
-import type { MapEvent } from '@/components/map/event-map'
+import { CATEGORY_BY_SLUG } from '@/lib/events/taxonomy'
 
-export const metadata: Metadata = {
-  title: 'Carte des événements — Paris',
-  description: 'Explorez les événements culturels à Paris sur une carte interactive. Concerts, expos, théâtre, soirées près de chez vous.',
+export const metadata = {
+  title: 'Carte des sorties à Paris : qu’y a-t-il autour de moi ?',
+  description: 'La carte de toutes les sorties culturelles à Paris : concerts, expos, théâtre. Filtre par date, type ou gratuité et regarde ce qui se passe autour de toi.',
   alternates: { canonical: '/carte' },
 }
 
-export const dynamic = 'force-dynamic'
+type Props = { searchParams: Promise<Record<string, string | undefined>> }
 
-async function getGeocodedEvents(): Promise<MapEvent[]> {
-  const now = new Date()
+const WHEN = new Set(['tonight', 'tomorrow', 'weekend', 'week'])
 
-  const results = await db
-    .select({
-      id: events.id,
-      title: events.title,
-      slug: events.slug,
-      imageUrl: events.imageUrl,
-      startDate: events.startDate,
-      isFree: events.isFree,
-      categorySlug: categories.slug,
-      categoryName: categories.name,
-      categoryIcon: categories.icon,
-      venueName: venues.name,
-      lat: venues.lat,
-      lng: venues.lng,
-    })
-    .from(events)
-    .innerJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(
-      and(
-        eq(events.status, 'active'),
-        gte(events.startDate, now),
-        isNotNull(venues.lat),
-        isNotNull(venues.lng)
-      )
-    )
-    .orderBy(desc(events.qualityScore))
-    .limit(500)
-
-  return results
-    .filter((r) => r.lat != null && r.lng != null)
-    .map((r) => ({
-      id: r.id,
-      title: r.title,
-      slug: r.slug,
-      imageUrl: r.imageUrl,
-      startDate: r.startDate?.toISOString() ?? null,
-      isFree: r.isFree ?? false,
-      categorySlug: r.categorySlug,
-      categoryName: r.categoryName,
-      categoryIcon: r.categoryIcon,
-      venueName: r.venueName,
-      lat: Number(r.lat),
-      lng: Number(r.lng),
-    }))
-}
-
-export default async function CartePage() {
-  const mapEvents = await getGeocodedEvents()
+export default async function CartePage({ searchParams }: Props) {
+  const sp = await searchParams
+  const lat = Number(sp.lat)
+  const lng = Number(sp.lng)
+  const zoom = Number(sp.zoom)
+  const initialView =
+    Number.isFinite(lat) && Number.isFinite(lng) && lat > 48.1 && lat < 49.3 && lng > 1.4 && lng < 3.6
+      ? { lat, lng, zoom: Number.isFinite(zoom) && zoom >= 9 && zoom <= 18 ? zoom : 15 }
+      : null
 
   return (
-    <div className="px-0 md:px-4 md:py-4">
-      {/* Header — visible on mobile */}
-      <div className="px-4 py-3 md:hidden">
-        <h1 className="text-lg font-bold text-text-primary">Carte</h1>
-        <p className="text-[12px] text-text-muted">
-          {mapEvents.length} événement{mapEvents.length !== 1 ? 's' : ''} sur la carte
-        </p>
+    <div className="relative">
+      <h1 className="sr-only">Carte des sorties à Paris</h1>
+      <div className="h-[calc(100dvh-3.5rem-4rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-3.5rem)]">
+        <MapWrapper
+          initialView={initialView}
+          initialState={{
+            when: sp.when && WHEN.has(sp.when) ? sp.when : 'week',
+            cat: sp.cat && CATEGORY_BY_SLUG[sp.cat] ? sp.cat : null,
+            free: sp.free === '1',
+          }}
+        />
       </div>
-
-      <MapWrapper events={mapEvents} />
     </div>
   )
 }

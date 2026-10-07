@@ -7,7 +7,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { db, events, venues, categories, articles } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, count } from 'drizzle-orm'
 
 // ─── Types ───
 
@@ -231,11 +231,11 @@ export async function generateArticle(input: ArticleInput): Promise<GeneratedArt
   const promptFn = ARTICLE_PROMPTS[input.type]
   if (!promptFn) return null
 
-  const anthropic = new Anthropic({ apiKey })
+  const anthropic = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 1 })
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250404',
+      model: process.env.ANTHROPIC_ARTICLE_MODEL || 'claude-haiku-4-5',
       max_tokens: 2000,
       messages: [
         {
@@ -367,7 +367,9 @@ export async function saveArticles(generatedArticles: GeneratedArticle[]): Promi
         priority: article.priority,
         relatedEventIds: article.relatedEventIds || null,
         generatedBy: 'ai-daily',
-        status: 'published',
+        // AI drafts are never published automatically (scaled-content risk, possible
+        // errors from scraped data): an editor sets status = 'published' after review.
+        status: 'draft',
       })
       saved++
     } catch (error) {

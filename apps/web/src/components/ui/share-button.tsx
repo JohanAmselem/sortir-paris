@@ -1,6 +1,6 @@
 'use client'
 
-import { Share2, Check, Copy } from 'lucide-react'
+import { Share2, Check } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -47,19 +47,16 @@ export function ShareButton({ title, text, url, className }: ShareButtonProps) {
 
   return (
     <button
+      type="button"
       onClick={handleShare}
       className={cn(
-        'flex items-center justify-center rounded-xl border border-border bg-surface transition-all',
-        'hover:border-accent/30 hover:shadow-sm active:scale-95',
+        'flex h-11 w-11 items-center justify-center rounded-full border border-border-strong bg-surface transition-colors hover:border-ink active:scale-95',
         className
       )}
-      aria-label="Partager"
+      aria-label={copied ? 'Lien copié' : 'Partager'}
     >
-      {copied ? (
-        <Check className="h-4 w-4 text-success" />
-      ) : (
-        <Share2 className="h-4 w-4 text-text-secondary" />
-      )}
+      {copied ? <Check className="h-[18px] w-[18px] text-success" aria-hidden /> : <Share2 className="h-[18px] w-[18px] text-ink" aria-hidden />}
+      <span className="sr-only" aria-live="polite">{copied ? 'Lien copié' : ''}</span>
     </button>
   )
 }

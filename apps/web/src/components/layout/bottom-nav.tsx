@@ -2,44 +2,54 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Compass, Heart, Trophy, User } from 'lucide-react'
+import { Home, Compass, Map, Sparkles, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Accueil', icon: Home },
   { href: '/evenements', label: 'Explorer', icon: Compass },
-  { href: '/match', label: 'Match', icon: Heart },
-  { href: '/top', label: 'Top', icon: Trophy },
-  { href: '/compte', label: 'Profil', icon: User },
+  { href: '/carte', label: 'Carte', icon: Map },
+  { href: '/club', label: 'Le Club', icon: Sparkles },
+  { href: '/compte', label: 'Moi', icon: User },
 ] as const
+
+const MATCHES: Record<string, string[]> = {
+  '/evenements': ['/evenements', '/ce-soir', '/ce-week-end', '/gratuit', '/categories', '/collections', '/paris', '/lieux'],
+  '/club': ['/club', '/match', '/drop', '/quiz', '/top', '/surprise'],
+  '/compte': ['/compte', '/login', '/onboarding'],
+}
 
 export function BottomNav() {
   const pathname = usePathname()
-
-  // Hide on login/onboarding pages
-  if (pathname === '/login' || pathname === '/onboarding') return null
+  // The event page has its own action bar (save / share / book).
+  if (pathname === '/onboarding' || /^\/evenements\/[^/]+$/.test(pathname)) return null
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 bg-white/90 backdrop-blur-xl md:hidden safe-area-bottom">
-      <div className="flex h-14 items-center justify-around px-2">
+    <nav
+      aria-label="Navigation"
+      className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border/70 safe-area-bottom md:hidden"
+    >
+      <ul className="grid h-16 grid-cols-5">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/' && href.length > 1 && pathname.startsWith(href + '/'))
-
+          const prefixes = MATCHES[href] ?? [href]
+          const active = href === '/' ? pathname === '/' : prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'))
           return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex flex-col items-center gap-0.5 px-4 py-1 transition-colors',
-                isActive ? 'text-accent' : 'text-text-muted'
-              )}
-            >
-              <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.5 : 1.5} />
-              <span className="text-[10px] font-medium">{label}</span>
-            </Link>
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors',
+                  active ? 'text-accent' : 'text-text-muted'
+                )}
+              >
+                <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+                {label}
+              </Link>
+            </li>
           )
         })}
-      </div>
+      </ul>
     </nav>
   )
 }

@@ -1,218 +1,277 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { LocateFixed, SlidersHorizontal, X } from 'lucide-react'
+import { ARRONDISSEMENTS, CATEGORIES, INTENTS } from '@/lib/events/taxonomy'
+import { countFilters, eventsHref } from '@/lib/events/params'
+import type { EventQuery, SortKey } from '@/lib/events/types'
+import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
-import { DatePicker } from './date-picker'
-import { NearMeButton } from '@/components/ui/near-me-button'
 
-const DATE_FILTERS = [
-  { label: 'Ce soir', value: 'today', icon: '🌙' },
-  { label: 'Ce week-end', value: 'weekend', icon: '📅' },
-  { label: 'Cette semaine', value: 'week', icon: '🗓️' },
-] as const
-
-const MONTHS_SHORT = [
-  'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
-  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
-]
-
-const ARRONDISSEMENTS = [
-  '1er', '2e', '3e', '4e', '5e', '6e', '7e', '8e', '9e', '10e',
-  '11e', '12e', '13e', '14e', '15e', '16e', '17e', '18e', '19e', '20e',
-] as const
-
-const AMBIANCE_FILTERS = [
-  { value: 'romantique', label: 'Sortie à deux', icon: '💕' },
-  { value: 'festif', label: 'Entre potes', icon: '🎉' },
-  { value: 'chill', label: 'Chill', icon: '😌' },
-  { value: 'familial', label: 'En famille', icon: '👨‍👩‍👧' },
-  { value: 'culturel', label: 'Culturel', icon: '📚' },
-] as const
+type Lockable = 'when' | 'categories' | 'arrondissements' | 'free'
 
 interface FilterBarProps {
-  categories: { slug: string; name: string; icon: string | null }[]
-  className?: string
+  query: EventQuery
+  basePath: string
+  /** Filters fixed by the page itself (e.g. /ce-soir locks "when"). */
+  locked?: Lockable[]
+  total?: number
 }
 
-export function FilterBar({ categories, className }: FilterBarProps) {
+const WHEN_OPTIONS = [
+  { id: 'tonight', label: 'Ce soir' },
+  { id: 'tomorrow', label: 'Demain' },
+  { id: 'weekend', label: 'Week-end' },
+  { id: 'week', label: 'Semaine' },
+]
+
+const SORTS: Array<{ id: SortKey; label: string }> = [
+  { id: 'relevance', label: 'Recommandés' },
+  { id: 'soon', label: 'Les plus proches dans le temps' },
+  { id: 'popular', label: 'Les plus populaires' },
+  { id: 'distance', label: 'Les plus près de moi' },
+]
+
+const BUDGETS = [
+  { free: true, max: null, label: 'Gratuit' },
+  { free: false, max: 10, label: 'Moins de 10 €' },
+  { free: false, max: 20, label: 'Moins de 20 €' },
+  { free: false, max: 40, label: 'Moins de 40 €' },
+]
+
+function Chip({ active, onClick, children, className }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[14px] font-medium transition-colors',
+        active ? 'border-ink bg-ink text-paper' : 'border-border-strong bg-surface text-ink hover:border-ink',
+        className
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+const toggle = <T,>(list: T[] | undefined, v: T) => (list?.includes(v) ? list.filter((x) => x !== v) : [...(list ?? []), v])
+
+export function FilterBar({ query, basePath, locked = [], total }: FilterBarProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [pending, startTransition] = useTransition()
+  const [draft, setDraft] = useState<EventQuery>(query)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
 
-  const activeCategory = searchParams.get('category')
-  const activeDate = searchParams.get('date')
-  const activeFree = searchParams.get('free')
-  const activeArr = searchParams.get('arr')
-  const activeAmbiance = searchParams.get('ambiance')
-  const [showArrDropdown, setShowArrDropdown] = useState(false)
+  useEffect(() => setDraft(query), [query])
 
-  // Check if activeDate is an ISO date (YYYY-MM-DD)
-  const isISODate = activeDate && /^\d{4}-\d{2}-\d{2}$/.test(activeDate)
-
-  const setFilter = (key: string, value: string | null) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value === null || params.get(key) === value) {
-      params.delete(key)
-    } else {
-      params.set(key, value)
-    }
-    params.delete('page')
-    router.push(`?${params.toString()}`, { scroll: false })
+  const go = (q: EventQuery, filter?: string) => {
+    // Locked filters are part of the path, never of the query string.
+    const clean: EventQuery = { ...q }
+    if (locked.includes('when')) clean.when = null
+    if (locked.includes('categories')) clean.categories = []
+    if (locked.includes('arrondissements')) clean.arrondissements = []
+    if (locked.includes('free')) clean.free = false
+    if (filter) track('filter', { filter })
+    startTransition(() => router.push(eventsHref(clean, basePath), { scroll: false }))
   }
 
-  const formatSelectedDate = (isoDate: string): string => {
-    const d = new Date(isoDate + 'T00:00:00')
-    return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
+  const locate = (then: (coords: { lat: number; lng: number }) => void) => {
+    if (!('geolocation' in navigator)) return setGeoError('Géolocalisation indisponible sur cet appareil.')
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setGeoError(null)
+        then({ lat: p.coords.latitude, lng: p.coords.longitude })
+      },
+      () => setGeoError('Position refusée ou indisponible.'),
+      { timeout: 8000, maximumAge: 300_000 }
+    )
   }
+
+  const nearActive = Boolean(query.near)
+  const active = countFilters({ ...query, when: locked.includes('when') ? null : query.when })
 
   return (
-    <div className={cn('scrollbar-hide flex items-center gap-1.5 overflow-x-auto py-0.5', className)}>
-      {/* Date filters */}
-      {DATE_FILTERS.map((filter) => (
+    <div className={cn('transition-opacity', pending && 'opacity-60')}>
+      <div className="rail scrollbar-hide items-center py-1" role="toolbar" aria-label="Filtres rapides">
         <button
-          key={filter.value}
-          onClick={() => setFilter('date', filter.value)}
-          className={cn(
-            'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-            activeDate === filter.value
-              ? 'border-accent bg-accent text-white shadow-sm'
-              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-          )}
+          type="button"
+          onClick={() => dialog.current?.showModal()}
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-ink bg-surface px-4 text-[14px] font-semibold text-ink"
         >
-          <span className="text-sm">{filter.icon}</span>
-          {filter.label}
+          <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          Filtres{active > 0 && <span className="rounded-full bg-accent px-1.5 text-[12px] text-paper">{active}</span>}
         </button>
-      ))}
-
-      {/* Date picker button */}
-      <div className="relative flex-shrink-0">
-        <button
-          onClick={() => setShowDatePicker(!showDatePicker)}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-            isISODate
-              ? 'border-accent bg-accent text-white shadow-sm'
-              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-          )}
-        >
-          <span className="text-sm">📆</span>
-          {isISODate ? formatSelectedDate(activeDate!) : 'Date...'}
-        </button>
-
-        {showDatePicker && (
-          <DatePicker
-            selectedDate={isISODate ? activeDate : null}
-            onSelect={(date) => setFilter('date', date)}
-            onClose={() => setShowDatePicker(false)}
-          />
+        {!locked.includes('when') &&
+          WHEN_OPTIONS.map((w) => (
+            <Chip key={w.id} active={query.when === w.id} onClick={() => go({ ...query, when: query.when === w.id ? null : w.id }, 'when')}>
+              {w.label}
+            </Chip>
+          ))}
+        {!locked.includes('free') && (
+          <Chip active={Boolean(query.free)} onClick={() => go({ ...query, free: !query.free, maxPrice: null }, 'free')}>
+            Gratuit
+          </Chip>
         )}
+        <Chip
+          active={nearActive}
+          onClick={() =>
+            nearActive
+              ? go({ ...query, near: null, sort: query.sort === 'distance' ? undefined : query.sort }, 'near')
+              : locate((c) => go({ ...query, near: { ...c, radiusKm: 2.5 }, sort: 'distance' }, 'near'))
+          }
+        >
+          <LocateFixed className="h-4 w-4" aria-hidden />
+          Près de moi
+        </Chip>
+        {INTENTS.slice(0, 4).map((i) => (
+          <Chip key={i.slug} active={Boolean(query.intents?.includes(i.slug))} onClick={() => go({ ...query, intents: toggle(query.intents, i.slug) }, 'mood')}>
+            {i.label}
+          </Chip>
+        ))}
       </div>
+      {geoError && <p className="mt-1 text-[13px] text-text-secondary">{geoError}</p>}
 
-      {/* Free filter */}
-      <button
-        onClick={() => setFilter('free', 'true')}
-        className={cn(
-          'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-          activeFree === 'true'
-            ? 'border-free bg-free text-white shadow-sm'
-            : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-        )}
+      <dialog
+        ref={dialog}
+        aria-labelledby="filters-title"
+        className="m-0 mt-auto h-[88dvh] w-full max-w-none rounded-t-2xl bg-paper p-0 text-ink backdrop:bg-ink/50 sm:m-auto sm:h-auto sm:max-h-[85dvh] sm:max-w-xl sm:rounded-2xl"
+        onClick={(e) => {
+          if (e.target === dialog.current) dialog.current?.close()
+        }}
       >
-        <span className="text-sm">🆓</span>
-        Gratuit
-      </button>
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 id="filters-title" className="font-display text-[1.8rem]">Filtres</h2>
+            <button type="button" onClick={() => dialog.current?.close()} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-hover" aria-label="Fermer les filtres">
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
 
-      {/* Near me */}
-      <NearMeButton />
+          <div className="flex-1 space-y-7 overflow-y-auto px-4 py-5">
+            {!locked.includes('when') && (
+              <fieldset>
+                <legend className="text-[15px] font-semibold">Quand</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[{ id: 'now', label: 'Maintenant' }, { id: 'today', label: "Aujourd'hui" }, ...WHEN_OPTIONS, { id: 'month', label: 'Ce mois-ci' }].map((w) => (
+                    <Chip key={w.id} active={draft.when === w.id} onClick={() => setDraft({ ...draft, when: draft.when === w.id ? null : w.id })}>
+                      {w.label}
+                    </Chip>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
-      {/* Arrondissement filter */}
-      <div className="relative flex-shrink-0">
-        <button
-          onClick={() => setShowArrDropdown(!showArrDropdown)}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-            activeArr
-              ? 'border-neon bg-neon text-white shadow-sm'
-              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-          )}
-        >
-          <span className="text-sm">📍</span>
-          {activeArr ? `${activeArr} arr.` : 'Quartier'}
-        </button>
+            {!locked.includes('categories') && (
+              <fieldset>
+                <legend className="text-[15px] font-semibold">Quoi</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {CATEGORIES.map((c) => (
+                    <Chip key={c.slug} active={Boolean(draft.categories?.includes(c.slug))} onClick={() => setDraft({ ...draft, categories: toggle(draft.categories, c.slug) })}>
+                      {c.plural}
+                    </Chip>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
-        {showArrDropdown && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowArrDropdown(false)} />
-            <div className="absolute top-full left-0 z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-xl">
-              {activeArr && (
-                <button
-                  onClick={() => { setFilter('arr', null); setShowArrDropdown(false) }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-accent hover:bg-surface-hover"
-                >
-                  Tous les quartiers
-                </button>
-              )}
-              <div className="grid grid-cols-2 gap-0.5">
-                {ARRONDISSEMENTS.map((arr) => (
-                  <button
-                    key={arr}
-                    onClick={() => { setFilter('arr', arr); setShowArrDropdown(false) }}
-                    className={cn(
-                      'rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all text-center',
-                      activeArr === arr
-                        ? 'bg-neon text-white'
-                        : 'text-text-secondary hover:bg-surface-hover'
-                    )}
-                  >
-                    {arr}
-                  </button>
+            <fieldset>
+              <legend className="text-[15px] font-semibold">Ambiance</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {INTENTS.map((i) => (
+                  <Chip key={i.slug} active={Boolean(draft.intents?.includes(i.slug))} onClick={() => setDraft({ ...draft, intents: toggle(draft.intents, i.slug) })}>
+                    {i.label}
+                  </Chip>
                 ))}
               </div>
-            </div>
-          </>
-        )}
-      </div>
+            </fieldset>
 
-      {/* Separator */}
-      <div className="mx-0.5 h-6 w-px flex-shrink-0 bg-border" />
+            {!locked.includes('free') && (
+              <fieldset>
+                <legend className="text-[15px] font-semibold">Budget</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {BUDGETS.map((b) => {
+                    const on = b.free ? Boolean(draft.free) : !draft.free && draft.maxPrice === b.max
+                    return (
+                      <Chip key={b.label} active={on} onClick={() => setDraft({ ...draft, free: on ? false : b.free, maxPrice: on || b.free ? null : b.max })}>
+                        {b.label}
+                      </Chip>
+                    )
+                  })}
+                </div>
+              </fieldset>
+            )}
 
-      {/* Category filters */}
-      {categories.map((cat) => (
-        <button
-          key={cat.slug}
-          onClick={() => setFilter('category', cat.slug)}
-          className={cn(
-            'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-            activeCategory === cat.slug
-              ? 'border-primary bg-primary text-white shadow-sm'
-              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-          )}
-        >
-          {cat.icon && <span className="text-sm">{cat.icon}</span>}
-          {cat.name}
-        </button>
-      ))}
+            {!locked.includes('arrondissements') && (
+              <fieldset>
+                <legend className="text-[15px] font-semibold">Quartier</legend>
+                <div className="mt-2 grid grid-cols-5 gap-2 sm:grid-cols-10">
+                  {ARRONDISSEMENTS.map((a) => {
+                    const on = Boolean(draft.arrondissements?.includes(a))
+                    return (
+                      <button
+                        key={a}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setDraft({ ...draft, arrondissements: toggle(draft.arrondissements, a) })}
+                        className={cn('h-11 rounded-lg border text-[14px] font-semibold transition-colors', on ? 'border-ink bg-ink text-paper' : 'border-border-strong bg-surface hover:border-ink')}
+                      >
+                        {a}
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+            )}
 
-      {/* Separator */}
-      <div className="mx-0.5 h-6 w-px flex-shrink-0 bg-border" />
+            <fieldset>
+              <legend className="text-[15px] font-semibold">Trier par</legend>
+              <div className="mt-2 flex flex-col gap-1">
+                {SORTS.filter((s) => s.id !== 'distance' || draft.near).map((s) => (
+                  <label key={s.id} className="flex h-11 cursor-pointer items-center gap-3 text-[15px]">
+                    <input
+                      type="radio"
+                      name="sort"
+                      className="h-4 w-4 accent-[var(--color-accent)]"
+                      checked={(draft.sort ?? (draft.near ? 'distance' : 'relevance')) === s.id}
+                      onChange={() => setDraft({ ...draft, sort: s.id })}
+                    />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
 
-      {/* Ambiance filters */}
-      {AMBIANCE_FILTERS.map((amb) => (
-        <button
-          key={amb.value}
-          onClick={() => setFilter('ambiance', amb.value)}
-          className={cn(
-            'flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-            activeAmbiance === amb.value
-              ? 'border-purple-500 bg-purple-500 text-white shadow-sm'
-              : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
-          )}
-        >
-          <span className="text-sm">{amb.icon}</span>
-          {amb.label}
-        </button>
-      ))}
+          <div className="flex gap-2 border-t border-border px-4 py-3 safe-area-bottom">
+            <button
+              type="button"
+              onClick={() => setDraft({ ...query, when: locked.includes('when') ? query.when : null, categories: locked.includes('categories') ? query.categories : [], arrondissements: locked.includes('arrondissements') ? query.arrondissements : [], intents: [], free: locked.includes('free') ? query.free : false, maxPrice: null, sort: undefined })}
+              className="h-12 flex-1 rounded-full border border-border-strong text-[15px] font-semibold"
+            >
+              Tout effacer
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                dialog.current?.close()
+                go(draft, 'sheet')
+              }}
+              className="h-12 flex-[2] rounded-full bg-ink text-[15px] font-semibold text-paper"
+            >
+              Voir les résultats
+            </button>
+          </div>
+        </div>
+      </dialog>
+      {typeof total === 'number' && (
+        <p className="mt-3 text-[14px] text-text-secondary" aria-live="polite">
+          {total === 0 ? 'Aucun résultat' : `${total.toLocaleString('fr-FR')} sortie${total > 1 ? 's' : ''}`}
+        </p>
+      )}
     </div>
   )
 }

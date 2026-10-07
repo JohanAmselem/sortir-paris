@@ -1,84 +1,79 @@
-import { Metadata } from 'next'
-import { EventCard } from '@/components/events/event-card'
-import { db, events, venues, categories } from '@sortir/db'
-import { inArray, eq } from 'drizzle-orm'
-import Link from 'next/link'
-import { ArrowLeft, Share2 } from 'lucide-react'
-
-export const metadata: Metadata = {
-  title: 'Sélection partagée — Paname Club',
-  description: 'Découvrez cette sélection de sorties culturelles à Paris.',
-}
+import type { Metadata } from 'next'
+import { z } from 'zod'
+import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
+import type { CardEvent } from '@/lib/events/types'
+import { getCardsByIds } from '@/app/club/_lib/member'
 
 export const dynamic = 'force-dynamic'
 
-interface Props {
-  searchParams: Promise<{ [key: string]: string | undefined }>
+export const metadata: Metadata = {
+  title: 'Une sélection de sorties à Paris',
+  description: 'Une sélection de sorties à Paris partagée depuis Paname Club.',
+  robots: { index: false, follow: true },
 }
 
-async function getSharedEvents(ids: string[]) {
-  if (ids.length === 0) return []
+const MAX_IDS = 20
+const idsSchema = z.array(z.guid()).min(1).max(MAX_IDS)
 
-  return db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(inArray(events.id, ids))
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+
+/** "a,b,c" → unique valid ids, or null when the list is invalid / too long. */
+function parseIds(raw: string | undefined): string[] | null {
+  if (!raw) return null
+  const list = [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))]
+  const parsed = idsSchema.safeParse(list)
+  return parsed.success ? parsed.data : null
 }
 
-export default async function PartagePage({ searchParams }: Props) {
-  const params = await searchParams
-  const title = params.title ?? 'Ma sélection'
-  const ids = params.ids?.split(',').filter(Boolean) ?? []
+function cleanTitle(raw: string | undefined): string {
+  const t = (raw ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 80)
+  return t || 'Une sélection de sorties'
+}
 
-  const eventsList = await getSharedEvents(ids)
+export default async function PartagePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ids?: string | string[]; title?: string | string[] }>
+}) {
+  const sp = await searchParams
+  const ids = parseIds(first(sp.ids))
+  const title = cleanTitle(first(sp.title))
+
+  let events: CardEvent[] | null = []
+  if (ids) {
+    try {
+      events = await getCardsByIds(ids)
+    } catch (err) {
+      console.error('[partage] failed', err)
+      events = null
+    }
+  }
 
   return (
-    <div className="px-4 py-6">
-      <Link
-        href="/evenements"
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Explorer
-      </Link>
+    <div className="px-4 pb-16 pt-8 sm:pt-12">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Sélection partagée</p>
+      <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.8rem]">{title}</h1>
 
-      <div className="mt-4 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10">
-          <Share2 className="h-5 w-5 text-accent" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{title}</h1>
-          <p className="text-[13px] text-text-muted">
-            {eventsList.length} événement{eventsList.length !== 1 ? 's' : ''} dans cette sélection
-          </p>
-        </div>
-      </div>
-
-      {eventsList.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {eventsList.map((r) => (
-            <EventCard
-              key={r.event.id}
-              event={{
-                ...r.event,
-                category: r.category,
-                venue: r.venue,
-                tags: [],
-                ambiances: [],
-              } as never}
-            />
-          ))}
-        </div>
+      {events === null ? (
+        <DataUnavailable className="mt-8" />
+      ) : events.length === 0 ? (
+        <EmptyState
+          className="mt-8"
+          title="Lien invalide ou expiré"
+          actions={[
+            { href: '/ce-week-end', label: 'Ce week-end' },
+            { href: '/evenements', label: 'Tout l’agenda' },
+          ]}
+        >
+          Cette sélection n’existe plus ou le lien est incomplet.
+        </EmptyState>
       ) : (
-        <div className="mt-16 text-center">
-          <p className="text-4xl">🔗</p>
-          <p className="mt-3 text-lg font-medium text-text-primary">Lien invalide</p>
-          <p className="mt-1 text-[13px] text-text-muted">
-            Cette sélection n&apos;existe plus ou le lien est invalide.
+        <>
+          <p className="mt-2 text-[15px] text-text-secondary">
+            {events.length} sortie{events.length > 1 ? 's' : ''} dans cette sélection.
           </p>
-        </div>
+          <EventGrid events={events} now={new Date()} className="mt-8" />
+        </>
       )}
     </div>
   )

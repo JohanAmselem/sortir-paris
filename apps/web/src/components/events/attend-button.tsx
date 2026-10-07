@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect, useTransition, useMemo } from 'react'
-import Image from 'next/image'
-import { UserCheck, Users, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useTransition } from 'react'
+import { Loader2, UserCheck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AttendButtonProps {
@@ -11,106 +9,103 @@ interface AttendButtonProps {
   className?: string
 }
 
-interface Attendee {
-  name: string | null
-  avatarUrl: string | null
-}
-
+/**
+ * « J'y vais ». Closed (hidden) once the event ended more than a day ago;
+ * the server enforces the same rule. XP is granted once and removed on undo.
+ */
 export function AttendButton({ eventId, className }: AttendButtonProps) {
-  const supabase = useMemo(() => createClient(), [])
-  const [isAttending, setIsAttending] = useState(false)
-  const [attendeeCount, setAttendeeCount] = useState(0)
-  const [attendees, setAttendees] = useState<Attendee[]>([])
-  const [isPending, startTransition] = useTransition()
+  const [attending, setAttending] = useState(false)
+  const [count, setCount] = useState(0)
+  const [open, setOpen] = useState(true)
   const [loaded, setLoaded] = useState(false)
-  const [hasUser, setHasUser] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setHasUser(!!data.user))
-  }, [supabase])
-
-  useEffect(() => {
-    fetch(`/api/attendance?eventId=${eventId}`)
-      .then(r => r.json())
-      .then(data => {
-        setAttendeeCount(data.count)
-        setAttendees(data.attendees ?? [])
-        setIsAttending(data.isAttending)
+    const ctrl = new AbortController()
+    fetch(`/api/attendance?eventId=${encodeURIComponent(eventId)}`, { signal: ctrl.signal, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { count: number; isAttending: boolean; open: boolean } | null) => {
+        if (d) {
+          setCount(d.count)
+          setAttending(d.isAttending)
+          setOpen(d.open)
+        }
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
+    return () => ctrl.abort()
   }, [eventId])
 
   const toggle = () => {
+    const previous = attending
+    setError(null)
     startTransition(async () => {
-      const res = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId }),
-      })
-
-      if (res.status === 401) {
-        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname)
-        return
+      try {
+        const res = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId, attending: !previous }),
+        })
+        if (res.status === 401) {
+          window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname)
+          return
+        }
+        const data = (await res.json().catch(() => ({}))) as { attending?: boolean; error?: string }
+        if (!res.ok) {
+          setError(data.error ?? 'Échec, réessaie.')
+          if (res.status === 409) setOpen(false)
+          return
+        }
+        const now = Boolean(data.attending)
+        setAttending(now)
+        if (now !== previous) setCount((c) => Math.max(0, c + (now ? 1 : -1)))
+      } catch {
+        setError('Connexion perdue, réessaie.')
       }
-
-      const data = await res.json()
-      setIsAttending(data.attending)
-      setAttendeeCount(prev => data.attending ? prev + 1 : Math.max(0, prev - 1))
     })
   }
 
-  if (!loaded) return null
+  if (!loaded) return <div className={cn('h-11', className)} aria-hidden />
+  if (!open && !attending) {
+    return count > 0 ? (
+      <p className={cn('text-[13px] text-text-secondary', className)}>
+        {count} membre{count > 1 ? 's y sont allés' : ' y est allé'}
+      </p>
+    ) : null
+  }
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col gap-1.5', className)}>
       <button
+        type="button"
         onClick={toggle}
         disabled={isPending}
+        aria-pressed={attending}
         className={cn(
-          'flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-all active:scale-[0.97]',
-          isAttending
-            ? 'bg-accent/10 text-accent border-2 border-accent/30 hover:bg-accent/15'
-            : 'bg-surface border-2 border-border hover:border-accent/30 text-text-primary hover:text-accent'
+          'inline-flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-[14px] font-semibold transition-colors',
+          attending ? 'border-accent bg-accent-soft text-accent' : 'border-border-strong bg-surface text-ink hover:border-ink'
         )}
       >
         {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : isAttending ? (
-          <UserCheck className="h-4 w-4" />
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        ) : attending ? (
+          <UserCheck className="h-4 w-4" aria-hidden />
         ) : (
-          <Users className="h-4 w-4" />
+          <Users className="h-4 w-4" aria-hidden />
         )}
-        {isAttending ? 'J\'y vais !' : 'J\'y vais'}
+        {attending ? 'J’y vais' : 'J’y vais ?'}
+        <span className="sr-only">{attending ? ', cliquer pour annuler' : ''}</span>
       </button>
-
-      {/* Attendee avatars + count */}
-      {attendeeCount > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="flex -space-x-1.5">
-            {attendees.slice(0, 4).map((a, i) => (
-              a.avatarUrl ? (
-                <Image
-                  key={i}
-                  src={a.avatarUrl}
-                  alt=""
-                  width={22}
-                  height={22}
-                  className="rounded-full border-2 border-surface"
-                />
-              ) : (
-                <div key={i} className="flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-surface bg-accent/10">
-                  <span className="text-[8px] font-bold text-accent">
-                    {a.name?.[0]?.toUpperCase() ?? '?'}
-                  </span>
-                </div>
-              )
-            ))}
-          </div>
-          <span className="text-[12px] text-text-muted">
-            {attendeeCount} membre{attendeeCount > 1 ? 's' : ''} {attendeeCount > 1 ? 'y vont' : 'y va'}
-          </span>
-        </div>
+      {count > 0 && (
+        <p className="text-[13px] text-text-secondary">
+          {count} membre{count > 1 ? 's y vont' : ' y va'}
+        </p>
+      )}
+      {error && (
+        <p className="text-[13px] font-medium text-error" role="alert">
+          {error}
+        </p>
       )}
     </div>
   )

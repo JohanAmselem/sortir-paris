@@ -1,260 +1,119 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, tasteProfiles, tasteQuizAnswers, users } from '@sortir/db'
-import { eq, sql } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
-import { QUIZ_QUESTIONS } from '@/lib/taste-quiz-data'
+import { z } from 'zod'
+import { desc, eq } from 'drizzle-orm'
+import { db, tasteProfiles, tasteQuizAnswers } from '@sortir/db'
+import { isKnownQuestion, MIN_ANSWERS, scoreQuiz, type QuizAnswers } from '@/lib/taste-quiz-data'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
+import { syncGamification } from '@/app/club/_lib/member'
 
-// =========================================
-// "Tu préfères" — Cultural Taste Quiz API
-// =========================================
+export const dynamic = 'force-dynamic'
 
-// Build question → dimension mappings from quiz data
-const QUESTION_DIMENSIONS: Record<string, { dimension: string; weight: number }[]> = {}
-for (const q of QUIZ_QUESTIONS) {
-  QUESTION_DIMENSIONS[q.id] = q.dimensions
+const answersSchema = z
+  .record(z.string().max(8), z.enum(['a', 'b'], { message: 'Réponse invalide.' }))
+  .refine((a) => Object.keys(a).every(isKnownQuestion), { message: 'Question inconnue.' })
+
+const bodySchema = z.object({
+  answers: answersSchema,
+  /** « Recommencer »: don't merge with the previous answers. */
+  replace: z.boolean().optional(),
+})
+
+function asAnswers(raw: unknown): QuizAnswers {
+  const parsed = answersSchema.safeParse(raw)
+  return parsed.success ? parsed.data : {}
 }
 
-const ALL_DIMENSIONS = ['exploration', 'energy', 'social', 'budget', 'planning', 'mainstream', 'visual', 'depth'] as const
-type Dimension = typeof ALL_DIMENSIONS[number]
-
-// Archetype definitions with ideal dimension profiles
-const ARCHETYPES: Record<string, Record<Dimension, number>> = {
-  'explorateur-nocturne':  { exploration: 90, energy: 85, social: 60, budget: 40, planning: 20, mainstream: 30, visual: 50, depth: 50 },
-  'esthete-confidentiel':  { exploration: 85, energy: 40, social: 40, budget: 60, planning: 60, mainstream: 15, visual: 70, depth: 80 },
-  'epicurien-social':      { exploration: 50, energy: 60, social: 85, budget: 80, planning: 60, mainstream: 80, visual: 50, depth: 40 },
-  'flaneur-curieux':       { exploration: 75, energy: 30, social: 50, budget: 30, planning: 30, mainstream: 40, visual: 60, depth: 60 },
-  'fetard-culturel':       { exploration: 50, energy: 90, social: 85, budget: 50, planning: 40, mainstream: 75, visual: 50, depth: 30 },
-  'intellectuel-engage':   { exploration: 60, energy: 20, social: 50, budget: 40, planning: 70, mainstream: 20, visual: 30, depth: 95 },
-  'romantique-parisien':   { exploration: 50, energy: 25, social: 25, budget: 60, planning: 50, mainstream: 50, visual: 75, depth: 60 },
-  'aventurier-creatif':    { exploration: 90, energy: 60, social: 50, budget: 40, planning: 25, mainstream: 20, visual: 85, depth: 55 },
-}
-
-const ARCHETYPE_LABELS: Record<string, string> = {
-  'explorateur-nocturne': 'Explorateur nocturne',
-  'esthete-confidentiel': 'Esthète confidentiel',
-  'epicurien-social':     'Épicurien social',
-  'flaneur-curieux':      'Flâneur curieux',
-  'fetard-culturel':      'Fêtard culturel',
-  'intellectuel-engage':  'Intellectuel engagé',
-  'romantique-parisien':  'Romantique parisien',
-  'aventurier-creatif':   'Aventurier créatif',
-}
-
-// XP reward for completing the taste quiz
-const XP_TASTE_QUIZ = 50
-
-// --------------- Scoring Logic ---------------
-
-function computeScores(answers: Record<string, 'a' | 'b'>): Record<Dimension, number> {
-  // Accumulate weighted scores per dimension
-  const totals: Record<string, number> = {}
-  const weights: Record<string, number> = {}
-
-  for (const dim of ALL_DIMENSIONS) {
-    totals[dim] = 0
-    weights[dim] = 0
-  }
-
-  for (const [questionId, answer] of Object.entries(answers)) {
-    const mappings = QUESTION_DIMENSIONS[questionId]
-    if (!mappings) continue
-
-    const value = answer === 'b' ? 1 : 0
-
-    for (const { dimension, weight } of mappings) {
-      totals[dimension] += value * weight
-      weights[dimension] += weight
-    }
-  }
-
-  // Normalize to 0-100
-  const scores = {} as Record<Dimension, number>
-  for (const dim of ALL_DIMENSIONS) {
-    if (weights[dim] > 0) {
-      scores[dim] = Math.round((totals[dim] / weights[dim]) * 100)
-    } else {
-      scores[dim] = 50 // default neutral
-    }
-  }
-
-  return scores
-}
-
-function findArchetype(scores: Record<Dimension, number>): string {
-  let bestArchetype = 'flaneur-curieux'
-  let bestDistance = Infinity
-
-  for (const [slug, ideal] of Object.entries(ARCHETYPES)) {
-    let distance = 0
-    for (const dim of ALL_DIMENSIONS) {
-      distance += (scores[dim] - ideal[dim]) ** 2
-    }
-    if (distance < bestDistance) {
-      bestDistance = distance
-      bestArchetype = slug
-    }
-  }
-
-  return bestArchetype
-}
-
-function generateAiSummary(scores: Record<Dimension, number>, archetype: string): string {
-  const label = ARCHETYPE_LABELS[archetype] || archetype
-  const parts: string[] = []
-
-  parts.push(`Profil "${label}".`)
-
-  // Exploration
-  if (scores.exploration >= 70) parts.push('Toujours en quête de nouveautés et de découvertes inattendues.')
-  else if (scores.exploration <= 30) parts.push('Préfère les valeurs sûres et les lieux familiers.')
-
-  // Energy
-  if (scores.energy >= 70) parts.push('Aime l\'ambiance festive et les événements à haute énergie.')
-  else if (scores.energy <= 30) parts.push('Recherche le calme, les moments contemplatifs.')
-
-  // Social
-  if (scores.social >= 70) parts.push('Adore sortir en groupe et partager des expériences.')
-  else if (scores.social <= 30) parts.push('Apprécie les sorties en solo ou en petit comité.')
-
-  // Budget
-  if (scores.budget >= 70) parts.push('Prêt·e à investir pour une expérience premium.')
-  else if (scores.budget <= 30) parts.push('Privilégie les bons plans et les événements gratuits.')
-
-  // Mainstream
-  if (scores.mainstream <= 30) parts.push('Attiré·e par la scène underground et les lieux confidentiels.')
-  else if (scores.mainstream >= 70) parts.push('Aime les grands événements populaires et les incontournables.')
-
-  // Depth
-  if (scores.depth >= 70) parts.push('Cherche la profondeur intellectuelle et les expériences enrichissantes.')
-  else if (scores.depth <= 30) parts.push('Privilégie le divertissement léger et la bonne humeur.')
-
-  return parts.join(' ')
-}
-
-// --------------- GET ---------------
-
+// GET /api/taste-quiz — the member's profile and answers (to continue the quiz).
 export async function GET() {
+  const user = await getSessionUser()
+  if (!user) return errors.unauthorized()
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const [[profile], [latest]] = await Promise.all([
+      db.select().from(tasteProfiles).where(eq(tasteProfiles.userId, user.id)).limit(1),
+      db
+        .select({ answers: tasteQuizAnswers.answers, completedAt: tasteQuizAnswers.completedAt })
+        .from(tasteQuizAnswers)
+        .where(eq(tasteQuizAnswers.userId, user.id))
+        .orderBy(desc(tasteQuizAnswers.completedAt))
+        .limit(1),
+    ])
+    return NextResponse.json(
+      {
+        completed: Boolean(profile),
+        profile: profile
+          ? {
+              archetype: profile.archetype,
+              summary: profile.aiSummary,
+              scores: {
+                exploration: profile.exploration,
+                energy: profile.energy,
+                social: profile.social,
+                budget: profile.budget,
+                planning: profile.planning,
+                mainstream: profile.mainstream,
+                visual: profile.visual,
+                depth: profile.depth,
+              },
+            }
+          : null,
+        answers: asAnswers(latest?.answers),
+        completedAt: latest?.completedAt ?? null,
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } }
+    )
+  } catch (err) {
+    console.error('[api/taste-quiz] GET failed', err)
+    return errors.server()
+  }
+}
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+// POST /api/taste-quiz — save answers (merged with previous ones), recompute the profile.
+export async function POST(request: NextRequest) {
+  const user = await getSessionUser()
+  if (!user) return errors.unauthorized()
+  const limited = limit(request, 'taste-quiz', 10, 60 * 60_000, user.id)
+  if (limited) return limited
+  const body = await parseBody(request, bodySchema)
+  if (!body.ok) return body.response
 
-    // Check if user has a taste profile
-    const profile = await db
-      .select()
-      .from(tasteProfiles)
-      .where(eq(tasteProfiles.userId, user.id))
-      .limit(1)
-
-    // Get latest quiz answers
-    const latestAnswers = await db
-      .select()
+  try {
+    const [latest] = await db
+      .select({ answers: tasteQuizAnswers.answers })
       .from(tasteQuizAnswers)
       .where(eq(tasteQuizAnswers.userId, user.id))
-      .orderBy(sql`${tasteQuizAnswers.completedAt} DESC`)
+      .orderBy(desc(tasteQuizAnswers.completedAt))
       .limit(1)
-
-    return NextResponse.json({
-      completed: profile.length > 0,
-      profile: profile[0] ?? null,
-      lastAnswers: latestAnswers[0]?.answers ?? null,
-      lastCompletedAt: latestAnswers[0]?.completedAt ?? null,
-    })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-// --------------- POST ---------------
-
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const answers: QuizAnswers = body.data.replace
+      ? body.data.answers
+      : { ...asAnswers(latest?.answers), ...body.data.answers }
+    const result = scoreQuiz(answers)
+    if (result.answered < MIN_ANSWERS) {
+      return errors.badRequest(`Réponds à au moins ${MIN_ANSWERS} questions pour obtenir ton profil.`)
     }
 
-    const body = await request.json()
-    const answers: Record<string, 'a' | 'b'> = body.answers
-
-    if (!answers || typeof answers !== 'object') {
-      return NextResponse.json({ error: 'answers object required' }, { status: 400 })
-    }
-
-    // Validate answers
-    for (const [key, val] of Object.entries(answers)) {
-      if (val !== 'a' && val !== 'b') {
-        return NextResponse.json({ error: `Invalid answer for ${key}: must be "a" or "b"` }, { status: 400 })
-      }
-    }
-
-    // Compute scores
-    const scores = computeScores(answers)
-    const archetype = findArchetype(scores)
-    const aiSummary = generateAiSummary(scores, archetype)
-
-    // Upsert taste profile
-    const existing = await db
-      .select()
-      .from(tasteProfiles)
-      .where(eq(tasteProfiles.userId, user.id))
-      .limit(1)
-
-    const profileData = {
-      exploration: scores.exploration,
-      energy: scores.energy,
-      social: scores.social,
-      budget: scores.budget,
-      planning: scores.planning,
-      mainstream: scores.mainstream,
-      visual: scores.visual,
-      depth: scores.depth,
-      archetype,
-      aiSummary,
+    await ensureUserRow(user)
+    const profile = {
+      ...result.scores,
+      archetype: result.archetype,
+      aiSummary: result.summary,
       updatedAt: new Date(),
     }
+    await db
+      .insert(tasteProfiles)
+      .values({ userId: user.id, ...profile })
+      .onConflictDoUpdate({ target: tasteProfiles.userId, set: profile })
+    await db.insert(tasteQuizAnswers).values({ userId: user.id, answers })
 
-    if (existing.length > 0) {
-      await db
-        .update(tasteProfiles)
-        .set(profileData)
-        .where(eq(tasteProfiles.userId, user.id))
-    } else {
-      await db.insert(tasteProfiles).values({
-        userId: user.id,
-        ...profileData,
-      })
-
-      // Award XP only for first-time completion
-      await db
-        .update(users)
-        .set({ xp: sql`${users.xp} + ${XP_TASTE_QUIZ}` })
-        .where(eq(users.id, user.id))
-    }
-
-    // Always save the quiz answers for history
-    await db.insert(tasteQuizAnswers).values({
-      userId: user.id,
-      answers,
-    })
-
-    const profile = {
-      userId: user.id,
-      ...profileData,
-      archetypeLabel: ARCHETYPE_LABELS[archetype] || archetype,
-    }
-
+    const g = await syncGamification(user.id)
     return NextResponse.json({
       success: true,
-      profile,
-      xpAwarded: existing.length === 0 ? XP_TASTE_QUIZ : 0,
+      profile: { archetype: result.archetype, summary: result.summary, scores: result.scores },
+      answered: result.answered,
+      xp: g?.xp ?? null,
+      newBadges: g?.newBadges ?? [],
     })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error('[api/taste-quiz] POST failed', err)
+    return errors.server()
   }
 }

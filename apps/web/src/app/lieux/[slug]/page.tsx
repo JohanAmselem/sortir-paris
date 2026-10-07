@@ -1,179 +1,130 @@
-import { Metadata } from 'next'
-import { notFound } from 'next/navigation'
-import Link from 'next/link'
-import { MapPin, Globe, ArrowLeft } from 'lucide-react'
-import { EventCard } from '@/components/events/event-card'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, desc } from 'drizzle-orm'
+import type { Metadata } from 'next'
+import Image from 'next/image'
+import { notFound, permanentRedirect } from 'next/navigation'
+import { ExternalLink } from 'lucide-react'
+import { PageIntro } from '@/components/events/listing'
+import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
+import { LoadMore } from '@/components/events/load-more'
+import { getVenueBySlug } from '@/lib/venues'
+import { bucketNow, safeQueryEvents } from '@/lib/events/query'
+import { safeJsonLd } from '@/lib/json-ld'
+import { safeUrl } from '@/lib/format'
+import { absoluteUrl } from '@/lib/site'
+
+export const revalidate = 1800
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
-async function getVenue(slug: string) {
-  const result = await db
-    .select()
-    .from(venues)
-    .where(eq(venues.slug, slug))
-    .limit(1)
-
-  return result[0] || null
-}
-
-async function getVenueEvents(venueId: string) {
-  const now = new Date()
-
-  return db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(
-      and(
-        eq(events.venueId, venueId),
-        eq(events.status, 'active'),
-        gte(events.startDate, now)
-      )
-    )
-    .orderBy(desc(events.startDate))
-    .limit(30)
+/** No pages at build time: each one is rendered on first visit, then cached (ISR). */
+export function generateStaticParams() {
+  return []
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const venue = await getVenue(slug)
-  if (!venue) return { title: 'Lieu introuvable' }
-
+  const v = await getVenueBySlug(slug).catch(() => null)
+  if (!v) return { title: 'Lieu introuvable', robots: { index: false } }
+  const upcoming = await safeQueryEvents({ venueSlug: slug, limit: 1 })
+  const where = v.arrondissement ? ` (${v.arrondissement})` : ''
   return {
-    title: `${venue.name} — Événements — Paname Club`,
-    description: `Tous les événements à venir à ${venue.name}${venue.address ? `, ${venue.address}` : ''}, Paris.`,
-    alternates: { canonical: `/lieux/${slug}` },
-    openGraph: {
-      title: `${venue.name} — Paname Club`,
-      description: `Découvrez les prochains événements à ${venue.name}.`,
-    },
+    title: `${v.name}${where} : programme et prochains événements`,
+    description: `Le programme de ${v.name}${v.address ? `, ${v.address}` : ''}${where} à Paris : concerts, spectacles et expositions à venir.`,
+    alternates: { canonical: `/lieux/${v.canonicalSlug ?? v.slug}` },
+    robots: upcoming.total === 0 ? { index: false, follow: true } : undefined,
   }
 }
 
 export default async function VenuePage({ params }: Props) {
   const { slug } = await params
-  const venue = await getVenue(slug)
-
+  const venue = await getVenueBySlug(slug).catch(() => null)
   if (!venue) notFound()
+  if (venue.canonicalSlug && venue.canonicalSlug !== slug) permanentRedirect(`/lieux/${venue.canonicalSlug}`)
 
-  const venueEvents = await getVenueEvents(venue.id)
+  const now = bucketNow()
+  const page = await safeQueryEvents({ venueSlug: slug, sort: 'soon', limit: 24 })
+  const mapToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  const hasGeo = venue.lat != null && venue.lng != null
+  const website = safeUrl(venue.website)
 
-  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-  const hasCoords = venue.lat && venue.lng
-
-  const jsonLd = {
+  const placeLd = {
     '@context': 'https://schema.org',
     '@type': 'Place',
     name: venue.name,
+    url: absoluteUrl(`/lieux/${venue.slug}`),
     address: {
       '@type': 'PostalAddress',
-      streetAddress: venue.address ?? '',
-      addressLocality: venue.city ?? 'Paris',
-      postalCode: venue.zipCode ?? '',
+      ...(venue.address ? { streetAddress: venue.address } : {}),
+      addressLocality: venue.city || 'Paris',
+      ...(venue.zipCode ? { postalCode: venue.zipCode } : {}),
       addressCountry: 'FR',
     },
-    ...(hasCoords && {
-      geo: {
-        '@type': 'GeoCoordinates',
-        latitude: venue.lat,
-        longitude: venue.lng,
-      },
-    }),
+    ...(hasGeo ? { geo: { '@type': 'GeoCoordinates', latitude: venue.lat, longitude: venue.lng } } : {}),
+    ...(website ? { sameAs: [website] } : {}),
   }
 
   return (
-    <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
-      <div className="px-4 py-6 pb-24">
-        {/* Back */}
-        <Link href="/evenements" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Retour
-        </Link>
-
-        {/* Venue info */}
-        <div className="mt-4">
-          <h1 className="text-2xl font-bold text-text-primary">{venue.name}</h1>
-
-          <div className="mt-3 flex flex-col gap-2">
-            {(venue.address || venue.arrondissement) && (
-              <div className="flex items-start gap-2 text-[14px] text-text-secondary">
-                <MapPin className="h-4 w-4 flex-shrink-0 text-accent mt-0.5" />
-                <span>
-                  {venue.address}
-                  {venue.arrondissement ? ` — ${venue.arrondissement} arr.` : ''}
-                  {venue.city && venue.city !== 'Paris' ? `, ${venue.city}` : ''}
-                  {venue.zipCode ? ` ${venue.zipCode}` : ''}
-                </span>
-              </div>
-            )}
-
-            {venue.website && (
-              <a
-                href={venue.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-[14px] text-accent hover:text-accent-hover transition-colors"
-              >
-                <Globe className="h-4 w-4 flex-shrink-0" />
-                Site web
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* Static map */}
-        {hasCoords && mapboxToken && (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
-            <img
-              src={`https://api.mapbox.com/styles/v1/mapbox/light-v11/static/pin-s+7C3AED(${venue.lng},${venue.lat})/${venue.lng},${venue.lat},15,0/600x200@2x?access_token=${mapboxToken}`}
-              alt={`Carte de ${venue.name}`}
-              className="h-[200px] w-full object-cover"
-              loading="lazy"
-            />
-          </div>
-        )}
-
-        {/* Upcoming events */}
-        <div className="mt-8">
-          <h2 className="text-lg font-bold text-text-primary">
-            Événements à venir
-          </h2>
-          <p className="mt-1 text-[13px] text-text-muted">
-            {venueEvents.length} événement{venueEvents.length !== 1 ? 's' : ''}
-          </p>
-
-          {venueEvents.length > 0 ? (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {venueEvents.map((item) => (
-                <EventCard
-                  key={item.event.id}
-                  event={{
-                    ...item.event,
-                    category: item.category,
-                    venue: item.venue,
-                    tags: [],
-                    ambiances: [],
-                  } as never}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-8 text-center">
-              <p className="text-3xl">📍</p>
-              <p className="mt-3 text-[14px] text-text-muted">
-                Aucun événement à venir dans ce lieu
-              </p>
-            </div>
+    <div className="px-4">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(placeLd) }} />
+      <PageIntro kicker={venue.arrondissement ? `Paris ${venue.arrondissement}` : venue.city} title={venue.name}>
+        <p>{[venue.address, [venue.zipCode, venue.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</p>
+        <div className="mt-2 flex flex-wrap gap-x-5">
+          {hasGeo && (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center text-[15px] font-semibold text-accent hover:underline"
+            >
+              Itinéraire
+            </a>
+          )}
+          {hasGeo && (
+            <a href={`/carte?lat=${venue.lat}&lng=${venue.lng}&zoom=15`} className="inline-flex h-11 items-center text-[15px] font-semibold text-accent hover:underline">
+              Autour de ce lieu
+            </a>
+          )}
+          {website && (
+            <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-1.5 text-[15px] font-semibold text-accent hover:underline">
+              Site du lieu <ExternalLink className="h-4 w-4" aria-hidden />
+            </a>
           )}
         </div>
-      </div>
-    </>
+      </PageIntro>
+
+      {hasGeo && mapToken && (
+        <div className="relative mb-8 aspect-[3/1] overflow-hidden rounded-xl bg-paper-deep">
+          <Image
+            src={`https://api.mapbox.com/styles/v1/mapbox/light-v11/static/pin-l+7c3aed(${venue.lng},${venue.lat})/${venue.lng},${venue.lat},14.5,0/960x320@2x?access_token=${mapToken}`}
+            alt={`Plan d’accès à ${venue.name}`}
+            fill
+            unoptimized
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
+      )}
+
+      <h2 className="font-display text-[2rem] text-ink">À l’affiche</h2>
+      {page.error ? (
+        <DataUnavailable className="mt-4" />
+      ) : page.events.length === 0 ? (
+        <EmptyState className="mt-4" title="Rien de programmé pour l’instant" actions={venue.arrondissement ? [{ href: `/paris/${venue.arrondissement}`, label: `Sortir dans le ${venue.arrondissement}` }] : [{ href: '/evenements', label: 'Toutes les sorties' }]}>
+          Aucun événement à venir repéré dans nos sources pour ce lieu.
+        </EmptyState>
+      ) : (
+        <>
+          <EventGrid events={page.events} now={now} className="mt-5" />
+          <LoadMore
+            params={new URLSearchParams({ venue: slug, sort: 'soon' }).toString()}
+            initialCount={page.events.length}
+            total={page.total}
+            nowIso={now.toISOString()}
+            seenIds={page.events.map((e) => e.id)}
+          />
+        </>
+      )}
+    </div>
   )
 }

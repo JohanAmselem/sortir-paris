@@ -1,61 +1,38 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { db, users } from '@sortir/db'
 import { eq } from 'drizzle-orm'
+import { db, users } from '@sortir/db'
+import { createClient } from '@/lib/supabase/server'
+import { ensureUserRow } from '@/app/club/_lib/api'
+import { safeNext } from '@/app/club/_lib/safe-next'
 
-// GET /api/auth/callback — OAuth / Magic Link callback handler
+export const dynamic = 'force-dynamic'
+
+// GET /api/auth/callback — OAuth / magic link callback.
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  // Only same-site paths: never `${origin}${next}` with next=@evil.com or //evil.com.
+  const next = safeNext(searchParams.get('next'))
+  const to = (path: string) => NextResponse.redirect(new URL(path, origin))
 
-  if (code) {
+  if (!code) return to('/login?error=auth')
+
+  try {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) return to(`/login?error=auth&next=${encodeURIComponent(next)}`)
 
-    if (!error) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return to(`/login?error=auth&next=${encodeURIComponent(next)}`)
 
-      if (user) {
-        // Ensure user exists in our DB
-        const existing = await db
-          .select({ id: users.id, onboarded: users.onboarded })
-          .from(users)
-          .where(eq(users.id, user.id))
-          .limit(1)
-
-        if (existing.length === 0) {
-          // Create user in DB on first login
-          await db.insert(users).values({
-            id: user.id,
-            email: user.email!,
-            name:
-              user.user_metadata?.full_name ||
-              user.user_metadata?.name ||
-              user.email?.split('@')[0] ||
-              null,
-            avatarUrl:
-              user.user_metadata?.avatar_url ||
-              user.user_metadata?.picture ||
-              null,
-            onboarded: false,
-          })
-          // New user → go to onboarding
-          return NextResponse.redirect(`${origin}/onboarding`)
-        }
-
-        // Existing user — check if onboarded
-        if (!existing[0].onboarded) {
-          return NextResponse.redirect(`${origin}/onboarding`)
-        }
-      }
-
-      return NextResponse.redirect(`${origin}${next}`)
-    }
+    await ensureUserRow(user)
+    const [row] = await db.select({ onboarded: users.onboarded }).from(users).where(eq(users.id, user.id)).limit(1)
+    if (row && !row.onboarded) return to(`/onboarding?next=${encodeURIComponent(next)}`)
+    return to(next)
+  } catch (err) {
+    console.error('[auth/callback] failed', err)
+    return to('/login?error=auth')
   }
-
-  // Auth error — redirect to login with error
-  return NextResponse.redirect(`${origin}/login?error=auth`)
 }

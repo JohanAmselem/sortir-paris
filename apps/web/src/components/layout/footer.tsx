@@ -1,87 +1,84 @@
 import Link from 'next/link'
+import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
+
+const DISCOVER = [
+  { href: '/ce-soir', label: 'Que faire ce soir' },
+  { href: '/ce-week-end', label: 'Sorties ce week-end' },
+  { href: '/gratuit', label: 'Sorties gratuites' },
+  { href: '/carte', label: 'Carte des sorties' },
+  { href: '/collections', label: 'Nos sélections' },
+  { href: '/lieux', label: 'Lieux culturels' },
+]
+
+const CLUB = [
+  { href: '/club', label: 'Le Club' },
+  { href: '/surprise', label: 'Surprends-moi' },
+  { href: '/match', label: 'Match culturel' },
+  { href: '/quiz', label: 'Quiz « Tu préfères »' },
+  { href: '/news', label: 'Le journal' },
+  { href: '/newsletter', label: 'Newsletter' },
+]
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-primary pb-20 pt-12 md:pb-10">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-1">
-            <p className="text-[17px] font-black text-white">
-              PANAME<span className="font-extralight text-accent-glow">CLUB</span>
+    <footer className="mt-16 bg-night text-paper/75">
+      <div className="mx-auto max-w-7xl px-4 pb-10 pt-14">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <p className="font-display text-[2rem] text-paper">
+              PANAME<span className="font-light text-accent-glow">CLUB</span>
             </p>
-            <p className="mt-3 max-w-[200px] text-[13px] leading-relaxed text-white/30">
-              L&apos;IA culturelle qui te trouve ton meilleur plan pour ce soir.
+            <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-paper/75">
+              Les meilleures idées de sortie à Paris, choisies chaque jour parmi des milliers d’événements.
             </p>
           </div>
 
-          {/* Discover */}
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Découvrir</h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: '/ce-soir', label: 'Ce soir' },
-                { href: '/ce-week-end', label: 'Ce week-end' },
-                { href: '/gratuit', label: 'Gratuit' },
-                { href: '/evenements', label: 'Tous les événements' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Categories */}
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Catégories</h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: '/categories/concerts', label: 'Concerts' },
-                { href: '/categories/expos', label: 'Expositions' },
-                { href: '/categories/theatre', label: 'Théâtre' },
-                { href: '/categories/cinema', label: 'Cinéma' },
-                { href: '/categories/festivals', label: 'Festivals' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Info */}
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Infos</h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: '/news', label: 'News culturelles' },
-                { href: '/collections', label: 'Collections' },
-                { href: '/lieux', label: 'Lieux' },
-                { href: '/surprise', label: 'Surprise moi' },
-                { href: '/carte', label: 'Carte interactive' },
-                { href: '/newsletter', label: 'Newsletter' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-[13px] text-white/30 hover:text-white transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FooterList title="Découvrir" links={DISCOVER} />
+          <FooterList
+            title="Catégories"
+            links={CATEGORIES.map((c) => ({ href: `/categories/${c.slug}`, label: c.plural }))}
+          />
+          <FooterList title="Le Club" links={CLUB} />
         </div>
 
-        <div className="mt-12 border-t border-white/5 pt-6">
-          <p className="text-[11px] text-white/20">
-            &copy; {new Date().getFullYear()} Paname Club. Fait avec amour depuis Paris.
-          </p>
+        <div className="mt-12">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/60">Par arrondissement</h2>
+          <ul className="mt-3 flex flex-wrap gap-x-1 gap-y-1">
+            {ARRONDISSEMENTS.map((arr) => (
+              <li key={arr}>
+                <Link
+                  href={`/paris/${arr}`}
+                  className="inline-block rounded px-2 py-1.5 text-[14px] text-paper/75 transition-colors hover:bg-paper/10 hover:text-paper"
+                >
+                  {arr}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
+
+        <p className="mt-12 border-t border-paper/10 pt-6 text-[13px] text-paper/60">
+          © {new Date().getFullYear()} Paname Club. Informations issues des agendas officiels et des sites des lieux :
+          vérifie toujours horaires et tarifs auprès de l’organisateur.
+        </p>
       </div>
     </footer>
+  )
+}
+
+function FooterList({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
+  return (
+    <div>
+      <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/60">{title}</h2>
+      <ul className="mt-4 space-y-1">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="inline-block py-1 text-[15px] text-paper/80 transition-colors hover:text-paper">
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

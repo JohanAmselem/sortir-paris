@@ -1,97 +1,55 @@
-import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { EventCard } from '@/components/events/event-card'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, desc } from 'drizzle-orm'
+import { Listing, PageIntro } from '@/components/events/listing'
+import { parseEventParams } from '@/lib/events/params'
+import { CATEGORIES, CATEGORY_BY_SLUG } from '@/lib/events/taxonomy'
+import { listingMetadata } from '@/lib/seo'
 
-interface Props {
+type Props = {
   params: Promise<{ slug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-async function getCategoryData(slug: string) {
-  const category = await db.query.categories?.findFirst({
-    where: eq(categories.slug, slug),
-  })
-
-  if (!category) return null
-
-  const now = new Date()
-  const categoryEvents = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(
-      and(
-        eq(events.status, 'active'),
-        eq(events.categoryId, category.id),
-        gte(events.startDate, now)
-      )
-    )
-    .orderBy(desc(events.qualityScore))
-    .limit(48)
-
-  return { category, events: categoryEvents }
+const INTROS: Record<string, string> = {
+  concerts: 'Les concerts à Paris dans les prochains jours : jazz, rock, classique, électro, chanson, des clubs aux grandes salles.',
+  expos: 'Les expositions en cours et à venir à Paris, des grands musées aux galeries. Les dates de fin sont toujours indiquées.',
+  theatre: 'Les pièces de théâtre à l’affiche à Paris : classiques, créations, théâtre contemporain et seul-en-scène.',
+  spectacles: 'Humour, cirque, magie, cabaret, comédie musicale : les spectacles à voir à Paris.',
+  danse: 'Les spectacles de danse à Paris : ballet, danse contemporaine, hip-hop, bals et scènes ouvertes.',
+  cinema: 'Projections, avant-premières, ciné-clubs et festivals de cinéma à Paris.',
+  festivals: 'Les festivals à Paris dans les semaines à venir : musique, arts, cinéma, littérature.',
+  conferences: 'Conférences, rencontres, débats et lectures à Paris, souvent gratuits.',
+  ateliers: 'Ateliers créatifs, initiations et cours ponctuels à Paris, pour adultes et enfants.',
+  visites: 'Visites guidées, balades urbaines et découvertes du patrimoine parisien.',
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export function generateStaticParams() {
+  return CATEGORIES.map((c) => ({ slug: c.slug }))
+}
+
+export async function generateMetadata({ params, searchParams }: Props) {
   const { slug } = await params
-  const data = await getCategoryData(slug)
-  if (!data) return { title: 'Catégorie introuvable' }
-
-  return {
-    title: `${data.category.name} à Paris`,
-    description: `Découvrez les ${data.category.name.toLowerCase()} à Paris. ${data.events.length} événements disponibles.`,
-    alternates: { canonical: `/categories/${slug}` },
-  }
+  const cat = CATEGORY_BY_SLUG[slug]
+  if (!cat) return {}
+  return listingMetadata(`/categories/${slug}`, `${cat.plural} à Paris : l’agenda`, INTROS[slug] ?? '', await searchParams)
 }
 
-export default async function CategoryPage({ params }: Props) {
+export default async function CategoryPage({ params, searchParams }: Props) {
   const { slug } = await params
-  const data = await getCategoryData(slug)
-
-  if (!data) notFound()
-
-  const { category, events: categoryEvents } = data
-
+  const cat = CATEGORY_BY_SLUG[slug]
+  if (!cat) notFound()
+  const query = parseEventParams(await searchParams)
   return (
-    <div className="px-4 py-6">
-      <div className="flex items-center gap-3">
-        <span className="text-4xl">{category.icon}</span>
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{category.name}</h1>
-          <p className="text-sm text-text-muted">
-            {categoryEvents.length} événements à venir
-          </p>
-        </div>
-      </div>
-
-      {categoryEvents.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {categoryEvents.map((item) => (
-            <EventCard
-              key={item.event.id}
-              event={{
-                ...item.event,
-                category: item.category,
-                venue: item.venue,
-                tags: [],
-                ambiances: [],
-              } as never}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="mt-16 text-center">
-          <p className="text-5xl">{category.icon}</p>
-          <p className="mt-4 text-lg font-semibold text-text-primary">
-            Pas d&apos;événement à venir
-          </p>
-          <p className="mt-1 text-sm text-text-muted">
-            Revenez bientôt !
-          </p>
-        </div>
-      )}
+    <div className="px-4">
+      <PageIntro kicker="Catégorie" title={cat.plural}>
+        {INTROS[slug]}
+      </PageIntro>
+      <Listing
+        query={query}
+        fixed={{ categories: [slug] }}
+        locked={['categories']}
+        basePath={`/categories/${slug}`}
+        emptyActions={[{ href: '/evenements', label: 'Toutes les sorties' }]}
+      />
     </div>
   )
 }

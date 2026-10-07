@@ -1,394 +1,232 @@
-import { Suspense } from 'react'
-import { SectionRow } from '@/components/events/section-row'
-import { EventCard } from '@/components/events/event-card'
-import { AISearchBox } from '@/components/search/ai-search-box'
-import { MoodSelector } from '@/components/ui/mood-selector'
-import { BackToTop } from '@/components/ui/back-to-top'
-import { SkeletonRow } from '@/components/ui/skeleton-card'
-import { PourToiSection } from '@/components/events/pour-toi-section'
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowRight, Sparkles } from 'lucide-react'
-import { Clock } from 'lucide-react'
-import { db, events, venues, categories, users, articles } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm'
+import { ArrowRight, Dices, MapPinned } from 'lucide-react'
+import { Discover } from '@/components/home/discover'
+import { PourToiClient } from '@/components/home/pour-toi-client'
+import { WeekendProgram, type ProgramDay } from '@/components/home/weekend-program'
+import { EventCard } from '@/components/events/event-card'
+import { DataUnavailable, EventList, EventRail, SectionHeader } from '@/components/events/blocks'
+import { recommend } from '@/lib/ai/recommend'
+import { bucketNow, diversify, safeQueryEvents } from '@/lib/events/query'
+import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
+import { COLLECTIONS } from '@/lib/collections'
+import { getWindow, parisDate, parisNightDay, parisParts } from '@/lib/paris-time'
+import { safeJsonLd } from '@/lib/json-ld'
+import { SITE_URL } from '@/lib/site'
+import type { CardEvent } from '@/lib/events/types'
+
+// Anonymous, identical for everyone → static + revalidated every 5 minutes.
+export const revalidate = 300
 
 export const metadata = {
-  title: 'Paname Club — Sorties culturelles à Paris',
-  description: 'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.',
+  title: { absolute: 'Paname Club · Que faire à Paris ce soir, demain ou ce week-end ?' },
+  description:
+    'Concerts, expos, théâtre, sorties gratuites : dis ce que tu veux faire, Paname Club te propose les meilleures idées de sortie à Paris en quelques secondes.',
+  alternates: { canonical: '/' },
 }
 
-export const revalidate = 60
+const WEEKDAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
-async function getHomeData() {
-  const now = new Date()
-  const endOfDay = new Date(now)
-  endOfDay.setHours(23, 59, 59, 999)
-  const nextWeek = new Date(now)
-  nextWeek.setDate(now.getDate() + 7)
-
-  const in48h = new Date(now)
-  in48h.setHours(now.getHours() + 48)
-
-  const [tonight, upcoming, free, trending, lastChance, allCategories, latestNews] = await Promise.all([
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(eq(events.status, 'active'), gte(events.startDate, now), lte(events.startDate, endOfDay)))
-      .orderBy(desc(events.qualityScore))
-      .limit(20),
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(eq(events.status, 'active'), gte(events.startDate, now), lte(events.startDate, nextWeek)))
-      .orderBy(desc(events.qualityScore))
-      .limit(20),
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(eq(events.status, 'active'), eq(events.isFree, true), gte(events.startDate, now)))
-      .orderBy(desc(events.qualityScore))
-      .limit(20),
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(eq(events.status, 'active'), gte(events.startDate, now)))
-      .orderBy(desc(sql`${events.saveCount} + ${events.viewCount}`))
-      .limit(12),
-    // Last chance — events ending within 48h
-    db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(
-        eq(events.status, 'active'),
-        gte(events.endDate, now),
-        lte(events.endDate, in48h),
-      ))
-      .orderBy(asc(events.endDate))
-      .limit(12),
-    db.select().from(categories).orderBy(asc(categories.position)),
-    // Latest news articles
-    db
-      .select()
-      .from(articles)
-      .where(eq(articles.status, 'published'))
-      .orderBy(desc(articles.priority), desc(articles.publishedAt))
-      .limit(4),
-  ])
-
-  return { tonight, upcoming, free, trending, lastChance, categories: allCategories, latestNews }
-}
-
-function mapEvents(rows: Array<{ event: typeof events.$inferSelect; venue: typeof venues.$inferSelect | null; category: typeof categories.$inferSelect | null }>) {
-  return rows.map((r) => ({
-    ...r.event,
-    category: r.category,
-    venue: r.venue,
-    tags: [],
-    ambiances: [],
-  })) as never[]
+/** Split the weekend window into Paris days (Friday night → Sunday). */
+function groupWeekend(events: CardEvent[], now: Date): ProgramDay[] {
+  const w = getWindow('weekend', now)
+  const first = parisNightDay(w.start)
+  const last = parisNightDay(new Date(w.end.getTime() - 1))
+  const days: ProgramDay[] = []
+  for (let i = 0; i < 4; i++) {
+    const d = parisNightDay(parisDate(first.year, first.month, first.day + i, 12))
+    days.push({ key: `${d.year}-${d.month}-${d.day}`, label: WEEKDAYS[d.weekday], events: [] })
+    if (d.year === last.year && d.month === last.month && d.day === last.day) break
+  }
+  for (const e of events) {
+    const start = new Date(e.startDate)
+    const d = parisNightDay(start < now ? now : start)
+    const day = days.find((x) => x.key === `${d.year}-${d.month}-${d.day}`)
+    if (day && day.events.length < 6) day.events.push(e)
+  }
+  return days
 }
 
 export default async function HomePage() {
-  const { tonight, upcoming, free, trending, lastChance, categories: cats, latestNews } = await getHomeData()
+  const now = bucketNow()
 
-  // Check if user is logged in and onboarded for personalized section
-  let currentUserId: string | null = null
-  let isLoggedInNotOnboarded = false
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const dbUser = await db.query.users?.findFirst({
-        where: eq(users.id, user.id),
-      })
-      if (dbUser?.onboarded) {
-        currentUserId = user.id
-      } else {
-        isLoggedInNotOnboarded = true
-      }
-    }
-  } catch {
-    // Not logged in, that's fine
-  }
+  const [discover, tonight, weekend, expos, lastChance, free] = await Promise.all([
+    recommend({ when: 'tonight' }, 4),
+    safeQueryEvents({ when: 'tonight', withImage: true, oneOffOnly: true, limit: 24 }),
+    safeQueryEvents({ when: 'weekend', oneOffOnly: true, limit: 60 }),
+    safeQueryEvents({ categories: ['expos'], when: 'month', runsEndingWithinDays: 400, withImage: true, limit: 16 }),
+    safeQueryEvents({ runsEndingWithinDays: 7, withImage: true, sort: 'ending', limit: 10 }),
+    safeQueryEvents({ free: true, when: 'week', withImage: true, oneOffOnly: true, limit: 12 }),
+  ])
 
-  // Pick first 2 events as featured
-  const featuredEvents = tonight.length > 0 ? tonight.slice(0, 2) : upcoming.slice(0, 2)
-  const regularTonight = tonight.length > 2 ? tonight.slice(2) : tonight
+  const shown = new Set(discover.events.map((e) => e.id))
+  const picks = diversify(tonight.events.filter((e) => !shown.has(e.id)), 3)
+  picks.forEach((e) => shown.add(e.id))
+  const program = groupWeekend(diversify(weekend.events, 60), now)
+  const freeWeek = diversify(free.events.filter((e) => !shown.has(e.id)), 8)
+  const hour = parisParts(now).hour
+  const tonightIsLate = hour >= 21 || hour < 4
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Paname Club',
-    url: 'https://www.panameclub.fr',
-    description: 'Concerts, expos, spectacles, festivals — toute la culture parisienne en un clic.',
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: 'https://www.panameclub.fr/evenements?q={search_term_string}',
-      'query-input': 'required name=search_term_string',
-    },
+    url: SITE_URL,
+    inLanguage: 'fr-FR',
   }
 
   return (
-    <div className="min-h-screen">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-primary px-4 pb-16 pt-12 md:pb-24 md:pt-20">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_-10%,_var(--color-accent),_transparent_60%)] opacity-20" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_60%_at_90%_50%,_var(--color-neon),_transparent_60%)] opacity-8" />
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-bg to-transparent" />
+    <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
 
-        <div className="relative z-10 mx-auto max-w-2xl">
-          <h1 className="text-center text-3xl font-black tracking-tight md:text-5xl">
-            <span className="gradient-text">Paname</span>
-            <span className="text-white"> Club</span>
-          </h1>
+      <Discover initial={{ ...discover, query: discover.query }} nowIso={now.toISOString()} />
 
-          <p className="mx-auto mt-3 max-w-xs text-center text-[14px] leading-relaxed text-white/40 md:max-w-md md:text-[15px]">
-            Dis-nous ce que tu veux, on te trouve la sortie parfaite
-          </p>
-
-          <div className="mt-8">
-            <AISearchBox />
-          </div>
-        </div>
-      </section>
-
-      {/* Mood selector */}
-      <section className="px-4 py-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="h-4 w-4 text-accent" />
-          <h2 className="text-[14px] font-bold text-text-primary">J&apos;ai envie de...</h2>
-        </div>
-        <MoodSelector />
-      </section>
-
-      {/* Onboarding prompt for logged-in but not onboarded users */}
-      {isLoggedInNotOnboarded && (
-        <section className="px-4 pb-4">
-          <Link
-            href="/onboarding"
-            className="flex items-center gap-4 rounded-2xl border-2 border-dashed border-accent/30 bg-accent/5 p-4 transition-all hover:border-accent/50 hover:bg-accent/10"
-          >
-            <span className="text-3xl">🎯</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-bold text-text-primary">Personnalise tes sorties</p>
-              <p className="text-[12px] text-text-secondary">
-                30 secondes pour nous dire ce que tu aimes — on te trouve les meilleurs plans
-              </p>
-            </div>
-            <ArrowRight className="h-5 w-5 flex-shrink-0 text-accent" />
-          </Link>
-        </section>
-      )}
-
-      {/* Personalized section */}
-      {currentUserId && (
-        <Suspense fallback={<SkeletonRow />}>
-          <PourToiSection userId={currentUserId} />
-        </Suspense>
-      )}
-
-      {/* Featured events */}
-      {featuredEvents.length > 0 && (
-        <section className="px-4 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
-              <span>⭐</span> A la une
-            </h2>
-            <Link href="/ce-soir" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
-              Voir tout <ArrowRight className="h-3.5 w-3.5" />
+      {/* Tonight: the three strongest picks, ranked */}
+      <section aria-labelledby="picks-title" className="px-4 pt-12">
+        <SectionHeader
+          id="picks-title"
+          kicker={tonightIsLate ? 'Il est encore temps' : 'Notre sélection'}
+          title="Le choix de ce soir"
+          href="/ce-soir"
+          linkLabel="Tout ce soir"
+        />
+        {tonight.error ? (
+          <DataUnavailable className="mt-5" />
+        ) : picks.length === 0 ? (
+          <p className="mt-4 text-[15px] text-text-secondary">
+            La soirée est bien avancée.{' '}
+            <Link href="/ce-week-end" className="font-semibold text-accent underline underline-offset-2">
+              Prépare plutôt ton week-end
             </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {featuredEvents.map((item) => (
-              <EventCard
-                key={item.event.id}
-                event={{
-                  ...item.event,
-                  category: item.category,
-                  venue: item.venue,
-                  tags: [],
-                  ambiances: [],
-                } as never}
-                variant="featured"
-              />
+            .
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {picks.map((e, i) => (
+              <EventCard key={e.id} event={e} variant="feature" rank={i + 1} priority={i === 0} now={now} />
             ))}
           </div>
+        )}
+      </section>
+
+      <PourToiClient excludeIds={[...shown]} />
+
+      {/* Interactive shortcuts */}
+      <section aria-label="Autres façons de chercher" className="grid gap-3 px-4 pt-10 sm:grid-cols-2">
+        <Link
+          href="/carte"
+          className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-ink"
+        >
+          <MapPinned className="h-9 w-9 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[17px] font-semibold text-ink">Autour de moi</p>
+            <p className="text-[14px] text-text-secondary">La carte de tout ce qui se passe, filtrable en un geste.</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+        <Link
+          href="/surprise"
+          className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-ink"
+        >
+          <Dices className="h-9 w-9 shrink-0 text-neon" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[17px] font-semibold text-ink">Surprends-moi</p>
+            <p className="text-[14px] text-text-secondary">Une seule idée, tirée au sort parmi les bonnes.</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+      </section>
+
+      {/* Weekend programme */}
+      <section aria-labelledby="weekend-title" className="grid gap-8 px-4 pt-14 lg:grid-cols-[1fr_1.2fr]">
+        <div>
+          <SectionHeader id="weekend-title" kicker="Le programme" title="Ce week-end" href="/ce-week-end" />
+          <p className="mt-3 max-w-sm text-[15px] text-text-secondary">
+            Du vendredi soir au dimanche, jour par jour. Les expositions sont dans la rubrique d’à côté.
+          </p>
+        </div>
+        {weekend.error ? <DataUnavailable /> : <WeekendProgram days={program} nowIso={now.toISOString()} />}
+      </section>
+
+      {/* Exhibitions: tall posters */}
+      {expos.events.length > 0 && (
+        <section aria-labelledby="expos-title" className="px-4 pt-14">
+          <SectionHeader id="expos-title" kicker="À voir" title="Les expos du moment" href="/collections/expos-du-moment" />
+          <EventRail events={diversify(expos.events, 12)} variant="tile" now={now} className="mt-5" />
         </section>
       )}
 
-      {/* Event sections */}
-      <Suspense fallback={<SkeletonRow />}>
-        <div className="space-y-2">
-          {regularTonight.length > 0 && (
-            <SectionRow title="Ce soir" icon="🌙" href="/ce-soir" events={mapEvents(regularTonight)} />
-          )}
-          {upcoming.length > 0 && (
-            <SectionRow title="Cette semaine" icon="🔥" href="/evenements" events={mapEvents(upcoming)} />
-          )}
-          {trending.length > 0 && (
-            <SectionRow title="Tendances" icon="📈" href="/evenements" events={mapEvents(trending)} />
-          )}
-          {lastChance.length > 0 && (
-            <SectionRow title="Dernière chance" icon="⏳" href="/evenements" events={mapEvents(lastChance)} />
-          )}
-          {free.length > 0 && (
-            <SectionRow title="Bons plans gratuits" icon="✨" href="/evenements?free=true" events={mapEvents(free)} />
-          )}
-        </div>
-      </Suspense>
+      {/* Last chance — vermilion */}
+      {lastChance.events.length > 0 && (
+        <section aria-labelledby="last-title" className="mx-[calc(50%-50vw)] mt-14 bg-neon-soft py-10">
+          <div className="mx-auto max-w-7xl px-4">
+            <SectionHeader id="last-title" kicker="Ça ferme bientôt" title="Dernière chance" />
+            <EventRail events={lastChance.events} variant="tile" now={now} className="mt-5" />
+          </div>
+        </section>
+      )}
 
-      {/* Match + Drop CTA */}
-      <section className="px-4 py-6">
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            href="/match"
-            className="group relative overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/10 to-neon/5 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
-          >
-            <span className="text-3xl">❤️</span>
-            <h3 className="mt-2 text-[14px] font-bold text-text-primary group-hover:text-accent transition-colors">Match Culturel</h3>
-            <p className="mt-0.5 text-[11px] text-text-muted">Swipe pour découvrir</p>
-            <div className="absolute -bottom-4 -right-4 text-6xl opacity-10 group-hover:opacity-20 transition-opacity">❤️</div>
-          </Link>
-          <Link
-            href="/drop"
-            className="group relative overflow-hidden rounded-2xl border border-neon/20 bg-gradient-to-br from-neon/10 to-amber-500/5 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5"
-          >
-            <span className="text-3xl">🔥</span>
-            <h3 className="mt-2 text-[14px] font-bold text-text-primary group-hover:text-neon transition-colors">Drop du lundi</h3>
-            <p className="mt-0.5 text-[11px] text-text-muted">5 sorties perso / semaine</p>
-            <div className="absolute -bottom-4 -right-4 text-6xl opacity-10 group-hover:opacity-20 transition-opacity">🔥</div>
-          </Link>
-        </div>
-      </section>
+      {/* Free this week */}
+      {freeWeek.length > 0 && (
+        <section aria-labelledby="free-title" className="px-4 pt-14">
+          <SectionHeader id="free-title" kicker="0 €" title="Gratuit cette semaine" href="/gratuit" />
+          <EventRail events={freeWeek} now={now} className="mt-5" />
+        </section>
+      )}
 
       {/* Collections */}
-      <section className="px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
-            <span>📚</span> Collections
-          </h2>
-          <Link href="/collections" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
-            Voir tout <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="scrollbar-hide flex gap-3 overflow-x-auto snap-x snap-mandatory">
-          {[
-            { slug: 'expos-printemps', emoji: '🖼️', title: 'Les expos du moment', gradient: 'from-amber-500/20 to-orange-500/20' },
-            { slug: 'sorties-gratuites', emoji: '🆓', title: 'Bons plans gratuits', gradient: 'from-emerald-500/20 to-teal-500/20' },
-            { slug: 'concerts-jazz', emoji: '🎷', title: 'Jazz à Paris', gradient: 'from-indigo-500/20 to-purple-500/20' },
-            { slug: 'theatre-comedie', emoji: '🎭', title: 'Théâtre & Comédie', gradient: 'from-red-500/20 to-pink-500/20' },
-            { slug: 'sorties-en-famille', emoji: '👨‍👩‍👧‍👦', title: 'En famille', gradient: 'from-sky-500/20 to-cyan-500/20' },
-            { slug: 'soirees-dansantes', emoji: '💃', title: 'On danse ce soir', gradient: 'from-fuchsia-500/20 to-violet-500/20' },
-          ].map((col) => (
-            <Link
-              key={col.slug}
-              href={`/collections/${col.slug}`}
-              className={`group flex-shrink-0 snap-start w-[180px] rounded-2xl border border-border/60 bg-gradient-to-br ${col.gradient} p-4 transition-all hover:shadow-md hover:-translate-y-0.5`}
-            >
-              <span className="text-3xl">{col.emoji}</span>
-              <p className="mt-2 text-[13px] font-bold text-text-primary group-hover:text-accent transition-colors line-clamp-2">{col.title}</p>
-            </Link>
-          ))}
-          <div className="w-1 flex-shrink-0" />
-        </div>
-      </section>
-
-      {/* Categories */}
-      <section className="px-4 py-10">
-        <h2 className="text-lg font-bold text-text-primary">Explorer par catégorie</h2>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {cats.map((cat) => (
-            <Link
-              key={cat.slug}
-              href={`/categories/${cat.slug}`}
-              className="group flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-surface p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-accent/20 active:scale-[0.97]"
-            >
-              <span className="text-2xl transition-transform duration-200 group-hover:scale-110">{cat.icon}</span>
-              <span className="text-[11px] font-semibold text-text-secondary group-hover:text-text-primary">{cat.name}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* News */}
-      {latestNews.length > 0 && (
-        <section className="px-4 py-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
-              <span>📰</span> News culturelles
-            </h2>
-            <Link href="/news" className="flex items-center gap-1 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
-              Voir tout <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {latestNews.map((article) => (
-              <Link
-                key={article.id}
-                href={`/news/${article.slug}`}
-                className="group flex gap-3 rounded-xl border border-border/60 bg-surface p-3 transition-all hover:shadow-md hover:-translate-y-0.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                    {article.type === 'actualite' ? '🔴 Actualité' : article.type === 'selection' ? '⭐ Sélection' : article.type === 'focus' ? '🔍 Focus' : article.type === 'tendance' ? '📈 Tendance' : '🎙️ Interview'}
-                  </span>
-                  <h3 className="mt-1 text-[13px] font-semibold text-text-primary leading-snug line-clamp-2 group-hover:text-accent transition-colors">
-                    {article.title}
-                  </h3>
-                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted">
-                    <Clock className="h-2.5 w-2.5" />
-                    {new Date(article.publishedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                  </div>
-                </div>
+      <section aria-labelledby="collections-title" className="px-4 pt-14">
+        <SectionHeader id="collections-title" kicker="Envie de…" title="Nos sélections" href="/collections" />
+        <ul className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+          {COLLECTIONS.map((c) => (
+            <li key={c.slug} className="bg-surface">
+              <Link href={`/collections/${c.slug}`} className="block h-full p-4 transition-colors hover:bg-surface-hover">
+                <span className="font-display block text-[1.5rem] text-ink">{c.title}</span>
+                <span className="mt-1 block text-[13px] text-text-secondary">{c.tagline}</span>
               </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Browse: categories & neighbourhoods (internal linking) */}
+      <section aria-labelledby="browse-title" className="grid gap-10 px-4 pt-14 md:grid-cols-2">
+        <div>
+          <h2 id="browse-title" className="font-display text-[2rem] text-ink">Par envie</h2>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => (
+              <li key={c.slug}>
+                <Link
+                  href={`/categories/${c.slug}`}
+                  className="inline-flex h-11 items-center rounded-full border border-border-strong bg-surface px-4 text-[15px] font-medium text-ink transition-colors hover:border-ink"
+                >
+                  {c.plural}
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
+        </div>
+        <div>
+          <h2 className="font-display text-[2rem] text-ink">Par quartier</h2>
+          <ul className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10 md:grid-cols-5 lg:grid-cols-10">
+            {ARRONDISSEMENTS.map((a) => (
+              <li key={a}>
+                <Link
+                  href={`/paris/${a}`}
+                  className="flex h-11 items-center justify-center rounded-lg border border-border bg-surface text-[15px] font-semibold text-ink transition-colors hover:border-ink"
+                >
+                  {a}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {discover.events.length === 0 && picks.length === 0 && (
+        <section className="px-4 pt-10">
+          <EventList events={weekend.events.slice(0, 5)} now={now} />
         </section>
       )}
-
-      {/* CTA */}
-      <section className="mx-4 mb-8 overflow-hidden rounded-2xl bg-primary relative">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_100%_at_0%_50%,_var(--color-accent),_transparent_60%)] opacity-15" />
-        <div className="relative p-8 text-center md:p-10">
-          <h2 className="text-lg font-bold text-white md:text-xl">
-            Ne rate plus aucune sortie
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-white/35">
-            Crée ton compte, dis-nous ce que tu aimes, et on te trouve les meilleurs plans chaque jour.
-          </p>
-          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-[13px] font-bold text-primary transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
-            >
-              Rejoindre le club
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-            <Link
-              href="/onboarding"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-6 py-2.5 text-[13px] font-medium text-white/70 transition-all hover:text-white hover:border-white/40"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Personnaliser mes sorties
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <BackToTop />
     </div>
   )
 }

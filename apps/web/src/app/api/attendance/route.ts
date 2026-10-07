@@ -1,105 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, userAttendances, events, users } from '@sortir/db'
-import { eq, and, sql, count } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
-import { XP_REWARDS } from '@/lib/gamification'
+import { z } from 'zod'
+import { and, count, eq, sql } from 'drizzle-orm'
+import { db, events, userAttendances } from '@sortir/db'
+import { effectiveEndSql } from '@/lib/events/query'
+import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
+import { syncGamification } from '@/app/club/_lib/member'
 
-// GET /api/attendance?eventId=xxx — Get attendance info
+export const dynamic = 'force-dynamic'
+
+/** « J'y vais » is accepted until one day after the event ended. */
+const GRACE = sql`interval '1 day'`
+
+// GET /api/attendance?eventId= — count + whether the current member goes.
 export async function GET(request: NextRequest) {
-  const eventId = request.nextUrl.searchParams.get('eventId')
-  if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 })
-
-  // Count attendees
-  const [stats] = await db
-    .select({ count: count() })
-    .from(userAttendances)
-    .where(eq(userAttendances.eventId, eventId))
-
-  // Get attendee avatars (first 5)
-  const attendees = await db
-    .select({ name: users.name, avatarUrl: users.avatarUrl })
-    .from(userAttendances)
-    .innerJoin(users, eq(userAttendances.userId, users.id))
-    .where(eq(userAttendances.eventId, eventId))
-    .limit(5)
-
-  // Check if current user is attending
-  let isAttending = false
+  const eventId = parseIdParam(request.nextUrl.searchParams.get('eventId'))
+  if (!eventId) return errors.badRequest('Identifiant d’événement invalide.')
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const [[stats], [ev], user] = await Promise.all([
+      db.select({ n: count() }).from(userAttendances).where(eq(userAttendances.eventId, eventId)),
+      db
+        .select({ open: sql<boolean>`${effectiveEndSql} + ${GRACE} >= now()` })
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1),
+      getSessionUser(),
+    ])
+    if (!ev) return errors.notFound('Événement introuvable.')
+    let isAttending = false
     if (user) {
-      const existing = await db
-        .select()
+      const rows = await db
+        .select({ id: userAttendances.eventId })
         .from(userAttendances)
         .where(and(eq(userAttendances.userId, user.id), eq(userAttendances.eventId, eventId)))
         .limit(1)
-      isAttending = existing.length > 0
+      isAttending = rows.length > 0
     }
-  } catch {
-    // not logged in
+    return NextResponse.json(
+      { count: Number(stats?.n ?? 0), isAttending, open: Boolean(ev.open) },
+      { headers: { 'Cache-Control': 'private, no-store' } }
+    )
+  } catch (err) {
+    console.error('[api/attendance] GET failed', err)
+    return errors.server()
   }
-
-  return NextResponse.json({
-    count: Number(stats.count),
-    attendees,
-    isAttending,
-  })
 }
 
-// POST /api/attendance — Toggle attendance
+const bodySchema = z.object({ eventId: idSchema, attending: z.boolean().optional() })
+
+// POST /api/attendance — toggle « J'y vais ».
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await getSessionUser()
+  if (!user) return errors.unauthorized()
+  const limited = limit(request, 'attendance', 30, 60_000, user.id)
+  if (limited) return limited
+  const body = await parseBody(request, bodySchema)
+  if (!body.ok) return body.response
+  const { eventId } = body.data
 
-  let body: { eventId?: string }
   try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const { eventId } = body
-  if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 })
-
-  const existing = await db
-    .select()
-    .from(userAttendances)
-    .where(and(eq(userAttendances.userId, user.id), eq(userAttendances.eventId, eventId)))
-    .limit(1)
-
-  if (existing.length > 0) {
-    // Remove attendance
-    await db
-      .delete(userAttendances)
-      .where(and(eq(userAttendances.userId, user.id), eq(userAttendances.eventId, eventId)))
-    await db
-      .update(events)
-      .set({ attendanceCount: sql`GREATEST(${events.attendanceCount} - 1, 0)` })
+    const [ev] = await db
+      .select({ open: sql<boolean>`${effectiveEndSql} + ${GRACE} >= now()` })
+      .from(events)
       .where(eq(events.id, eventId))
+      .limit(1)
+    if (!ev) return errors.notFound('Événement introuvable.')
 
-    // Remove XP
-    await db
-      .update(users)
-      .set({ xp: sql`GREATEST(${users.xp} - ${XP_REWARDS.ATTEND}, 0)` })
-      .where(eq(users.id, user.id))
+    await ensureUserRow(user)
+    const where = and(eq(userAttendances.userId, user.id), eq(userAttendances.eventId, eventId))
+    const target =
+      body.data.attending ??
+      (await db.select({ id: userAttendances.eventId }).from(userAttendances).where(where).limit(1)).length === 0
 
-    return NextResponse.json({ attending: false })
+    if (target) {
+      if (!ev.open) return jsonClosed()
+      const inserted = await db.insert(userAttendances).values({ userId: user.id, eventId }).onConflictDoNothing().returning()
+      if (inserted.length) {
+        await db.update(events).set({ attendanceCount: sql`${events.attendanceCount} + 1` }).where(eq(events.id, eventId))
+      }
+    } else {
+      const deleted = await db.delete(userAttendances).where(where).returning()
+      if (deleted.length) {
+        await db
+          .update(events)
+          .set({ attendanceCount: sql`greatest(${events.attendanceCount} - 1, 0)` })
+          .where(eq(events.id, eventId))
+      }
+    }
+
+    const g = await syncGamification(user.id)
+    return NextResponse.json({ attending: target, xp: g?.xp ?? null, level: g?.level ?? null, newBadges: g?.newBadges ?? [] })
+  } catch (err) {
+    console.error('[api/attendance] POST failed', err)
+    return errors.server()
   }
+}
 
-  // Add attendance
-  await db.insert(userAttendances).values({ userId: user.id, eventId })
-  await db
-    .update(events)
-    .set({ attendanceCount: sql`${events.attendanceCount} + 1` })
-    .where(eq(events.id, eventId))
-
-  // Add XP
-  await db
-    .update(users)
-    .set({ xp: sql`${users.xp} + ${XP_REWARDS.ATTEND}` })
-    .where(eq(users.id, user.id))
-
-  return NextResponse.json({ attending: true })
+function jsonClosed() {
+  return NextResponse.json({ error: 'Cet événement est terminé depuis plus d’un jour.' }, { status: 409 })
 }

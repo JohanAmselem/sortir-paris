@@ -1,0 +1,38 @@
+name: Scrapers CI
+
+on:
+  pull_request:
+    paths:
+      - 'scrapers/**'
+      - '.github/workflows/ci-scrapers.yml'
+      - '.github/workflows/daily-scrape.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scrapers/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-scrapers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scrapers/requirements*.txt
+      - run: pip install -r scrapers/requirements-dev.txt
+      - name: Compile
+        working-directory: scrapers
+        run: python -m compileall -q -x '\.venv' .
+      - name: Tests (offline, fixtures only)
+        working-directory: scrapers
+        run: python -m pytest -q

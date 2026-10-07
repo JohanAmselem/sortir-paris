@@ -1,5 +1,17 @@
 /**
- * Sync all active events from Supabase → Meilisearch
+ * ⚠️  LEGACY / MANUAL ONLY — do not schedule.
+ *
+ * The production Meilisearch sync is `scrapers/pipelines/meili.py` (run by
+ * `python cron.py --post` in .github/workflows/daily-scrape.yml). It is the single
+ * source of truth for the document shape and index settings, indexes only live events
+ * (status='active' AND canonical_event_id IS NULL AND coalesce(end_date,start_date) >= now())
+ * and swaps a freshly built index so no stale document survives.
+ *
+ * This script still pushes ALL active events (including past ones and cross-source
+ * duplicates) with an older document shape into the live index without deleting stale
+ * documents: running it will reintroduce the problems fixed by the Python sync.
+ * Kept only for one-off debugging / creating the public search key.
+ *
  * Usage: pnpm tsx scripts/sync-meilisearch.ts
  */
 import { config } from 'dotenv'

@@ -1,120 +1,145 @@
 """
-Venue geocoding utility.
-Uses the French government's free address API (api-adresse.data.gouv.fr).
-No API key required. Accurate for French addresses.
+Venue geocoding with the French government address API (BAN, api-adresse.data.gouv.fr).
+Free, no key. AUDIT D9: municipality-level answers put 97 venues on the Paris centroid.
+
+Rules:
+- accept only score ≥ 0.6 and type in (housenumber, street, locality)
+- result must be in Île-de-France (bbox + postcode 75/77/78/91/92/93/94/95)
+- write lat/lng + postcode + city (never forced to "Paris") + arrondissement
+- record geocode_status ('ok' | 'failed') and geocode_attempts; skip venues with ≥ 3 attempts
 """
+
+from __future__ import annotations
 
 import os
 import time
-import httpx
-import psycopg2
+from typing import Optional
+
+from utils.normalize import IDF_DEPARTMENTS, arrondissement_from_zip, in_idf
 
 API_URL = "https://api-adresse.data.gouv.fr/search/"
+MIN_SCORE = 0.6
+ACCEPTED_TYPES = {"housenumber", "street", "locality"}
+MAX_ATTEMPTS = 3
 
-# Paris bounding box (rough)
-PARIS_LAT_MIN, PARIS_LAT_MAX = 48.80, 48.92
-PARIS_LNG_MIN, PARIS_LNG_MAX = 2.20, 2.47
+
+def pick_feature(data: dict) -> Optional[dict]:
+    """Pure: choose an acceptable BAN feature or None."""
+    for feat in (data or {}).get("features", []):
+        props = feat.get("properties", {})
+        if props.get("score", 0) < MIN_SCORE or props.get("type") not in ACCEPTED_TYPES:
+            continue
+        coords = (feat.get("geometry") or {}).get("coordinates") or []
+        if len(coords) != 2:
+            continue
+        lng, lat = coords
+        postcode = str(props.get("postcode") or "")
+        if not in_idf(lat, lng) or postcode[:2] not in IDF_DEPARTMENTS:
+            continue
+        return {
+            "lat": float(lat),
+            "lng": float(lng),
+            "postcode": postcode or None,
+            "city": props.get("city"),
+            "arrondissement": arrondissement_from_zip(postcode),
+            "score": props.get("score"),
+            "type": props.get("type"),
+        }
+    return None
 
 
-def geocode_address(address: str, city: str = "Paris") -> tuple[float, float] | None:
-    """Geocode a French address using the government API.
-
-    Returns (lat, lng) or None if not found / outside Paris.
-    """
+def geocode_address(address: str, zip_code: Optional[str] = None, city: Optional[str] = None,
+                    client=None) -> Optional[dict]:
     if not address:
         return None
+    from utils.http import PoliteClient
 
-    query = f"{address}, {city}"
+    q = " ".join(p for p in (address, zip_code, city) if p)
+    params = {"q": q, "limit": 3, "autocomplete": 0}
+    if zip_code:
+        params["postcode"] = zip_code
+    own = client is None
+    client = client or PoliteClient(delay=0.1)  # BAN allows 50 req/s/IP; stay far below
     try:
-        resp = httpx.get(
-            API_URL,
-            params={"q": query, "limit": 1, "autocomplete": 0},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-        features = data.get("features", [])
-        if not features:
-            return None
-
-        coords = features[0]["geometry"]["coordinates"]
-        lng, lat = coords[0], coords[1]  # GeoJSON: [lng, lat]
-
-        # Validate within Paris area
-        if not (PARIS_LAT_MIN <= lat <= PARIS_LAT_MAX and PARIS_LNG_MIN <= lng <= PARIS_LNG_MAX):
-            return None
-
-        return (lat, lng)
-
-    except Exception as e:
-        print(f"  [Geocode] Error for '{query}': {e}")
-        return None
+        data = client.get_json(API_URL, params=params)
+    finally:
+        if own:
+            client.close()
+    return pick_feature(data)
 
 
-def geocode_missing_venues():
-    """Find venues with missing lat/lng and geocode them."""
-    db_url = os.getenv("DATABASE_URL", "")
-    if not db_url:
-        print("[Geocode] DATABASE_URL not set, skipping")
-        return
+def geocode_missing_venues(conn=None, limit: int = 500) -> dict:
+    """Geocode venues without coordinates (pending/failed with < 3 attempts)."""
+    from utils.http import PoliteClient
 
-    print("\n[Geocode] Geocoding venues with missing coordinates...")
+    own = conn is None
+    if own:
+        if not os.getenv("DATABASE_URL"):
+            print("[Geocode] DATABASE_URL not set, skipping")
+            return {"ok": 0, "failed": 0}
+        from pipelines.ingest import get_db_connection
 
-    conn = psycopg2.connect(db_url)
-    cursor = conn.cursor()
-
-    # Find venues without coordinates that have an address
-    cursor.execute("""
-        SELECT id, name, address, city, zip_code
-        FROM venues
+        conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, name, address, zip_code, city FROM venues
         WHERE lat IS NULL
-          AND address IS NOT NULL
-          AND address != ''
-        ORDER BY created_at DESC
-        LIMIT 500
-    """)
-    venues = cursor.fetchall()
-
-    if not venues:
-        print("[Geocode] All venues already geocoded!")
-        cursor.close()
-        conn.close()
-        return
-
-    print(f"[Geocode] Found {len(venues)} venues to geocode")
-
-    updated = 0
-    errors = 0
-
-    for venue_id, name, address, city, zip_code in venues:
-        # Build address string
-        addr_parts = [address]
-        if zip_code:
-            addr_parts.append(zip_code)
-        city_str = city or "Paris"
-
-        result = geocode_address(" ".join(addr_parts), city_str)
-
-        if result:
-            lat, lng = result
-            cursor.execute(
-                "UPDATE venues SET lat = %s, lng = %s WHERE id = %s",
-                (lat, lng, venue_id),
-            )
-            updated += 1
-        else:
-            errors += 1
-
-        # Rate limit: ~20 requests/sec
-        time.sleep(0.05)
-
-        # Commit every 50 updates
-        if updated % 50 == 0 and updated > 0:
-            conn.commit()
-
+          AND geocode_status IN ('pending', 'failed')
+          AND geocode_attempts < %s
+          AND coalesce(address, '') <> ''
+        ORDER BY geocode_attempts, created_at DESC
+        LIMIT %s
+        """,
+        (MAX_ATTEMPTS, limit),
+    )
+    venues = cur.fetchall()
+    print(f"\n[Geocode] {len(venues)} venues to geocode")
+    ok = failed = 0
+    client = PoliteClient(delay=0.1)
+    try:
+        for venue_id, name, address, zip_code, city in venues:
+            try:
+                res = geocode_address(address, zip_code, city, client=client)
+            except Exception as e:
+                print(f"  [Geocode] {name}: {e}")
+                res = None
+            if res:
+                cur.execute(
+                    """
+                    UPDATE venues SET lat = %s, lng = %s,
+                        zip_code = COALESCE(%s, zip_code),
+                        city = COALESCE(%s, city),
+                        arrondissement = COALESCE(%s, arrondissement),
+                        geocode_status = 'ok', geocode_attempts = geocode_attempts + 1
+                    WHERE id = %s
+                    """,
+                    (res["lat"], res["lng"], res["postcode"], res["city"], res["arrondissement"], venue_id),
+                )
+                ok += 1
+            else:
+                cur.execute(
+                    """UPDATE venues SET geocode_status = 'failed', geocode_attempts = geocode_attempts + 1
+                       WHERE id = %s""",
+                    (venue_id,),
+                )
+                failed += 1
+            if (ok + failed) % 50 == 0:
+                conn.commit()
+    finally:
+        client.close()
+    # Arrondissement for venues that already have a Paris postcode
+    cur.execute(
+        """
+        UPDATE venues SET arrondissement = CASE
+            WHEN substring(zip_code from 4 for 2)::int = 1 THEN '1er'
+            ELSE (substring(zip_code from 4 for 2)::int)::text || 'e' END
+        WHERE arrondissement IS NULL AND zip_code ~ '^75(0(0[1-9]|1[0-9]|20)|116)$'
+        """
+    )
     conn.commit()
-    cursor.close()
-    conn.close()
-
-    print(f"[Geocode] Done: {updated} geocoded, {errors} failed, {len(venues)} total")
+    cur.close()
+    if own:
+        conn.close()
+    print(f"[Geocode] done: {ok} ok, {failed} failed")
+    return {"ok": ok, "failed": failed}

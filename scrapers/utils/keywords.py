@@ -3,8 +3,27 @@ Auto-generate rich keywords from event data for improved search relevance.
 Used during ingestion to enrich Meilisearch documents.
 """
 
+from __future__ import annotations
+
 import re
+from functools import lru_cache
 from typing import Optional
+
+from unidecode import unidecode
+
+
+def _fold(text: str) -> str:
+    return unidecode(text or "").lower()
+
+
+@lru_cache(maxsize=4096)
+def _term_re(term: str):
+    return re.compile(r"(?<![a-z0-9])" + re.escape(_fold(term)) + r"(?![a-z0-9])")
+
+
+def _has(term: str, folded_text: str) -> bool:
+    """Whole-word, accent-insensitive match (no more 'rap' in 'rapide')."""
+    return bool(_term_re(term).search(folded_text))
 
 # ─── Comprehensive French cultural keyword dictionaries ───
 
@@ -80,11 +99,12 @@ def extract_keywords(
     short_desc: Optional[str] = None,
     category_slug: Optional[str] = None,
     venue_name: Optional[str] = None,
+    is_free: bool = False,
 ) -> list[str]:
     """Extract rich keywords from event data for Meilisearch."""
     keywords = set()
-    text = f"{title} {short_desc or ''} {description or ''}".lower()
-    full_text = f"{text} {venue_name or ''}".lower()
+    text = _fold(f"{title} {short_desc or ''} {description or ''}")
+    full_text = f"{text} {_fold(venue_name or '')}"
 
     # 1. Genre-specific keywords
     all_genres = {
@@ -95,7 +115,7 @@ def extract_keywords(
     }
     for genre, terms in all_genres.items():
         for term in terms:
-            if term.lower() in full_text:
+            if _has(term, full_text):
                 keywords.add(genre)
                 for related in terms:
                     if len(related) >= 3:
@@ -105,7 +125,7 @@ def extract_keywords(
     # 2. Ambiance keywords
     for ambiance, terms in AMBIANCE_KEYWORDS.items():
         for term in terms:
-            if term.lower() in full_text:
+            if _has(term, full_text):
                 keywords.add(ambiance)
                 for related in terms:
                     keywords.add(related)
@@ -117,13 +137,13 @@ def extract_keywords(
             keywords.add(term)
 
     # 4. Free-related
-    if "gratuit" in text or "entrée libre" in text:
+    if is_free:
         keywords.update(["gratuit", "entrée libre", "free", "bon plan", "sortie gratuite"])
 
     # 5. Time-related
-    if "nocturne" in text or "nuit" in text:
+    if _has("nocturne", text) or _has("nuit", text):
         keywords.update(["nocturne", "soirée", "nuit"])
-    if "brunch" in text or "matin" in text:
+    if _has("brunch", text) or _has("matin", text):
         keywords.update(["brunch", "matinée", "matin"])
 
     return [k for k in sorted(keywords) if len(k) >= 2]

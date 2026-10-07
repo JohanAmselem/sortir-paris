@@ -1,211 +1,140 @@
 """
-TMDB (The Movie Database) scraper — Films currently in Paris cinemas.
-Source: https://api.themoviedb.org/3
+TMDB (The Movie Database) — ENRICHMENT ONLY, never an event source.
 
-Uses the free TMDB API to get all movies currently showing in French cinemas,
-with high-quality metadata (posters, synopses, ratings, genres).
-Creates one event per film per day for the next 7 days.
+TMDB knows which films exist, not where/when they are screened in Paris. The previous
+version invented 3 showtimes per film per day: that is fabricated data and is gone.
 
-API Key: Free — register at https://www.themoviedb.org/settings/api
+Use `enrich_film(title, year)` to fetch poster / backdrop / French overview / genres
+for a film whose real screenings come from another source (allocine.py).
+
+API: official TMDB API v3, GET /search/movie?query=…&language=fr-FR
+Auth: env TMDB_API_KEY (v3 api_key query param) or TMDB_ACCESS_TOKEN (v4 bearer).
+No key → enrich_film returns None.
 """
 
-import httpx
-import time
-from datetime import datetime, timedelta
-from typing import Generator, Optional
-import os
+from __future__ import annotations
 
-from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    compute_quality_score,
-)
+import os
+from typing import Generator, Optional
+
+from utils.http import BudgetExceeded, PoliteClient
+from utils.normalize import clean_text
 
 API_BASE = "https://api.themoviedb.org/3"
 IMAGE_BASE = "https://image.tmdb.org/t/p"
 
-# Genre ID → name mapping (TMDB genre IDs)
+# TMDB movie genre ids (stable, documented at /genre/movie/list)
 GENRE_MAP = {
     28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie",
-    80: "Crime", 99: "Documentaire", 18: "Drame", 10751: "Famille",
+    80: "Crime", 99: "Documentaire", 18: "Drame", 10751: "Familial",
     14: "Fantastique", 36: "Histoire", 27: "Horreur", 10402: "Musique",
     9648: "Mystère", 10749: "Romance", 878: "Science-Fiction",
     10770: "Téléfilm", 53: "Thriller", 10752: "Guerre", 37: "Western",
 }
 
-HEADERS = {
-    "User-Agent": "SortirParis/1.0 (+https://sortir.paris)",
-    "Accept": "application/json",
-}
+# Per-run cache: (normalized title, year) → result dict or None
+_CACHE: dict = {}
 
 
-def fetch_events(
-    days_ahead: int = 7,
-    max_pages: int = 5,
-) -> Generator[dict, None, None]:
-    """Fetch currently showing movies from TMDB.
+def _credentials() -> tuple:
+    return os.getenv("TMDB_API_KEY", "").strip(), os.getenv("TMDB_ACCESS_TOKEN", "").strip()
 
-    Creates one event per film per day for the next `days_ahead` days.
-    Requires TMDB_API_KEY environment variable.
+
+def has_credentials() -> bool:
+    key, token = _credentials()
+    return bool(key or token)
+
+
+def _norm_title(title: str) -> str:
+    return (clean_text(title) or "").casefold()
+
+
+def parse_search_result(data: Optional[dict], title: str, year: Optional[int] = None) -> Optional[dict]:
+    """Pick the best /search/movie result and map it to our enrichment dict (pure)."""
+    if not data:
+        return None
+    results = [r for r in (data.get("results") or []) if isinstance(r, dict) and r.get("id")]
+    if not results:
+        return None
+
+    wanted = _norm_title(title)
+
+    def score(r: dict) -> tuple:
+        names = {_norm_title(r.get("title") or ""), _norm_title(r.get("original_title") or "")}
+        exact = wanted in names
+        ry = (r.get("release_date") or "")[:4]
+        year_ok = bool(year) and ry.isdigit() and abs(int(ry) - int(year)) <= 1
+        return (exact, year_ok, r.get("popularity") or 0)
+
+    best = max(results, key=score)
+    exact, year_ok, _ = score(best)
+    # Be conservative: without an exact title match (or a year match), don't attach data.
+    if not exact and not year_ok:
+        return None
+
+    poster = best.get("poster_path")
+    backdrop = best.get("backdrop_path")
+    return {
+        "tmdb_id": best["id"],
+        "title": best.get("title"),
+        "original_title": best.get("original_title"),
+        "release_date": best.get("release_date") or None,
+        "overview": clean_text(best.get("overview")) or None,
+        "poster_url": f"{IMAGE_BASE}/w500{poster}" if poster else None,
+        "backdrop_url": f"{IMAGE_BASE}/w780{backdrop}" if backdrop else None,
+        "genres": [GENRE_MAP[g] for g in (best.get("genre_ids") or []) if g in GENRE_MAP],
+    }
+
+
+def enrich_film(title: str, year: Optional[int] = None, client: Optional[PoliteClient] = None) -> Optional[dict]:
+    """Return {tmdb_id, poster_url, backdrop_url, overview, genres, ...} or None.
+
+    None when no TMDB credentials are set, on API error, or when no confident match.
+    Results are cached per (title, year) for the lifetime of the process (one run).
     """
-    api_key = os.getenv("TMDB_API_KEY", "")
-    if not api_key:
-        # Try using the API with a read access token
-        api_token = os.getenv("TMDB_ACCESS_TOKEN", "")
-        if not api_token:
-            print("  TMDB: No API key set (TMDB_API_KEY or TMDB_ACCESS_TOKEN). Skipping.")
-            return
+    if not title:
+        return None
+    key, token = _credentials()
+    if not (key or token):
+        return None
 
-    client = httpx.Client(headers=HEADERS, timeout=15, follow_redirects=True)
-    seen = set()
-    all_movies = []
+    cache_key = (_norm_title(title), year)
+    if cache_key in _CACHE:
+        return _CACHE[cache_key]
 
-    # Fetch all pages of now_playing
-    for page in range(1, max_pages + 1):
-        try:
-            params = {
-                "api_key": api_key,
-                "language": "fr-FR",
-                "region": "FR",
-                "page": page,
-            }
+    params = {"query": title, "language": "fr-FR", "include_adult": "false"}
+    if year:
+        params["year"] = str(year)
+    headers = {"Accept": "application/json"}
+    if key:
+        params["api_key"] = key
+    else:
+        headers["Authorization"] = f"Bearer {token}"
 
-            # Now playing in France
-            resp = client.get(f"{API_BASE}/movie/now_playing", params=params)
-            if resp.status_code == 401:
-                print("  TMDB: Invalid API key")
-                break
-            if resp.status_code != 200:
-                break
+    own = client is None
+    c = client or PoliteClient(delay=0.3)
+    try:
+        data = c.get_json(f"{API_BASE}/search/movie", params=params, headers=headers)
+        if not (data and data.get("results")) and year:
+            # release year on TMDB may differ from Allociné's production year
+            params.pop("year", None)
+            data = c.get_json(f"{API_BASE}/search/movie", params=params, headers=headers)
+    except BudgetExceeded:
+        raise
+    except Exception as e:  # noqa: BLE001 — enrichment must never break the caller
+        print(f"  [tmdb] search failed for {title!r}: {e}")
+        data = None
+    finally:
+        if own:
+            c.close()
 
-            data = resp.json()
-            movies = data.get("results", [])
-            if not movies:
-                break
+    result = parse_search_result(data, title, year)
+    _CACHE[cache_key] = result
+    return result
 
-            all_movies.extend(movies)
-            total_pages = data.get("total_pages", 1)
-            if page >= total_pages:
-                break
 
-            time.sleep(0.3)
-
-        except Exception as e:
-            print(f"  TMDB page {page} error: {e}")
-            break
-
-    # Also fetch upcoming movies
-    for page in range(1, 3):
-        try:
-            params = {
-                "api_key": api_key,
-                "language": "fr-FR",
-                "region": "FR",
-                "page": page,
-            }
-            resp = client.get(f"{API_BASE}/movie/upcoming", params=params)
-            if resp.status_code == 200:
-                movies = resp.json().get("results", [])
-                all_movies.extend(movies)
-            time.sleep(0.3)
-        except Exception:
-            break
-
-    print(f"  TMDB: Found {len(all_movies)} movies")
-
-    # Deduplicate by movie ID
-    unique_movies = {}
-    for movie in all_movies:
-        mid = movie.get("id")
-        if mid and mid not in unique_movies:
-            unique_movies[mid] = movie
-
-    # Generate events — one per film per day
-    for movie_id, movie in unique_movies.items():
-        title = movie.get("title", "")
-        original_title = movie.get("original_title", "")
-        if not title:
-            continue
-
-        # Full title with original if different
-        full_title = title
-        if original_title and original_title != title:
-            full_title = f"{title} ({original_title})"
-
-        overview = movie.get("overview", "")
-        poster_path = movie.get("poster_path")
-        backdrop_path = movie.get("backdrop_path")
-        release_date = movie.get("release_date", "")
-        vote_avg = movie.get("vote_average", 0)
-        vote_count = movie.get("vote_count", 0)
-        genre_ids = movie.get("genre_ids", [])
-
-        # Best image: prefer backdrop for events (landscape), fallback to poster
-        image_url = None
-        if backdrop_path:
-            image_url = f"{IMAGE_BASE}/w780{backdrop_path}"
-        elif poster_path:
-            image_url = f"{IMAGE_BASE}/w500{poster_path}"
-
-        # Genres
-        genres = [GENRE_MAP.get(gid, "") for gid in genre_ids if gid in GENRE_MAP]
-        genre_text = ", ".join(genres) if genres else "Film"
-
-        # Description
-        desc_parts = []
-        if overview:
-            desc_parts.append(overview)
-        if genres:
-            desc_parts.append(f"Genre : {genre_text}")
-        if vote_avg and vote_count > 10:
-            desc_parts.append(f"Note : {vote_avg:.1f}/10 ({vote_count} votes)")
-        description = "\n".join(desc_parts)
-
-        short_desc = truncate(overview) if overview else f"{genre_text} — En salle à Paris"
-
-        # TMDB page URL
-        source_url = f"https://www.themoviedb.org/movie/{movie_id}"
-
-        # Create one event per day
-        for day_offset in range(days_ahead):
-            date = datetime.now() + timedelta(days=day_offset)
-            date_str = date.strftime("%Y-%m-%d")
-
-            # Multiple showtimes per day
-            for showtime in ["14:00", "17:00", "20:00"]:
-                start_iso = f"{date_str}T{showtime}:00"
-                slug = generate_slug(title, start_iso)
-
-                if slug in seen:
-                    continue
-                seen.add(slug)
-
-                yield {
-                    "title": full_title,
-                    "slug": slug,
-                    "description": description,
-                    "short_desc": short_desc,
-                    "start_date": start_iso,
-                    "end_date": None,
-                    "image_url": image_url,
-                    "price_min": 800,   # ~8€ minimum for cinema
-                    "price_max": 1500,  # ~15€ maximum
-                    "is_free": False,
-                    "booking_url": None,  # No specific booking link — users go to their preferred cinema
-                    "source": "tmdb",
-                    "source_id": f"tmdb-{movie_id}-{date_str}-{showtime.replace(':', '')}",
-                    "source_url": source_url,
-                    "venue_name": "Cinémas de Paris",
-                    "venue_address": "",
-                    "venue_city": "Paris",
-                    "venue_zip": None,
-                    "venue_arrondissement": None,
-                    "category_slug": "cinema",
-                    "tags": ["cinema", "film"] + [g.lower() for g in genres[:3]],
-                    "quality_score": compute_quality_score(
-                        full_title, description, image_url, start_iso, "8€ - 15€", source_url
-                    ),
-                }
-
-    client.close()
+def fetch_events(days_ahead: int = 7, max_pages: int = 5) -> Generator[dict, None, None]:
+    """Kept for run.py compatibility. TMDB has no screening data: yields nothing."""
+    print("  tmdb: enrichment only, not an event source")
+    return
+    yield  # pragma: no cover — makes this a generator

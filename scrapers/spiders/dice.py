@@ -1,201 +1,162 @@
 """
-DICE spider.
-Source: https://dice.fm/partner/discover?location=paris
-Major platform for concerts, festivals, and nightlife events.
+DICE spider — concerts, club nights, comedy, talks in Paris.
+Source: https://dice.fm/browse/paris-5b23e8a0e63cc224a4c36a2d[/<type>/<subtype>]
 
-Uses their public API for event listings.
+Legal basis: public structured data embedded in the public browse pages
+(__NEXT_DATA__ → props.pageProps.events, server-rendered, ~30 events per page; the
+"nextCursor" pagination is client-side only, so one page per filter).
+
+Mapping: dates.event_start_date / event_end_date carry an offset; price.amount /
+amount_from are CENTIMES (EUR); venues[0].address holds the postcode. The city
+lat/lng in the payload is the city centroid, not the venue → not used.
 """
 
-import httpx
-from datetime import datetime
-from typing import Generator, Optional
+from __future__ import annotations
 
-from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    compute_quality_score,
-)
+import json
+import re
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Generator, List, Optional
 
-API_URL = "https://api.dice.fm/v1/events"
+from spiders.eventbrite_paris import is_off_topic
+from utils.event import make_event
+from utils.http import BudgetExceeded, PoliteClient
+from utils.normalize import IDF_DEPARTMENTS, UNKNOWN_PRICE, extract_zip, price_from_numbers
+
+SOURCE = "dice"
 BASE_URL = "https://dice.fm"
+PARIS_BROWSE = f"{BASE_URL}/browse/paris-5b23e8a0e63cc224a4c36a2d"
+
+# browse filter → explicit category
+FILTERS = [
+    ("music/gig", "concerts"),
+    ("music/party", "concerts"),
+    ("music/dj", "concerts"),
+    ("culture/comedy", "spectacles"),
+    ("culture/theatre", "theatre"),
+    ("culture/talks", "conferences"),
+    ("culture/art", "expos"),
+    ("culture/film", "cinema"),
+    ("culture/workshop", "ateliers"),
+]
+
+_NEXT_RE = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
+
+
+def _page_props(html: str) -> dict:
+    m = _NEXT_RE.search(html or "")
+    if not m:
+        return {}
+    try:
+        return (json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}
+    except ValueError:
+        return {}
+
+
+def price_from_dice(price: Optional[dict], status: Optional[str] = None) -> dict:
+    """DICE price block (centimes) → price dict. 0 on a sold-out/off-sale event = unknown."""
+    if not isinstance(price, dict) or (price.get("currency") or "EUR").upper() != "EUR":
+        return dict(UNKNOWN_PRICE)
+    amount = price.get("amount")
+    if amount is None:
+        amount = price.get("amount_from")
+        if not amount:  # "from 0 €" says nothing about the real price
+            return dict(UNKNOWN_PRICE)
+    if amount == 0 and (status or "on-sale") != "on-sale":
+        return dict(UNKNOWN_PRICE)
+    return price_from_numbers(Decimal(int(amount)) / 100)
+
+
+def city_from_address(address: Optional[str]) -> Optional[str]:
+    """'16 Place de la Bourse, 75002 Paris-2E-Arrondissement, France' → 'Paris'."""
+    m = re.search(r"\b\d{5}\s+([^,]+)", address or "")
+    if not m:
+        return None
+    city = re.sub(r"-\d+(?:er|e|E|ER)-Arrondissement$", "", m.group(1).strip())
+    return city or None
+
+
+def event_from_dice(e: dict, category_slug: Optional[str] = None) -> Optional[dict]:
+    name = e.get("name")
+    dates = e.get("dates") or {}
+    start = dates.get("event_start_date")
+    if not name or not start or not e.get("id"):
+        return None
+    venues = e.get("venues") or []
+    venue = venues[0] if venues else {}
+    address = venue.get("address")
+    zip_code = extract_zip(address)
+    m = re.search(r"\b(\d{5})\b", address or "")
+    if m and m.group(1)[:2] not in IDF_DEPARTMENTS:
+        return None
+    city = city_from_address(address) or (venue.get("city") or {}).get("name")
+    if not (zip_code or city):
+        return None
+    if is_off_topic(name, e.get("one_liner")):
+        return None
+    status = (e.get("status") or "").lower()
+    images = e.get("images") or {}
+    url = f"{BASE_URL}/event/{e['id']}"
+    return make_event(
+        source=SOURCE,
+        source_id=f"dice-{e['id']}",
+        title=name,
+        start=start,
+        end=dates.get("event_end_date"),
+        description=e.get("one_liner"),
+        image_url=images.get("landscape") or images.get("square") or images.get("portrait"),
+        price=price_from_dice(e.get("price"), status),
+        booking_url=url,
+        source_url=url,
+        venue_name=venue.get("name"),
+        venue_address=address,
+        venue_city=city,
+        venue_zip=zip_code,
+        category_slug=category_slug,
+        event_status="cancelled" if "cancel" in status else "scheduled",
+        is_online=False,
+    )
+
+
+def parse_browse(html: str, category_slug: Optional[str] = None) -> List[dict]:
+    out = []
+    for e in _page_props(html).get("events") or []:
+        if not isinstance(e, dict):
+            continue
+        try:
+            ev = event_from_dice(e, category_slug)
+        except Exception as ex:
+            print(f"  [{SOURCE}] bad event {e.get('id')}: {ex}")
+            continue
+        if ev:
+            out.append(ev)
+    return out
 
 
 def fetch_events(days_ahead: int = 60, max_pages: int = 10) -> Generator[dict, None, None]:
-    """Fetch events from DICE."""
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Accept": "application/json",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-    }
-
-    # Try API first, fallback to HTML
-    try:
-        resp = httpx.get(
-            f"{BASE_URL}/partner/discover",
-            params={"location": "paris", "format": "json"},
-            headers=headers,
-            timeout=30,
-            follow_redirects=True,
-        )
-        if resp.status_code == 200 and "json" in resp.headers.get("content-type", ""):
-            data = resp.json()
-            events = data.get("events") or data.get("data") or data.get("results") or []
-            for event_data in events:
-                event = parse_api_event(event_data)
-                if event:
-                    yield event
-            return
-    except Exception as e:
-        print(f"  DICE API not available: {e}")
-
-    # Fallback: scrape HTML
-    yield from fetch_events_html(max_pages)
-
-
-def fetch_events_html(max_pages: int = 5) -> Generator[dict, None, None]:
-    """Scrape DICE HTML listing."""
-    from bs4 import BeautifulSoup
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-    }
-
-    url = f"{BASE_URL}/partner/discover?location=paris"
-    print(f"  Fetching DICE HTML listing...")
-
-    try:
-        resp = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"  Error fetching DICE: {e}")
-        return
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    # DICE uses React — look for JSON data in script tags
-    for script in soup.select("script[type='application/json'], script#__NEXT_DATA__"):
-        try:
-            import json
-            data = json.loads(script.string or "")
-            # Navigate through Next.js data structure
-            props = data.get("props", {}).get("pageProps", {})
-            events = props.get("events") or props.get("initialEvents") or props.get("data", {}).get("events") or []
-            for event_data in events:
-                event = parse_api_event(event_data)
-                if event:
-                    yield event
-            if events:
-                return
-        except (json.JSONDecodeError, AttributeError):
-            continue
-
-    # Standard HTML parsing
-    cards = soup.select("[class*='EventCard'], [class*='event-card'], article, [data-testid*='event']")
-    for card in cards:
-        title_el = card.select_one("h2, h3, [class*='title'], [class*='name']")
-        if not title_el:
-            continue
-
-        title = clean_text(title_el.get_text())
-        if not title:
-            continue
-
-        link_el = card.select_one("a[href]")
-        event_url = None
-        if link_el and link_el.get("href"):
-            href = link_el["href"]
-            event_url = href if href.startswith("http") else f"{BASE_URL}{href}"
-
-        venue_el = card.select_one("[class*='venue'], [class*='location']")
-        venue_name = clean_text(venue_el.get_text()) if venue_el else None
-
-        date_el = card.select_one("time, [class*='date']")
-        date_text = date_el.get("datetime") if date_el and date_el.get("datetime") else None
-
-        img_el = card.select_one("img[src]")
-        image_url = None
-        if img_el:
-            src = img_el.get("src") or img_el.get("data-src")
-            if src and src.startswith("http"):
-                image_url = src
-
-        price_el = card.select_one("[class*='price']")
-        price_text = clean_text(price_el.get_text()) if price_el else None
-
-        slug = generate_slug(title, date_text)
-        quality = compute_quality_score(title=title, description=None, image_url=image_url, start_date=date_text, price_raw=price_text, booking_url=event_url)
-
-        yield {
-            "title": title, "slug": slug, "description": None, "short_desc": None,
-            "image_url": image_url, "start_date": date_text, "end_date": None,
-            "price_min": 0, "price_max": 0, "is_free": False,
-            "booking_url": event_url, "source": "dice",
-            "source_url": event_url or url, "source_id": slug,
-            "venue_name": venue_name, "venue_address": None,
-            "venue_city": "Paris", "venue_zip": None, "venue_arrondissement": None,
-            "venue_lat": None, "venue_lng": None,
-            "raw_category": "concert", "category_slug": "concerts",
-            "tags": ["concert", "live"], "quality_score": quality,
-        }
-
-
-def parse_api_event(data: dict) -> Optional[dict]:
-    """Parse a DICE API event."""
-    title = data.get("name") or data.get("title")
-    if not title:
-        return None
-
-    title = clean_text(title)
-    if not title:
-        return None
-
-    start_date = data.get("date") or data.get("start_time") or data.get("doors_open")
-    end_date = data.get("end_time") or data.get("end_date")
-
-    venue = data.get("venue") or data.get("location") or {}
-    venue_name = venue.get("name") if isinstance(venue, dict) else str(venue) if venue else None
-    venue_address = venue.get("address") if isinstance(venue, dict) else None
-    venue_lat = venue.get("latitude") or venue.get("lat") if isinstance(venue, dict) else None
-    venue_lng = venue.get("longitude") or venue.get("lng") if isinstance(venue, dict) else None
-
-    image_url = data.get("image_url") or data.get("cover_image") or data.get("apple_music_image")
-    if isinstance(data.get("images"), list) and data["images"]:
-        image_url = data["images"][0].get("url") if isinstance(data["images"][0], dict) else data["images"][0]
-
-    price_min = price_max = 0
-    is_free = False
-    if data.get("price"):
-        if isinstance(data["price"], dict):
-            price_min = int(float(data["price"].get("min", 0)) * 100)
-            price_max = int(float(data["price"].get("max", price_min / 100)) * 100)
-        elif isinstance(data["price"], (int, float)):
-            price_min = price_max = int(float(data["price"]) * 100)
-    if data.get("is_free") or data.get("free"):
-        is_free = True
-
-    event_url = data.get("url") or data.get("link")
-    if not event_url and data.get("slug"):
-        event_url = f"{BASE_URL}/event/{data['slug']}"
-
-    description = clean_text(data.get("description") or data.get("about"))
-    slug = generate_slug(title, start_date)
-    quality = compute_quality_score(title=title, description=description, image_url=image_url, start_date=start_date, price_raw=str(price_min) if price_min else None, booking_url=event_url)
-
-    return {
-        "title": title, "slug": slug, "description": description, "short_desc": truncate(description),
-        "image_url": image_url, "start_date": start_date, "end_date": end_date,
-        "price_min": price_min, "price_max": price_max, "is_free": is_free,
-        "booking_url": event_url, "source": "dice",
-        "source_url": event_url or f"{BASE_URL}/partner/discover?location=paris",
-        "source_id": str(data.get("id", slug)),
-        "venue_name": venue_name, "venue_address": venue_address,
-        "venue_city": "Paris", "venue_zip": None, "venue_arrondissement": None,
-        "venue_lat": venue_lat, "venue_lng": venue_lng,
-        "raw_category": data.get("genre") or data.get("category") or "concert",
-        "category_slug": "concerts",
-        "tags": data.get("tags") or data.get("genres") or ["concert", "live"],
-        "quality_score": quality,
-    }
+    """One browse page per filter (max_pages caps the number of filter pages)."""
+    horizon = datetime.now(timezone.utc) + timedelta(days=days_ahead)
+    seen: set = set()
+    with PoliteClient() as client:
+        for i, (path, category) in enumerate(FILTERS[:max_pages]):
+            url = f"{PARIS_BROWSE}/{path}"
+            try:
+                html = client.get_text(url)
+            except BudgetExceeded:
+                raise
+            if html is None or not _page_props(html):
+                if i == 0:
+                    print(f"  [{SOURCE}] blocked: no __NEXT_DATA__ events on {url}")
+                    return
+                continue
+            kept = 0
+            for ev in parse_browse(html, category):
+                if ev["source_id"] in seen:
+                    continue
+                if datetime.fromisoformat(ev["start_date"]) > horizon:
+                    continue
+                seen.add(ev["source_id"])
+                kept += 1
+                yield ev
+            print(f"  [{SOURCE}] {path}: {kept} events")

@@ -1,296 +1,299 @@
 """
-Main ingestion pipeline.
-Receives normalized events from spiders and:
-1. Deduplicates
-2. Upserts to PostgreSQL
-3. Syncs to Meilisearch
+Ingestion pipeline: validated, idempotent upserts into Postgres.
+
+- One SAVEPOINT per event: a bad row never rolls back its neighbours (AUDIT D5 / C1).
+- validation.validate() decides status: active / draft / rejected / cancelled (+ quality_reasons).
+- Updates never overwrite good data with NULL (COALESCE); prices only when known.
+- Slug conflicts get a short hash suffix instead of silently dropping the event.
+- Every upsert sets last_seen_at = now().
+- Meilisearch is NOT touched here: one full sync runs at the end (pipelines/meili.py).
+- Cross-source dedup runs after all sources (pipelines/dedup.py).
 """
 
-import os
+from __future__ import annotations
+
 import json
-import time
-import psycopg2
-import psycopg2.extras
-import httpx
-from datetime import datetime
-from typing import Optional, List, Tuple
-from dotenv import load_dotenv
+import os
+from collections import defaultdict
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+from utils.event import stable_id
 from utils.keywords import extract_keywords, keywords_to_search_string
+from utils.matching import dedup_title
+from utils.normalize import generate_slug
+from validation import decide_status, validate
+from pipelines.venues import VenueResolver
 
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-MEILISEARCH_HOST = os.getenv("MEILISEARCH_HOST", "http://localhost:7700")
-MEILISEARCH_API_KEY = os.getenv("MEILISEARCH_API_KEY", "")
+COMMIT_EVERY = 50
+MAX_LOGGED_ERRORS = 50
+PLACEHOLDER_MIN_TITLES = 3
 
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    import psycopg2
+
+    url = os.getenv("DATABASE_URL", "")
+    if not url:
+        raise RuntimeError("DATABASE_URL is not set")
+    conn = psycopg2.connect(url, connect_timeout=15, application_name="panameclub-scrapers")
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'UTC'")
+        cur.execute("SET statement_timeout = '60s'")
+    conn.commit()
+    return conn
 
 
-def find_or_create_venue(cursor, event: dict) -> Optional[str]:
-    """Find existing venue or create new one. Returns venue ID."""
-    venue_name = event.get("venue_name")
-    if not venue_name:
-        return None
-
-    # Try to find by name (exact match first)
-    cursor.execute(
-        "SELECT id FROM venues WHERE lower(name) = lower(%s) LIMIT 1",
-        (venue_name,),
-    )
-    row = cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Create new venue
-    from utils.normalize import generate_slug
-
-    slug = generate_slug(venue_name)
-
-    cursor.execute(
-        """
-        INSERT INTO venues (name, slug, address, city, zip_code, lat, lng)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id
-        """,
-        (
-            venue_name,
-            slug,
-            event.get("venue_address"),
-            event.get("venue_city", "Paris"),
-            event.get("venue_zip"),
-            event.get("venue_lat"),
-            event.get("venue_lng"),
-        ),
-    )
-    return cursor.fetchone()[0]
+def drop_placeholder_images(events: List[dict], min_titles: int = PLACEHOLDER_MIN_TITLES) -> int:
+    """An image URL shared by ≥ min_titles unrelated events is a placeholder (e.g. the
+    InfoConcert 'Muse' picture on 444 concerts) → removed. Returns #events changed."""
+    titles_by_image: Dict[str, set] = defaultdict(set)
+    for ev in events:
+        if ev.get("image_url"):
+            titles_by_image[ev["image_url"]].add(dedup_title(ev.get("title")))
+    shared = {img for img, titles in titles_by_image.items() if len(titles) >= min_titles}
+    changed = 0
+    for ev in events:
+        if ev.get("image_url") in shared:
+            ev["image_url"] = None
+            changed += 1
+    return changed
 
 
-def find_category_id(cursor, category_slug: Optional[str]) -> Optional[str]:
-    """Find category ID by slug."""
-    if not category_slug:
-        return None
-    cursor.execute("SELECT id FROM categories WHERE slug = %s", (category_slug,))
-    row = cursor.fetchone()
+class CategoryCache:
+    def __init__(self, cur):
+        cur.execute("SELECT slug, id FROM categories")
+        self.ids = {slug: cid for slug, cid in cur.fetchall()}
+
+    def get(self, slug: Optional[str]) -> Optional[str]:
+        return self.ids.get(slug) if slug else None
+
+
+def _unique_slug(cur, base: str, source: str, source_id: str) -> str:
+    cur.execute("SELECT 1 FROM events WHERE slug = %s", (base,))
+    if not cur.fetchone():
+        return base
+    return f"{base}-{stable_id(source, source_id)[:6]}"
+
+
+UPDATE_SQL = """
+UPDATE events SET
+    title = %(title)s,
+    description = COALESCE(%(description)s, description),
+    short_desc = COALESCE(%(short_desc)s, short_desc),
+    image_url = COALESCE(%(image_url)s, image_url),
+    start_date = %(start_date)s,
+    end_date = CASE WHEN %(end_date)s::timestamptz IS NOT NULL THEN %(end_date)s::timestamptz
+                    WHEN end_date >= %(start_date)s::timestamptz THEN end_date
+                    ELSE NULL END,
+    time_known = %(time_known)s,
+    price_min = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_min)s ELSE price_min END,
+    price_max = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_max)s ELSE price_max END,
+    is_free = CASE WHEN %(price_status)s <> 'unknown' THEN %(is_free)s ELSE is_free END,
+    price_status = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_status)s ELSE price_status END,
+    booking_url = COALESCE(%(booking_url)s, booking_url),
+    source_url = COALESCE(%(source_url)s, source_url),
+    category_id = COALESCE(%(category_id)s, category_id),
+    venue_id = COALESCE(%(venue_id)s, venue_id),
+    keywords = COALESCE(%(keywords)s, keywords),
+    status = %(status)s,
+    quality_score = %(quality_score)s,
+    quality_reasons = %(quality_reasons)s::jsonb,
+    last_seen_at = now(),
+    updated_at = now()
+WHERE id = %(id)s
+"""
+
+INSERT_SQL = """
+INSERT INTO events (
+    title, slug, description, short_desc, image_url,
+    start_date, end_date, time_known,
+    price_min, price_max, is_free, price_status,
+    booking_url, category_id, venue_id, keywords,
+    source, source_url, source_id,
+    status, quality_score, quality_reasons, last_seen_at
+) VALUES (
+    %(title)s, %(slug)s, %(description)s, %(short_desc)s, %(image_url)s,
+    %(start_date)s, %(end_date)s, %(time_known)s,
+    %(price_min)s, %(price_max)s, %(is_free)s, %(price_status)s,
+    %(booking_url)s, %(category_id)s, %(venue_id)s, %(keywords)s,
+    %(source)s, %(source_url)s, %(source_id)s,
+    %(status)s, %(quality_score)s, %(quality_reasons)s::jsonb, now()
+)
+ON CONFLICT (slug) DO NOTHING
+RETURNING id
+"""
+
+# Hard reasons that mean "not worth a new row" (existing rows are still updated).
+SKIP_INSERT = {"no_title", "no_start_date", "ended", "too_far_ahead"}
+UNSTORABLE = {"no_title", "no_start_date"}
+
+
+def process_event(cur, raw: dict, venues: VenueResolver, categories: CategoryCache) -> str:
+    """Validate + upsert one event. Returns 'new' | 'updated' | 'rejected' | 'skipped'."""
+    ev, hard, soft, score = validate(raw)
+    if ev is None or set(hard) & UNSTORABLE:
+        return "rejected"
+
+    cur.execute("SELECT id FROM events WHERE source = %s AND source_id = %s", (ev.source, ev.source_id))
+    existing = cur.fetchone()
+    if not existing and set(hard) & SKIP_INSERT:
+        return "skipped"  # e.g. already ended: not worth a row (and no venue creation)
+
+    venue_id, geocoded = venues.resolve(cur, raw) if raw.get("venue_name") else (None, False)
+    ev, hard, soft, score = validate(raw, venue_geocoded=geocoded)
+    status = decide_status(hard, score)
+    if hard and set(hard) <= {"ended"}:
+        status = "expired"
+
+    params = {
+        "title": ev.title,
+        "description": ev.description,
+        "short_desc": ev.short_desc,
+        "image_url": ev.image_url,
+        "start_date": ev.start_date,
+        "end_date": ev.end_date if (ev.end_date is None or ev.end_date >= ev.start_date) else None,
+        "time_known": ev.time_known,
+        "price_min": min(ev.price_min, ev.price_max) if ev.price_max else ev.price_min,
+        "price_max": max(ev.price_min, ev.price_max),
+        "is_free": ev.is_free and ev.price_max == 0,
+        "price_status": ev.price_status,
+        "booking_url": ev.booking_url,
+        "source_url": ev.source_url,
+        "category_id": categories.get(ev.category_slug),
+        "venue_id": venue_id,
+        "keywords": keywords_to_search_string(
+            extract_keywords(ev.title, ev.description, ev.short_desc, ev.category_slug,
+                             ev.venue_name, is_free=ev.price_status == "free")
+        ) or None,
+        "source": ev.source,
+        "source_id": ev.source_id,
+        "status": status,
+        "quality_score": score,
+        "quality_reasons": json.dumps(hard + soft),
+    }
+    if params["price_status"] == "free":
+        params["price_min"] = params["price_max"] = 0
+
+    if existing:
+        params["id"] = existing[0]
+        cur.execute(UPDATE_SQL, params)
+        return "updated"
+
+    base = ev.slug or generate_slug(ev.title, ev.start_date.isoformat())
+    params["slug"] = _unique_slug(cur, base, ev.source, ev.source_id)
+    cur.execute(INSERT_SQL, params)
+    if cur.fetchone():
+        return "new" if status != "rejected" else "rejected"
+    # lost a slug race → deterministic hashed slug
+    params["slug"] = f"{base}-{stable_id(ev.source, ev.source_id, 'x')[:8]}"
+    cur.execute(INSERT_SQL, params)
+    if cur.fetchone():
+        return "new" if status != "rejected" else "rejected"
+    raise RuntimeError(f"slug conflict for '{ev.title}'")
+
+
+def run_pipeline(events: List[dict], source_name: str, conn=None) -> dict:
+    """Ingest a batch of events for one source. Returns stats (never raises per event)."""
+    print(f"\n{'=' * 50}\nIngesting {len(events)} events from {source_name}\n{'=' * 50}")
+    stats = {"found": len(events), "new": 0, "updated": 0, "duplicate": 0,
+             "rejected": 0, "skipped": 0, "errors": 0, "error_list": []}
+    if not events:
+        return stats
+
+    n_placeholder = drop_placeholder_images(events)
+    if n_placeholder:
+        print(f"  dropped placeholder images on {n_placeholder} events")
+
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db_connection()
+    conn.autocommit = False
+    cur = conn.cursor()
+    venues = VenueResolver()
+    categories = CategoryCache(cur)
+
+    for i, raw in enumerate(events):
+        cur.execute("SAVEPOINT ev")
+        try:
+            action = process_event(cur, raw, venues, categories)
+            cur.execute("RELEASE SAVEPOINT ev")
+            stats[action] += 1
+        except Exception as e:
+            cur.execute("ROLLBACK TO SAVEPOINT ev")
+            venues._cache.clear()  # cached ids may belong to the rolled-back savepoint
+            stats["errors"] += 1
+            if len(stats["error_list"]) < MAX_LOGGED_ERRORS:
+                stats["error_list"].append(f"{(raw.get('title') or '?')[:80]}: {str(e)[:200]}")
+            if stats["errors"] <= 5:
+                print(f"  Error processing '{raw.get('title', '?')}': {e}")
+        if (i + 1) % COMMIT_EVERY == 0:
+            conn.commit()
+            print(f"  Progress: {i + 1}/{len(events)}", flush=True)
+
+    conn.commit()
+    cur.close()
+    if own_conn:
+        conn.close()
+    print(f"Results: { {k: v for k, v in stats.items() if k != 'error_list'} }")
+    return stats
+
+
+# ─────────────────────────── ingestion_logs ───────────────────────────
+
+def log_start(conn, source: str, started_at: Optional[datetime] = None) -> Optional[str]:
+    """Insert a 'running' row with the REAL start time of the source run."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO ingestion_logs (source, started_at, status)
+               VALUES (%s, COALESCE(%s, now()), 'running') RETURNING id""",
+            (source, started_at),
+        )
+        row = cur.fetchone()
+    conn.commit()
     return row[0] if row else None
 
 
-def upsert_event(cursor, event: dict, venue_id: Optional[str], category_id: Optional[str]) -> Tuple[str, str]:
-    """Upsert event. Returns (event_id, action) where action is 'new', 'updated', or 'duplicate'."""
-
-    # Check dedup by source + source_id
-    cursor.execute(
-        "SELECT id FROM events WHERE source = %s AND source_id = %s",
-        (event["source"], event["source_id"]),
-    )
-    existing = cursor.fetchone()
-
-    if existing:
-        # Update existing
-        cursor.execute(
-            """
-            UPDATE events SET
-                title = %s, description = %s, short_desc = %s,
-                image_url = %s, start_date = %s, end_date = %s,
-                price_min = %s, price_max = %s, is_free = %s,
-                booking_url = %s, category_id = %s, venue_id = %s,
-                quality_score = %s, updated_at = NOW()
-            WHERE id = %s
-            """,
-            (
-                event["title"], event["description"], event.get("short_desc"),
-                event.get("image_url"), event["start_date"], event.get("end_date"),
-                event["price_min"], event["price_max"], event["is_free"],
-                event.get("booking_url"), category_id, venue_id,
-                event.get("quality_score", 0), existing[0],
-            ),
-        )
-        return existing[0], "updated"
-
-    # Check fuzzy dedup: same title + same date + same venue
-    if venue_id and event.get("start_date"):
-        cursor.execute(
-            """
-            SELECT id FROM events
-            WHERE venue_id = %s
-              AND DATE(start_date) = DATE(%s)
-              AND similarity(lower(title), lower(%s)) > 0.6
-            LIMIT 1
-            """,
-            (venue_id, event["start_date"], event["title"]),
-        )
-        fuzzy = cursor.fetchone()
-        if fuzzy:
-            return fuzzy[0], "duplicate"
-
-    # Insert new
-    cursor.execute(
-        """
-        INSERT INTO events (
-            title, slug, description, short_desc, image_url,
-            start_date, end_date, price_min, price_max, is_free,
-            booking_url, category_id, venue_id,
-            source, source_url, source_id,
-            status, quality_score
-        ) VALUES (
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s,
-            %s, %s, %s,
-            %s, %s, %s,
-            %s, %s
-        )
-        ON CONFLICT (slug) DO NOTHING
-        RETURNING id
-        """,
-        (
-            event["title"], event["slug"], event["description"], event.get("short_desc"),
-            event.get("image_url"),
-            event["start_date"], event.get("end_date"),
-            event["price_min"], event["price_max"], event["is_free"],
-            event.get("booking_url"), category_id, venue_id,
-            event["source"], event.get("source_url"), event["source_id"],
-            "active" if event.get("quality_score", 0) >= 30 else "draft",
-            event.get("quality_score", 0),
-        ),
-    )
-    row = cursor.fetchone()
-    if row:
-        return row[0], "new"
-    return "", "duplicate"
+def compute_status(stats: dict, crashed: bool) -> str:
+    """'failed' when nothing was found or nothing could be stored (AUDIT D5)."""
+    if stats.get("found", 0) == 0 or stats.get("new", 0) + stats.get("updated", 0) == 0:
+        return "failed"
+    if crashed or stats.get("errors", 0):
+        return "partial"
+    return "success"
 
 
-def sync_to_meilisearch(events_to_sync: List[dict]):
-    """Push events to Meilisearch index."""
-    if not events_to_sync:
-        return
-
-    response = httpx.post(
-        f"{MEILISEARCH_HOST}/indexes/events/documents",
-        json=events_to_sync,
-        headers={"Authorization": f"Bearer {MEILISEARCH_API_KEY}"},
-        timeout=30,
-    )
-    response.raise_for_status()
-    print(f"  Synced {len(events_to_sync)} events to Meilisearch")
-
-
-def run_pipeline(events: list[dict], source_name: str):
-    """Run the full ingestion pipeline for a batch of events."""
-
-    print(f"\n{'='*50}")
-    print(f"Ingesting {len(events)} events from {source_name}")
-    print(f"{'='*50}")
-
-    conn = get_db_connection()
-    conn.autocommit = False
-
-    stats = {"new": 0, "updated": 0, "duplicate": 0, "errors": 0}
-    meili_batch: List[dict] = []
-    COMMIT_EVERY = 25  # Commit every N events — keep connection alive
-
-    for i, event in enumerate(events):
-        try:
-            # Reconnect if connection lost
-            if conn.closed:
-                print("  Reconnecting to database...")
-                conn = get_db_connection()
-                conn.autocommit = False
-
-            cursor = conn.cursor()
-            venue_id = find_or_create_venue(cursor, event)
-            category_id = find_category_id(cursor, event.get("category_slug"))
-            event_id, action = upsert_event(cursor, event, venue_id, category_id)
-            stats[action] += 1
-
-            # Commit in batches for performance
-            if (i + 1) % COMMIT_EVERY == 0:
-                conn.commit()
-                print(f"  Progress: {i + 1}/{len(events)} events processed...", flush=True)
-
-            if action in ("new", "updated") and event_id:
-                # Prepare Meilisearch document
-                start_ts = None
-                if event.get("start_date"):
-                    try:
-                        start_ts = int(datetime.fromisoformat(event["start_date"]).timestamp())
-                    except (ValueError, TypeError):
-                        pass
-
-                # Auto-generate rich keywords for search
-                event_keywords = extract_keywords(
-                    title=event["title"],
-                    description=event.get("description"),
-                    short_desc=event.get("short_desc"),
-                    category_slug=event.get("category_slug"),
-                    venue_name=event.get("venue_name"),
-                )
-
-                meili_batch.append({
-                    "id": event_id,
-                    "title": event["title"],
-                    "slug": event["slug"],
-                    "shortDesc": event.get("short_desc"),
-                    "description": event.get("description"),
-                    "imageUrl": event.get("image_url"),
-                    "startDate": start_ts,
-                    "priceMin": event["price_min"],
-                    "priceMax": event["price_max"],
-                    "isFree": event["is_free"],
-                    "bookingUrl": event.get("booking_url"),
-                    "categorySlug": event.get("category_slug"),
-                    "saveCount": 0,
-                    "qualityScore": event.get("quality_score", 0),
-                    "tags": event.get("tags_raw", []),
-                    "keywords": keywords_to_search_string(event_keywords),
-                    "ambiances": [],
-                })
-
-            cursor.close()
-
-        except Exception as e:
-            try:
-                if not conn.closed:
-                    conn.rollback()
-            except Exception:
-                pass
-            stats["errors"] += 1
-            if stats["errors"] <= 5:
-                print(f"  Error processing '{event.get('title', '?')}': {e}")
-
-    # Final commit for remaining events
+def log_finish(conn, log_id: Optional[str], source: str, stats: dict, crashed: bool, errors: List[str]) -> str:
+    status = compute_status(stats, crashed)
+    payload = json.dumps([e[:300] for e in errors][:MAX_LOGGED_ERRORS])
+    with conn.cursor() as cur:
+        if log_id:
+            cur.execute(
+                """UPDATE ingestion_logs SET finished_at = now(), status = %s, events_found = %s,
+                       events_new = %s, events_updated = %s, events_duped = %s, errors = %s::jsonb
+                   WHERE id = %s""",
+                (status, stats.get("found", 0), stats.get("new", 0), stats.get("updated", 0),
+                 stats.get("duplicate", 0), payload, log_id),
+            )
+        else:
+            cur.execute(
+                """INSERT INTO ingestion_logs (source, started_at, finished_at, status, events_found,
+                       events_new, events_updated, events_duped, errors)
+                   VALUES (%s, now(), now(), %s, %s, %s, %s, %s, %s::jsonb)""",
+                (source, status, stats.get("found", 0), stats.get("new", 0), stats.get("updated", 0),
+                 stats.get("duplicate", 0), payload),
+            )
     conn.commit()
+    return status
 
-    # Log ingestion
-    log_cursor = conn.cursor()
-    log_cursor.execute(
-        """
-        INSERT INTO ingestion_logs (source, started_at, finished_at, status, events_found, events_new, events_updated, events_duped, errors)
-        VALUES (%s, %s, NOW(), %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            source_name,
-            datetime.now(),
-            "success" if stats["errors"] == 0 else "partial",
-            len(events),
-            stats["new"],
-            stats["updated"],
-            stats["duplicate"],
-            json.dumps([]),
-        ),
-    )
-    conn.commit()
-    log_cursor.close()
 
-    # Sync to Meilisearch
-    if meili_batch:
-        try:
-            sync_to_meilisearch(meili_batch)
-        except Exception as e:
-            print(f"  Meilisearch sync error: {e}")
-
-    conn.close()
-
-    print(f"\nResults: {stats}")
-    return stats
+def last_successful_found(conn, source: str) -> Optional[int]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT events_found FROM ingestion_logs
+               WHERE source = %s AND status IN ('success', 'partial') AND finished_at IS NOT NULL
+               ORDER BY started_at DESC LIMIT 1""",
+            (source,),
+        )
+        row = cur.fetchone()
+    return row[0] if row else None

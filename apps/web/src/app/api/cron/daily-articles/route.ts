@@ -1,4 +1,14 @@
+import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 300
+
+function authorized(header: string | null, secret: string | undefined): boolean {
+  if (!secret || !header) return false
+  const a = Buffer.from(header)
+  const b = Buffer.from(`Bearer ${secret}`)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 import { generateDailyArticles, saveArticles } from '@/lib/article-generator'
 
 /**
@@ -18,14 +28,14 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!authorized(authHeader, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    console.log('[Cron] Starting daily article generation...')
+    console.warn('[Cron] Starting daily article generation...')
 
-    const generated = await generateDailyArticles(10)
+    const generated = await generateDailyArticles(3)
 
     if (generated.length === 0) {
       return NextResponse.json({
@@ -36,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const saved = await saveArticles(generated)
 
-    console.log(`[Cron] Generated ${generated.length}, saved ${saved} articles`)
+    console.warn(`[Cron] Generated ${generated.length}, saved ${saved} articles`)
 
     return NextResponse.json({
       success: true,
@@ -47,7 +57,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[Cron] Error:', error)
     return NextResponse.json(
-      { error: 'Generation failed', details: String(error) },
+      { error: 'Generation failed' },
       { status: 500 }
     )
   }

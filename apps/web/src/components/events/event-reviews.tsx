@@ -1,12 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import Image from 'next/image'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { StarRating } from './star-rating'
-import { Star, MessageSquare, User, Loader2, Trash2, Pencil } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 interface Review {
   id: string
@@ -14,325 +12,222 @@ interface Review {
   comment: string | null
   createdAt: string
   userName: string | null
-  userAvatar: string | null
 }
 
-interface ReviewStats {
-  avgRating: number | null
-  totalReviews: number
+interface ReviewsResponse {
+  reviews: Review[]
+  stats: { avgRating: number | null; totalReviews: number }
+  userReview: { rating: number; comment: string | null } | null
+  canReview: boolean
+  loggedIn: boolean
 }
 
-interface Props {
-  eventId: string
-}
+const COMMENT_MAX = 1000
+const dateFmt = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short', year: 'numeric' })
 
-export function EventReviews({ eventId }: Props) {
-  const supabase = useMemo(() => createClient(), [])
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [stats, setStats] = useState<ReviewStats>({ avgRating: null, totalReviews: 0 })
-  const [userReview, setUserReview] = useState<{ id: string; rating: number; comment: string | null } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-
-  // Form state
+/**
+ * Member reviews. Reviews open once the event has started (enforced by the
+ * API); rating 1–5, comment up to 1000 characters.
+ */
+export function EventReviews({ eventId }: { eventId: string }) {
+  const pathname = usePathname()
+  const [data, setData] = useState<ReviewsResponse | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-  }, [supabase])
-
-  const fetchReviews = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/reviews?eventId=${eventId}`)
-      const data = await res.json()
-      setReviews(data.reviews ?? [])
-      setStats(data.stats ?? { avgRating: null, totalReviews: 0 })
-      if (data.userReview) {
-        setUserReview(data.userReview)
-        setRating(data.userReview.rating)
-        setComment(data.userReview.comment ?? '')
-      }
+      const res = await fetch(`/api/reviews?eventId=${encodeURIComponent(eventId)}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(String(res.status))
+      const d = (await res.json()) as ReviewsResponse
+      setData(d)
+      setRating(d.userReview?.rating ?? 0)
+      setComment(d.userReview?.comment ?? '')
+      setFailed(false)
     } catch {
-      // ignore
-    } finally {
-      setLoading(false)
+      setFailed(true)
     }
   }, [eventId])
 
   useEffect(() => {
-    fetchReviews()
-  }, [fetchReviews])
+    load()
+  }, [load])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (rating === 0) return
-
+    if (!rating) {
+      setError('Choisis une note de 1 à 5.')
+      return
+    }
     setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, rating, comment }),
+        body: JSON.stringify({ eventId, rating, comment: comment.trim() || null }),
       })
-
       if (res.status === 401) {
         window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname)
         return
       }
-
-      if (res.ok) {
-        setIsEditing(false)
-        await fetchReviews()
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(d.error ?? 'Ton avis n’a pas pu être enregistré.')
+        return
       }
+      setEditing(false)
+      await load()
     } catch {
-      // ignore
+      setError('Connexion perdue, réessaie.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Supprimer ton avis ?')) return
+  const remove = async () => {
+    if (!window.confirm('Supprimer ton avis ?')) return
     setSubmitting(true)
     try {
-      await fetch(`/api/reviews?eventId=${eventId}`, { method: 'DELETE' })
-      setUserReview(null)
-      setRating(0)
-      setComment('')
-      setIsEditing(false)
-      await fetchReviews()
+      const res = await fetch(`/api/reviews?eventId=${encodeURIComponent(eventId)}`, { method: 'DELETE' })
+      if (res.ok) {
+        setRating(0)
+        setComment('')
+        await load()
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
-  const startEdit = () => {
-    if (userReview) {
-      setRating(userReview.rating)
-      setComment(userReview.comment ?? '')
-    }
-    setIsEditing(true)
-  }
+  if (failed) return null
+  if (!data) return <div className="skeleton mt-10 h-24 rounded-xl" aria-hidden />
 
-  const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({
-    star,
-    count: reviews.filter((r) => r.rating === star).length,
-    pct: reviews.length > 0 ? (reviews.filter((r) => r.rating === star).length / reviews.length) * 100 : 0,
-  }))
+  const { stats, reviews, userReview, canReview, loggedIn } = data
+  const showForm = canReview && loggedIn && (!userReview || editing)
 
   return (
-    <div className="mt-10">
-      <h2 className="flex items-center gap-2 text-[15px] font-bold text-text-primary">
-        <MessageSquare className="h-4 w-4 text-accent" />
-        Avis des membres
-        {stats.totalReviews > 0 && (
-          <span className="text-[13px] font-normal text-text-muted">({stats.totalReviews})</span>
-        )}
-      </h2>
-
-      {/* Stats summary */}
-      {stats.totalReviews > 0 && (
-        <div className="mt-4 flex gap-6 rounded-2xl border border-border/60 bg-surface p-4">
-          {/* Average */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-3xl font-bold text-text-primary">
-              {stats.avgRating?.toFixed(1)}
+    <section aria-labelledby="reviews-title" className="mt-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 id="reviews-title" className="font-display text-[1.8rem] text-ink">
+          L’avis des membres
+        </h2>
+        {stats.totalReviews > 0 && stats.avgRating != null && (
+          <p className="flex items-center gap-2 text-[14px] text-text-secondary">
+            <StarRating value={stats.avgRating} readonly size="sm" />
+            <span className="font-semibold text-ink">{stats.avgRating.toLocaleString('fr-FR')}</span>
+            <span>
+              · {stats.totalReviews} avis
             </span>
-            <StarRating value={Math.round(stats.avgRating ?? 0)} readonly size="sm" />
-            <span className="text-[11px] text-text-muted">
-              {stats.totalReviews} avis
-            </span>
-          </div>
-
-          {/* Distribution bars */}
-          <div className="flex flex-1 flex-col justify-center gap-1">
-            {ratingDistribution.map(({ star, count, pct }) => (
-              <div key={star} className="flex items-center gap-2">
-                <span className="w-3 text-[11px] text-text-muted text-right">{star}</span>
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                <div className="flex-1 h-1.5 rounded-full bg-surface-hover overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-amber-400 transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="w-5 text-[10px] text-text-muted text-right">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* User's existing review or form */}
-      {user && !loading && (
-        <div className="mt-4">
-          {userReview && !isEditing ? (
-            <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] font-semibold text-accent">Ton avis</span>
-                  <StarRating value={userReview.rating} readonly size="sm" />
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={startEdit}
-                    className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
-                    title="Modifier"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={submitting}
-                    className="rounded-lg p-1.5 text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-colors"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-              {userReview.comment && (
-                <p className="mt-2 text-[13px] text-text-secondary leading-relaxed">
-                  {userReview.comment}
-                </p>
-              )}
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="rounded-2xl border border-border/60 bg-surface p-4">
-              <p className="text-[13px] font-semibold text-text-primary">
-                {userReview ? 'Modifier ton avis' : 'Donne ton avis'}
-              </p>
-
-              <div className="mt-3 flex items-center gap-3">
-                <StarRating value={rating} onChange={setRating} size="lg" />
-                {rating > 0 && (
-                  <span className="text-[13px] text-text-muted">
-                    {rating === 1 && 'Bof'}
-                    {rating === 2 && 'Moyen'}
-                    {rating === 3 && 'Pas mal'}
-                    {rating === 4 && 'Top !'}
-                    {rating === 5 && 'Incroyable !'}
-                  </span>
-                )}
-              </div>
-
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Un commentaire ? (optionnel)"
-                rows={3}
-                maxLength={500}
-                className="mt-3 w-full resize-none rounded-xl border border-border/60 bg-bg px-3 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors"
-              />
-
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-[11px] text-text-muted">{comment.length}/500</span>
-                <div className="flex gap-2">
-                  {isEditing && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors"
-                    >
-                      Annuler
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={rating === 0 || submitting}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-all',
-                      rating > 0
-                        ? 'bg-accent text-white hover:bg-accent-hover active:scale-[0.98]'
-                        : 'bg-surface-hover text-text-muted cursor-not-allowed'
-                    )}
-                  >
-                    {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    {userReview ? 'Modifier' : 'Publier'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Login prompt */}
-      {!user && !loading && (
-        <div className="mt-4 rounded-2xl border border-border/60 bg-surface p-4 text-center">
-          <p className="text-[13px] text-text-secondary">
-            <a href={`/login?next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="font-semibold text-accent hover:text-accent-hover transition-colors">
-              Connecte-toi
-            </a>
-            {' '}pour donner ton avis
           </p>
+        )}
+      </div>
+
+      {!canReview ? (
+        <p className="mt-3 text-[15px] text-text-secondary">Les avis s’ouvrent quand l’événement commence. Garde-le pour ne pas l’oublier.</p>
+      ) : !loggedIn ? (
+        <p className="mt-3 text-[15px] text-text-secondary">
+          Tu y es allé ?{' '}
+          <Link
+            href={`/login?next=${encodeURIComponent(pathname || '/')}`}
+            className="font-semibold text-accent underline underline-offset-2"
+          >
+            Connecte-toi pour le noter
+          </Link>
+          .
+        </p>
+      ) : userReview && !editing ? (
+        <div className="mt-4 rounded-xl border border-accent bg-accent-soft p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[14px] font-semibold text-ink">Ton avis</p>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="inline-flex h-11 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-accent hover:bg-surface"
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+                Modifier
+              </button>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={submitting}
+                className="inline-flex h-11 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-text-secondary hover:bg-surface"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Supprimer
+              </button>
+            </div>
+          </div>
+          <StarRating value={userReview.rating} readonly size="sm" className="mt-1" />
+          {userReview.comment && <p className="mt-2 whitespace-pre-line text-[15px] text-ink">{userReview.comment}</p>}
         </div>
+      ) : null}
+
+      {showForm && (
+        <form onSubmit={submit} className="mt-4 rounded-xl border border-border bg-surface p-4" noValidate>
+          <StarRating value={rating} onChange={setRating} size="lg" label="Ta note sur 5" />
+          <label htmlFor={`review-${eventId}`} className="mt-3 block text-[14px] font-semibold text-ink">
+            Ton commentaire <span className="font-normal text-text-muted">(facultatif)</span>
+          </label>
+          <textarea
+            id={`review-${eventId}`}
+            value={comment}
+            onChange={(e) => setComment(e.target.value.slice(0, COMMENT_MAX))}
+            maxLength={COMMENT_MAX}
+            rows={3}
+            className="mt-1.5 w-full rounded-lg border border-border-strong bg-paper p-3 text-[15px] text-ink focus:border-accent focus:outline-none"
+            placeholder="Ce que tu en as pensé, en deux mots ou plus."
+          />
+          <div className="mt-1 flex items-center justify-between text-[12px] text-text-muted">
+            <span aria-live="polite">{error && <span className="font-medium text-error">{error}</span>}</span>
+            <span className="tabular-nums">
+              {comment.length}/{COMMENT_MAX}
+            </span>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[14px] font-semibold text-paper disabled:opacity-60"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {userReview ? 'Mettre à jour' : 'Publier mon avis'}
+            </button>
+            {editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="inline-flex h-11 items-center rounded-full px-4 text-[14px] font-semibold text-text-secondary"
+              >
+                Annuler
+              </button>
+            )}
+          </div>
+        </form>
       )}
 
-      {/* Reviews list */}
       {reviews.length > 0 && (
-        <div className="mt-5 space-y-3">
-          {reviews
-            .filter((r) => !userReview || r.id !== userReview.id)
-            .map((review) => (
-              <div key={review.id} className="rounded-xl border border-border/40 bg-surface/50 p-4">
-                <div className="flex items-center gap-2.5">
-                  {review.userAvatar ? (
-                    <Image
-                      src={review.userAvatar}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10">
-                      <User className="h-3.5 w-3.5 text-accent" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-text-primary truncate">
-                        {review.userName ?? 'Membre'}
-                      </span>
-                      <StarRating value={review.rating} readonly size="sm" />
-                    </div>
-                    <span className="text-[11px] text-text-muted">
-                      {new Date(review.createdAt).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                </div>
-                {review.comment && (
-                  <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-                    {review.comment}
-                  </p>
-                )}
+        <ul className="mt-5 divide-y divide-border">
+          {reviews.map((r) => (
+            <li key={r.id} className="py-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[14px] font-semibold text-ink">{r.userName ?? 'Un membre'}</p>
+                <time className="text-[12px] text-text-muted" dateTime={r.createdAt}>
+                  {dateFmt.format(new Date(r.createdAt))}
+                </time>
               </div>
-            ))}
-        </div>
+              <StarRating value={r.rating} readonly size="sm" className="mt-1" />
+              {r.comment && <p className="mt-2 whitespace-pre-line text-[15px] text-text-secondary">{r.comment}</p>}
+            </li>
+          ))}
+        </ul>
       )}
-
-      {/* Empty state */}
-      {!loading && reviews.length === 0 && (
-        <div className="mt-4 rounded-2xl border border-dashed border-border/60 py-8 text-center">
-          <Star className="mx-auto h-8 w-8 text-text-muted/30" />
-          <p className="mt-2 text-[13px] text-text-muted">Aucun avis pour le moment</p>
-          <p className="text-[12px] text-text-muted/70">Sois le premier à donner ton avis !</p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="mt-4 flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
-        </div>
-      )}
-    </div>
+    </section>
   )
 }

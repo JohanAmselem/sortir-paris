@@ -1,0 +1,231 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Sunset Sunside - ECPv6.17.5//NONSGML v1.0//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Sunset Sunside
+X-ORIGINAL-URL:https://www.sunset-sunside.com
+X-WR-CALDESC:Évènements pour Sunset Sunside
+REFRESH-INTERVAL;VALUE=DURATION:PT1H
+X-Robots-Tag:noindex
+X-PUBLISHED-TTL:PT1H
+BEGIN:VTIMEZONE
+TZID:Europe/Paris
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:20250330T010000
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:20251026T010000
+END:STANDARD
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:20260329T010000
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:20261025T010000
+END:STANDARD
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:20270328T010000
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:20271031T010000
+END:STANDARD
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:20280326T010000
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:20281029T010000
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20260607T153000
+DTEND;TZID=Europe/Paris:20270607T230000
+DTSTAMP:20260507T112515Z
+CREATED:20260507T112515Z
+LAST-MODIFIED:20260507T112515Z
+UID:151272-1780846200-1812409200@www.sunset-sunside.com
+SUMMARY:Concert des élèves de piano de Xavier Harry
+DESCRIPTION:Concert de fin d’année des élèves du pianiste Xavier Harry. Ces petits et grands vous présenteront leur travail de l’année. Au menu\, de la musique classique\, de la musique actuelle\, du piano voix ainsi que du 4 mains. Venez passer un agréable moment musical en leur compagnie.
+URL:https://www.sunset-sunside.com/concert/concert-des-eleves-de-piano-de-xavier-harry/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2025/05/Visuel-concert-eleves-Xavier-Harry.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261007T190000
+DTEND;TZID=Europe/Paris:20261007T210000
+DTSTAMP:20260820T114930Z
+CREATED:20260820T114930Z
+LAST-MODIFIED:20260820T114930Z
+UID:164648-1791399600-1791406800@www.sunset-sunside.com
+SUMMARY:Quinteto Libertad !
+DESCRIPTION:Né il y a 5 ans\, le Quinteto Libertad! propose des arrangements modernes sur des compositions du bandonéoniste Astor Piazzolla\, tout en respectant les racines du style inventé par ce dernier : le Nuevo Tango.\nUne  musique mêlant la sensualité et la violence des quartiers de Buenos Aires\, les sublimes mélodies et les harmonies les plus riches\, toujours dans la plus grande émotion.\nUne musique à la frontière du tango\, du rock\, de la pop\, du jazz et de la musique savante occidentale.
+URL:https://www.sunset-sunside.com/concert/quinteto-libertad/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/08/Format-carre-1.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261007T203000
+DTEND;TZID=Europe/Paris:20261007T203000
+DTSTAMP:20260715T132518Z
+CREATED:20260715T131840Z
+LAST-MODIFIED:20260715T132518Z
+UID:162384-1791405000-1791405000@www.sunset-sunside.com
+SUMMARY:Gabriel Delmas Trio invite Gaël Horellou
+DESCRIPTION:Autour du batteur Gabriel Delmas\, ce quartet cultive un jazz généreux\, habité par le groove et l’improvisation. L’invitation donné à Gaël Horellou\, saxophoniste incandescent\, apporte une intensité nouvelle à cette musique directe et vivante. Les thèmes circulent\, les prises de risques s’assument\, l’énergie reste toujours en mouvement. Un jazz chaleureux\, libre\, résolument tourné vers le public. Le premier album « New Step » est sorti le 29 Mai dernier sous le label Jazz Familly.
+URL:https://www.sunset-sunside.com/concert/gabriel-delmas-trio-invite-gael-horellou/
+LOCATION:Sunset\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/Gabriel-Delmas-Trio-Gael-Horellou-e1784121329928.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261007T213000
+DTEND;TZID=Europe/Paris:20261007T213000
+DTSTAMP:20260925T082722Z
+CREATED:20260812T120248Z
+LAST-MODIFIED:20260925T082722Z
+UID:164548-1791408600-1791408600@www.sunset-sunside.com
+SUMMARY:Irene Amata Quartet
+DESCRIPTION:« SEMBIANZE dévoile immédiatement\, dès les premiers morceaux\, un univers sonore\, instrumental\, à la fois puissant et intime\, élégant et lumineux\, original et déjà essentiel » Gil Chaveau – La Revue du Spectacle  \nLe dernier album d’Irene Amata\, « Sembianze »\, développe une esthétique rare dans le paysage du jazz vocal actuel : une musique du souffle\, de la nuance et de la transformation. L’album avance avec une intensité intérieure qui peut évoquer certains univers de Norma Winstone\, Maria Pia De Vito ou encore la délicatesse expressive de Luciana Souza\, tout en conservant une identité profondément méditerranéenne. Les compositions privilégient les couleurs harmoniques ouvertes\, les métriques souples et une circulation très organique entre écriture et improvisation. La voix d’Irene Amata n’est jamais démonstrative ; elle agit plutôt comme une présence mouvante à l’intérieur du groupe\, capable de passer de la légèreté à une tension émotionnelle très dense en quelques mesures. Cette manière de suspendre le temps\, associée à une écoute collective extrêmement fine entre les musiciens\, crée une musique immersive et cinématographique qui trouve toute sa force en concert. 
+URL:https://www.sunset-sunside.com/concert/irene-amata-quartet/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/08/Format-carre-13.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261008T193000
+DTEND;TZID=Europe/Paris:20261008T230000
+DTSTAMP:20260826T123108Z
+CREATED:20260826T123108Z
+LAST-MODIFIED:20260826T123108Z
+UID:164744-1791487800-1791500400@www.sunset-sunside.com
+SUMMARY:Gwen Cahue & Bastien Ribot Quartet
+DESCRIPTION:« Habitué des grandes scènes manouches\, Gwen Cahue est un guitariste hors pair qui a su s’imposer comme étant un des plus inventifs de sa génération. Violoniste incontournable\, Bastien Ribot est le cofondateur du RP Quartet où il s’est fait une réputation mondiale pour la justesse de son jeu d’archet et la qualité des arrangements qu’il signe. Les deux musiciens s’associent ici autour du répertoire de la chanson française et des grands standards du style. »
+URL:https://www.sunset-sunside.com/concert/gwen-cahue-bastien-ribot-quartet-2/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2025/11/Format-carre-10.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261008T203000
+DTEND;TZID=Europe/Paris:20261008T203000
+DTSTAMP:20260723T084606Z
+CREATED:20260722T114856Z
+LAST-MODIFIED:20260723T084606Z
+UID:163411-1791491400-1791491400@www.sunset-sunside.com
+SUMMARY:JOIA
+DESCRIPTION:Inspirées de la lumière du Brésil\, leurs voix se sont réunies en France pour créer un écrin commun à leur joyau vocal (« joia »). Trois voix qui s’entrelacent\, vibrent et respirent ensemble dans une polyphonie chaleureuse. \n  \n  \nLe trio vocal JOIA invite à un voyage musical délicat et joyeux\, ancré dans la grande tradition de la musique vocale brésilienne\, teinté d’humour\, de « ginga » et d’élégance. Leurs inspirations puisent autant chez le Trio Esperança ou le Quarteto em Cy que dans l’univers de Vinicius de Moraes\, Gilberto Gil\, Milton Nascimento\, Chico Buarque\, Tó Brandileone — sans oublier Alain Souchon et Tété. \n  \n  \nLe répertoire\,finement arrangé par Augusto Ordine\, figure majeure de la musique vocale brésilienne et fondateur du groupe Carioca Ordinarius\, prend vie sur scène avec la guitare 7 cordes de Gabriel Marques.
+URL:https://www.sunset-sunside.com/concert/joia/
+LOCATION:Sunset\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/JOI-176-2.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261008T213000
+DTEND;TZID=Europe/Paris:20261008T213000
+DTSTAMP:20260814T122515Z
+CREATED:20260814T122414Z
+LAST-MODIFIED:20260814T122515Z
+UID:164590-1791495000-1791495000@www.sunset-sunside.com
+SUMMARY:Galaad Moutoz Orchestra
+DESCRIPTION:Le Galaad Moutoz Orchestra est un orchestre de 8 musiciens\, jouant du jazz héroïque inédit. \n\nCréé en 2016\, l’orchestre a d’abord exploré avec panache des répertoires swing issus des années 30 (Chick Webb & Ella\, Fletcher Henderson\, Jimmie Lunceford) avant de s’orienter vers un son plus moderne (Gerald Wilson\, Buddy Rich)\, des arrangements originaux et enfin des compositions. \n\nAprès 10 ans d’existance\, 1 album\, plus de 400 dates en France et à l’étranger (Vittoria Jazz Festival\, Tel Aviv Jazz Festival\, Opéra Garnier\, Jazzablanca\, Jazz Club Étoile\, Gouvy Jazz Festival\, Pannonica\, Havel Hop Berlin\, etc)\, l’orchestre sort aujourd’hui son nouvel EP « Heal My Soul » avec la chanteuse Mélina Tobiana. \n\nConvaincue que le spectacle est avant tout un partage\, cette équipe de choc livre un jazz original\, à la fois pop et sophistiqué\, dans une grande communion swing sincère et chaleureuse.
+URL:https://www.sunset-sunside.com/concert/galaad-moutoz-orchestra/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/08/Galaad-Moutoz-and-Melina-Tobiana.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261009T190000
+DTEND;TZID=Europe/Paris:20261009T190000
+DTSTAMP:20260717T092212Z
+CREATED:20260710T100233Z
+LAST-MODIFIED:20260717T092212Z
+UID:161866-1791572400-1791572400@www.sunset-sunside.com
+SUMMARY:Alimé Bébégué
+DESCRIPTION:Dans ce nouveau projet\, Alimé Bébégué célèbre les rencontres à travers le bonheur et le plaisir qu’elles inspirent.\nArtitse au style profondément sensible\, nourri de jazz\, de musiques latines et africaines\, il propose une musique comme une invitation au voyage\, riche en émotions et en surprises.\nComme un symbole\, cet opus célèbre les rencontres. Entre autre celles issue d’une randonnée itinérante de 7 jours sur la vallée du Célé entre Figeac et Cahors.\nAprès la sortie officielle le 02 octobre 2026\, c’est avec un immense plaisir que nous fêterons cette sortie le 09 octobre 2026 au club mythique qu’est le Sunset-Sunside à Paris.
+URL:https://www.sunset-sunside.com/concert/alime-bebegue-2/
+LOCATION:Sunset\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/ALIME4.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261009T193000
+DTEND;TZID=Europe/Paris:20261009T230000
+DTSTAMP:20260725T153938Z
+CREATED:20260725T122612Z
+LAST-MODIFIED:20260725T153938Z
+UID:163737-1791574200-1791586800@www.sunset-sunside.com
+SUMMARY:Ines de Las Sierras Quintet
+DESCRIPTION:Artiste inclassable à « l’énergie brute concentrée dans chaque note » (The List)\,  Ines de las Sierras se démarque aussi bien dans la chanson\, que dans le jazz\, le tango et l’opéra\, refusant farouchement les étiquettes qu’on veut lui imposer. Depuis la sortie de son premier album « Romanza » (janvier 2026)\, elle a enchainé une tournée en Australie\, puis une série de cabarets-concerts au Festival  d’Avignon.
+URL:https://www.sunset-sunside.com/concert/ines-de-las-sierras-quintet/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/Capture-decran-2026-07-25-141533.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261009T213000
+DTEND;TZID=Europe/Paris:20261009T213000
+DTSTAMP:20260713T104610Z
+CREATED:20260711T133326Z
+LAST-MODIFIED:20260713T104610Z
+UID:162039-1791581400-1791581400@www.sunset-sunside.com
+SUMMARY:Carlton Rara "Universed Live"
+DESCRIPTION: La musique de Carlton Rara est un mélange à nul autre pareil : pop\, reggae\, blues\, « mizik rasin » d’Haïti…  et son dernier album Universed est une invitation à la sensation d’une vibration musicale universelle. \n  \nDeux fois en sélection FIP\, un album classé dans le top World/Jazz des Inrocks\, la chanson Do You Love Me au générique du film Joséphine avec Marilou Berry ;  dans la trame du temps\, le franco-haïtien a su marquer les cœurs et les esprits. \n  \nL’énergie dansante d’un Johnny Clegg\, l’intensité du blues de Taj Mahal ou de la pulsation reggae de Marley\, le spoken words de Gil Scott-Heron\,  le bouillon louisianais cher aux Neville Brothers ou encore cette façon unique de ramener la musique à une quiétude essentielle\,  sont autant de sensations que peut susciter un concert de Carlton Rara.
+URL:https://www.sunset-sunside.com/concert/carlton-rara-universed-live/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/C.RARA-1_credit-Celine-Roubini-1.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261010T190000
+DTEND;TZID=Europe/Paris:20261010T213000
+DTSTAMP:20260725T141637Z
+CREATED:20260711T144524Z
+LAST-MODIFIED:20260725T141637Z
+UID:162063-1791658800-1791667800@www.sunset-sunside.com
+SUMMARY:Christie Dashiell Quartet
+DESCRIPTION:FESTIVAL JAZZ SUR SEINE  \n  \nChristie Dashiell\, chanteuse à la créativité spectaculaire\, sort son deuxième album tant attendu\, *Journey in Black*. \nFille du bassiste de jazz Carroll Dashiell Jr\, née à Washington DC et ayant grandi en Caroline du Nord\, Christie Dashiell chante depuis toujours et apporte à ses prestations un héritage musical profondément enraciné. \n  \nReconnue pour ses talents d’improvisatrice\, ses capacités de scat stratosphériques et sa voix naturellement riche et claire\, Christie Dashiell est aujourd’hui l’une des artistes les plus recherchées de la scène jazz internationale. Elle s’est produite aux côtés de la maître-batteuse Terri Lyne Carrington\, du vibraphoniste Stefon Harris\, du collectif Black Lives\, des saxophonistes Lakecia Benjamin et Marcus Strickland\, du producteur Adam Blackstone et de nombreux autres artistes de premier plan. \n  \n« Journey in Black » met fortement en valeur la personnalité de Dashiell et renforce sa réputation. Ayant déjà reçu une rare critique 5 étoiles du magazine Downbeat\, l’album comprend sept compositions originales et deux arrangements qui explorent les thèmes de la liberté\, de l’héritage\, du deuil et de la joie. Mêlant à la fois du jazz « straight-ahead » et des morceaux influencés par la soul\, l’album offre un portrait sincère de la vie et des influences musicales de Dashiell. \n  \nSa distribution exceptionnelle de musiciens\, parmi lesquels l’organiste Shedrick Mitchell\, le bassiste Romeir Mendez et le trompettiste Marquis Hill\, qui fait une apparition dans « The Things You Do »\, met en valeur toutes les qualités qui caractérisent la musique de Dashiell\, avec sa sensibilité au groove\, au swing\, aux influences gospel et soul\, ainsi que son caractère dominant.  \n  \nSa formation exceptionnelle\, composée notamment de l’organiste Shedrick Mitchell\, du bassiste Romeir Mendez et du trompettiste Marquis Hill\, qui fait une brève apparition sur « The Things You Do »\, met en valeur toutes les qualités qui caractérisent la musique de Dashiell\, avec son sens du groove\, du swing\, ses influences gospel et soul\, ainsi que sa spiritualité omniprésente.
+URL:https://www.sunset-sunside.com/concert/christie-dashiell-quartet-2/
+LOCATION:Sunside\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/DASH0464.webp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261010T203000
+DTEND;TZID=Europe/Paris:20261010T203000
+DTSTAMP:20260806T171334Z
+CREATED:20260720T111127Z
+LAST-MODIFIED:20260806T171334Z
+UID:163082-1791664200-1791664200@www.sunset-sunside.com
+SUMMARY:Les dames de la Salsa avec Speranza Galez Orchestra
+DESCRIPTION:Pour inaugurer Les Samedis Salsa au Sunset\, la chanteuse vénézuélienne Speranza Galez rend hommage aux grandes voix féminines qui ont forgé l’identité de la salsa. De La Lupe à Celia Cruz\, de La India à Nathy Peluso\, ce concert retrace l’histoire d’un genre à travers celles qui l’ont porté et réinventé\, aux côtés d’un collectif de musiciens de la diaspora latino-américaine parisienne. Une soirée puissante et festive.
+URL:https://www.sunset-sunside.com/concert/les-dames-de-la-salsa-avec-speranza-galez-orchestra/
+LOCATION:Sunset\, 60 rue des Lombards\, Paris 1er\, 75001\, France
+CATEGORIES:Albums du mois,Coming Soon,Coup de coeur,Découvertes,Évènements
+ATTACH;FMTTYPE=image/webp:https://www.sunset-sunside.com/app/uploads/2026/07/10-Octobre-Speranza-Galez-e1784546035343.webp
+END:VEVENT
+END:VCALENDAR

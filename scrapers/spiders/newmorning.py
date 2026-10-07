@@ -1,196 +1,197 @@
 """
-New Morning spider.
+New Morning — legendary jazz/world club, 7-9 rue des Petites-Écuries, 75010 Paris.
 Source: https://www.newmorning.com/programmation
-Legendary Paris jazz/world music venue.
 
-Scrapes the programming page for upcoming concerts.
+The programmation page embeds a JSON-LD array of schema.org Event (≈70 upcoming shows):
+name, url, image, eventStatus, startDate — but startDate is always "T00:00:00" (no time),
+endDate is a fixed 23:30 placeholder, and offers.price is "0.00" when not set.
+So:
+  - date comes from JSON-LD; the real door/show time comes from the detail page
+    ("Concert 20h00 (portes 19h30)") — no detail → time unknown, never a default;
+  - price only when JSON-LD price > 0, else unknown (0.00 is a placeholder, not "free");
+  - endDate is ignored.
 """
 
-import httpx
+from __future__ import annotations
+
 import re
-from datetime import datetime
-from typing import Generator, Optional
+from datetime import date, datetime, time
+from typing import Generator, List, Optional
+
 from bs4 import BeautifulSoup
 
-from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    parse_price,
-    compute_quality_score,
+from utils.dates import parse_time_fr
+from utils.event import make_event
+from utils.http import BudgetExceeded, PoliteClient
+from utils.jsonld import extract_jsonld, image_from, iter_events
+from utils.normalize import UNKNOWN_PRICE, absolute_url, clean_text, price_from_numbers
+
+SOURCE = "newmorning"
+BASE_URL = "https://www.newmorning.com/"
+PROG_URL = "https://www.newmorning.com/programmation"
+
+VENUE = dict(
+    venue_name="New Morning",
+    venue_address="7-9 rue des Petites-Écuries",
+    venue_city="Paris",
+    venue_zip="75010",
+    venue_lat=48.87306825765204,
+    venue_lng=2.3533229065468597,
+    venue_website="https://www.newmorning.com",
 )
 
-BASE_URL = "https://www.newmorning.com"
-PROG_URL = f"{BASE_URL}/programmation"
+_ID_RE = re.compile(r"/(\d{8})-(\d+)-[^/]*\.html")
+_SHOW_RE = re.compile(r"(?:concert|s[ée]ance)\s+(\d{1,2}\s*h\s*\d{0,2})", re.I)
+_DOORS_RE = re.compile(r"portes\s+(\d{1,2}\s*h\s*\d{0,2})", re.I)
 
 
-def fetch_events(max_pages: int = 5) -> Generator[dict, None, None]:
-    """Fetch concerts from New Morning website."""
+def _https(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    url = absolute_url(BASE_URL, url.strip())
+    return re.sub(r"^http://", "https://", url) if url else None
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-    }
 
-    for page in range(1, max_pages + 1):
-        url = f"{PROG_URL}?page={page}" if page > 1 else PROG_URL
-        print(f"  Fetching New Morning page {page}...")
+def parse_listing(html: str) -> List[dict]:
+    """Programmation page → list of base items (pure).
 
+    Each item: {url, source_id, title, day (date), image_url, summary, status, price}.
+    """
+    items: List[dict] = []
+    seen = set()
+    for obj in iter_events(extract_jsonld(html)):
         try:
-            resp = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
-            resp.raise_for_status()
-        except Exception as e:
-            print(f"  Error fetching page {page}: {e}")
-            break
+            url = _https(obj.get("url"))
+            title = clean_text(obj.get("name"))
+            day_raw = (obj.get("startDate") or "")[:10]
+            if not url or not title or not day_raw:
+                continue
+            day = date.fromisoformat(day_raw)
+            m = _ID_RE.search(url)
+            sid = m.group(2) if m else url
+            if sid in seen:
+                continue
+            seen.add(sid)
 
-        soup = BeautifulSoup(resp.text, "html.parser")
+            offers = obj.get("offers") or {}
+            if isinstance(offers, list):
+                offers = offers[0] if offers else {}
+            try:
+                amount = float(str(offers.get("price") or "").replace(",", "."))
+            except ValueError:
+                amount = None
+            price = price_from_numbers(amount) if amount and amount > 0 else dict(UNKNOWN_PRICE)
 
-        # Find event cards — New Morning uses article or div elements for events
-        event_cards = soup.select("article.event, .event-card, .programmation-item, .views-row")
-        if not event_cards:
-            # Try alternative selectors
-            event_cards = soup.select("[class*='event'], [class*='concert'], .node--type-event")
+            summary = clean_text(obj.get("description"))
+            if summary:
+                # "Title : summary - " → summary
+                summary = re.sub(r"^\s*" + re.escape(title) + r"\s*:\s*", "", summary)
+                summary = clean_text(re.sub(r"\s*-\s*$", "", summary)) or None
 
-        if not event_cards:
-            print(f"  No events found on page {page}, stopping")
-            break
-
-        count = 0
-        for card in event_cards:
-            event = parse_event_card(card)
-            if event:
-                yield event
-                count += 1
-
-        print(f"  Found {count} events on page {page}")
-
-        if count == 0:
-            break
+            status = "cancelled" if "cancel" in str(obj.get("eventStatus") or "").lower() else "scheduled"
+            items.append(dict(
+                url=url, source_id=sid, title=title, day=day,
+                image_url=_https(image_from(obj.get("image"))),
+                summary=summary, status=status, price=price,
+            ))
+        except Exception as e:  # noqa: BLE001
+            print(f"  [newmorning] skipped one JSON-LD item: {e}")
+    return items
 
 
-def parse_event_card(card) -> Optional[dict]:
-    """Parse a single event card from New Morning."""
+def parse_detail(html: str) -> dict:
+    """Detail page → {show_time, doors_time (first set), show_times [(show, doors)], styles, description} (pure)."""
+    soup = BeautifulSoup(html, "html.parser")
+    out = {"show_time": None, "doors_time": None, "show_times": [], "styles": [], "description": None}
 
-    # Title
-    title_el = card.select_one("h2, h3, .event-title, .title, .field--name-title")
-    if not title_el:
-        title_el = card.select_one("a[href*='/event'], a[href*='/concert']")
-    if not title_el:
-        return None
+    # one pill per set: "Concert 20h00 (portes 19h30)" or "1re séance 19h00 (portes 18h30)"
+    for pill in soup.select(".ev-infos .ev-pill"):
+        text = clean_text(pill.get_text(" ")) or ""
+        m = _SHOW_RE.search(text)
+        if not m:
+            continue
+        t = parse_time_fr(m.group(1))
+        if t is None:
+            continue
+        d = _DOORS_RE.search(text)
+        out["show_times"].append((t, parse_time_fr(d.group(1)) if d else None))
+    out["show_times"].sort(key=lambda x: x[0])
+    if out["show_times"]:
+        out["show_time"], out["doors_time"] = out["show_times"][0]
 
-    title = clean_text(title_el.get_text())
-    if not title:
-        return None
+    out["styles"] = [s for s in (clean_text(a.get_text(" ")) for a in soup.select(".ev-styles a")) if s]
 
-    # Link
-    link_el = card.select_one("a[href]")
-    event_url = None
-    if link_el and link_el.get("href"):
-        href = link_el["href"]
-        event_url = href if href.startswith("http") else f"{BASE_URL}{href}"
+    pres = soup.select_one("article.ev-presentation")
+    if pres is not None:
+        parts = []
+        for el in pres.select(".ev-citation, .ev-texte"):
+            t = clean_text(el.get_text(" "))
+            if t:
+                parts.append(t)
+        out["description"] = "\n\n".join(parts) or None
+    return out
 
-    # Date
-    date_el = card.select_one(".date, .event-date, time, [class*='date'], .field--name-field-date")
-    date_text = clean_text(date_el.get_text()) if date_el else None
-    start_date = parse_french_date(date_text) if date_text else None
 
-    # Image
-    img_el = card.select_one("img[src]")
-    image_url = None
-    if img_el:
-        src = img_el.get("src") or img_el.get("data-src")
-        if src:
-            image_url = src if src.startswith("http") else f"{BASE_URL}{src}"
-
-    # Price
-    price_el = card.select_one(".price, .tarif, [class*='price'], [class*='tarif']")
-    price_text = clean_text(price_el.get_text()) if price_el else None
-    price_data = parse_price(price_text)
-
-    # Description
-    desc_el = card.select_one(".description, .body, .summary, p, .field--name-body")
-    description = clean_text(desc_el.get_text()) if desc_el else None
-
-    # Build normalized event
-    slug = generate_slug(title, start_date)
-
-    quality = compute_quality_score(
-        title=title,
+def build_event(item: dict, detail: Optional[dict] = None) -> dict:
+    detail = detail or {}
+    show = detail.get("show_time")
+    start = datetime.combine(item["day"], show) if isinstance(show, time) else item["day"]
+    description = detail.get("description") or item.get("summary")
+    sets = detail.get("show_times") or []
+    if sets:
+        label = ", ".join(
+            t.strftime("%Hh%M") + (f" (portes {d.strftime('%Hh%M')})" if d else "") for t, d in sets
+        )
+        head = ("Concert " if len(sets) == 1 else "Séances : ") + label + "."
+        description = f"{head}\n\n{description}" if description else head
+    return make_event(
+        source=SOURCE,
+        source_id=item["source_id"],
+        title=item["title"],
+        start=start,  # date only → time_known=False
         description=description,
-        image_url=image_url,
-        start_date=start_date,
-        price_raw=price_text,
-        booking_url=event_url,
+        short_desc=item.get("summary"),
+        image_url=item.get("image_url"),
+        price=item.get("price"),
+        booking_url=item["url"],
+        source_url=item["url"],
+        category_slug="concerts",
+        tags=["jazz", "new morning"] + list(detail.get("styles") or []),
+        event_status=item.get("status") or "scheduled",
+        **VENUE,
     )
 
-    return {
-        "title": title,
-        "slug": slug,
-        "description": description,
-        "short_desc": truncate(description),
-        "image_url": image_url,
-        "start_date": start_date,
-        "end_date": None,
-        "price_min": price_data["price_min"],
-        "price_max": price_data["price_max"],
-        "is_free": price_data["is_free"],
-        "booking_url": event_url,
-        "source": "newmorning",
-        "source_url": event_url or PROG_URL,
-        "source_id": slug,
-        "venue_name": "New Morning",
-        "venue_address": "7-9 Rue des Petites-Écuries",
-        "venue_city": "Paris",
-        "venue_zip": "75010",
-        "venue_arrondissement": "10e",
-        "venue_lat": 48.8719,
-        "venue_lng": 2.3492,
-        "raw_category": "concert",
-        "category_slug": "concerts",
-        "tags": ["jazz", "musique live", "new morning"],
-        "quality_score": quality,
-    }
 
+def fetch_events(max_pages: int = 5, max_details: int = 80) -> Generator[dict, None, None]:
+    """One listing request + one detail request per show (for the real time).
 
-def parse_french_date(text: str) -> Optional[str]:
-    """Parse French date strings like 'Mar 15 avril 2026' or '15/04/2026'."""
-
-    if not text:
-        return None
-
-    text = text.strip().lower()
-
-    # Try DD/MM/YYYY
-    match = re.search(r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})", text)
-    if match:
-        day, month, year = match.groups()
-        try:
-            return datetime(int(year), int(month), int(day), 20, 0).isoformat()
-        except ValueError:
-            pass
-
-    # French month names
-    months_fr = {
-        "janvier": 1, "février": 2, "mars": 3, "avril": 4,
-        "mai": 5, "juin": 6, "juillet": 7, "août": 8,
-        "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
-        "janv": 1, "févr": 2, "avr": 4, "juil": 7, "sept": 9, "oct": 10, "nov": 11, "déc": 12,
-    }
-
-    for month_name, month_num in months_fr.items():
-        if month_name in text:
-            day_match = re.search(r"(\d{1,2})", text)
-            if day_match:
-                day = int(day_match.group(1))
-                year = datetime.now().year
-                year_match = re.search(r"(\d{4})", text)
-                if year_match:
-                    year = int(year_match.group(1))
+    max_pages kept for run.py compatibility (the programmation is a single page).
+    """
+    with PoliteClient() as client:
+        resp = client.get(PROG_URL)
+        if resp.status_code != 200:
+            print(f"  [newmorning] blocked/unavailable: HTTP {resp.status_code} on {PROG_URL}")
+            return
+        items = parse_listing(resp.text)
+        if not items:
+            print("  [newmorning] no JSON-LD events on programmation page — structure changed?")
+            return
+        n_time = 0
+        for i, item in enumerate(items):
+            detail = None
+            if i < max_details:
                 try:
-                    # Default time 20h for concerts
-                    return datetime(year, month_num, day, 20, 0).isoformat()
-                except ValueError:
-                    pass
-                break
-
-    return None
+                    html = client.get_text(item["url"])
+                    detail = parse_detail(html) if html else None
+                except BudgetExceeded:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    print(f"  [newmorning] detail failed {item['url']}: {e}")
+            try:
+                ev = build_event(item, detail)
+            except Exception as e:  # noqa: BLE001
+                print(f"  [newmorning] skipped {item.get('url')}: {e}")
+                continue
+            n_time += 1 if ev["time_known"] else 0
+            yield ev
+        print(f"  [newmorning] {len(items)} concerts ({n_time} with real time)")

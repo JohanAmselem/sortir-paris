@@ -1,0 +1,1546 @@
+{
+ "error": false,
+ "message": null,
+ "messageParam": null,
+ "nextDate": null,
+ "results": [
+  {
+   "movie": {
+    "synopsis": "Dans le New Jersey, un adolescent de 16 ans partage son temps entre les tapis de lutte et le petit restaurant tcherkesse de sa famille, au bord de la faillite. Mais une décision impulsive de son père, éternel opportuniste, vient bouleverser sa trajectoire.",
+    "__typename": "Movie",
+    "internalId": 313150,
+    "id": "TW92aWU6MzEzMTUw",
+    "poster": {
+     "__typename": "InternalImage",
+     "id": "SW1hZ2U6OTAwMjEyMDMwNA==",
+     "internalId": 9002120304,
+     "url": "https://fr.web.img6.acsta.net/img/7c/2a/7c2a1b58e4e7ca30ea9816bb10d4b4ac.jpg",
+     "path": "/img/7c/2a/7c2a1b58e4e7ca30ea9816bb10d4b4ac.jpg"
+    },
+    "title": "Butterfly Jam",
+    "originalTitle": "Butterfly Jam",
+    "type": "FEATURE_FILM",
+    "runtime": "1h 37min",
+    "genres": [
+     {
+      "id": 13008,
+      "translate": "Drame",
+      "tag": "DRAMA"
+     }
+    ],
+    "languages": [
+     "ENGLISH"
+    ],
+    "data": {
+     "__typename": "MovieData",
+     "seo": {
+      "__typename": "Seo",
+      "browsable": true,
+      "title": null
+     },
+     "productionYear": 2026,
+     "rules": {
+      "rating": {
+       "has_warning_message": false,
+       "has_mandatory_review": false
+      }
+     }
+    },
+    "releases": [
+     {
+      "__typename": "MovieRelease",
+      "releaseDate": {
+       "__typename": "PartialDate",
+       "date": "2026-10-07",
+       "precision": "day"
+      },
+      "name": "Released",
+      "certificate": {
+       "__typename": "Certificate",
+       "code": "-12",
+       "label": "Interdit - 12 ans"
+      },
+      "advice": null,
+      "companyLimitation": null,
+      "releaseTags": {
+       "tagTypes": [
+        "THEATER"
+       ],
+       "tagFlags": null
+      },
+      "visaNumber": "162189"
+     }
+    ],
+    "synopsisFull": "<p class=\"bo-p\">Dans le New Jersey, un adolescent de 16 ans surnommé « Pyteh » partage son temps entre les tapis de lutte et le petit restaurant tcherkesse de sa famille, au bord de la faillite. Mais une décision impulsive de son père, éternel opportuniste, vient bouleverser sa trajectoire — façonnant peu à peu un récit de fierté, d’héritage et de masculinité.</p>"
+   },
+   "showtimes": {
+    "original": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203634,
+      "startsAt": "2026-10-07T08:55:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=08:55&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203742,
+      "startsAt": "2026-10-07T11:05:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=11:05&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203593,
+      "startsAt": "2026-10-07T13:15:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=13:15&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204013,
+      "startsAt": "2026-10-07T15:25:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=15:25&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204173,
+      "startsAt": "2026-10-07T17:40:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=17:40&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203677,
+      "startsAt": "2026-10-07T19:55:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=19:55&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203719,
+      "startsAt": "2026-10-07T22:10:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.313150&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=22:10&code=PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "original_st": [],
+    "original_sme": [],
+    "multiple": [],
+    "multiple_st": [],
+    "multiple_sme": []
+   }
+  },
+  {
+   "movie": {
+    "synopsis": "Corinne Maclou est figurante. Elle enchaîne les tournages avec l’espoir d’être remarquée et de décrocher enfin un vrai rôle. Lorsque son chemin croise celui de Sandrine Kiberlain et qu’une relation commence à se nouer entre les deux, Corinne espère concrétiser son rêve. Mais la célèbre actrice va-t-elle vraiment l’aider à se faire une place au sein de la grande famille du cinéma ?",
+    "__typename": "Movie",
+    "internalId": 1000023992,
+    "id": "TW92aWU6MTAwMDAyMzk5Mg==",
+    "poster": {
+     "__typename": "InternalImage",
+     "id": "SW1hZ2U6OTAwMjEwNTQzNA==",
+     "internalId": 9002105434,
+     "url": "https://fr.web.img6.acsta.net/img/04/d2/04d24a4f7815a30efe7dd1202384832f.jpg",
+     "path": "/img/04/d2/04d24a4f7815a30efe7dd1202384832f.jpg"
+    },
+    "title": "Ni vue, ni connue",
+    "originalTitle": "Ni vue, ni connue",
+    "type": "FEATURE_FILM",
+    "runtime": "1h 55min",
+    "genres": [
+     {
+      "id": 13005,
+      "translate": "Comédie",
+      "tag": "COMEDY"
+     }
+    ],
+    "languages": [
+     "FRENCH"
+    ],
+    "data": {
+     "__typename": "MovieData",
+     "seo": {
+      "__typename": "Seo",
+      "browsable": true,
+      "title": null
+     },
+     "productionYear": 2026,
+     "rules": {
+      "rating": {
+       "has_warning_message": false,
+       "has_mandatory_review": false
+      }
+     }
+    },
+    "releases": [
+     {
+      "__typename": "MovieRelease",
+      "releaseDate": {
+       "__typename": "PartialDate",
+       "date": "2026-10-07",
+       "precision": "day"
+      },
+      "name": "Released",
+      "certificate": {
+       "__typename": "Certificate",
+       "code": "U",
+       "label": "Tout public"
+      },
+      "advice": null,
+      "companyLimitation": null,
+      "releaseTags": {
+       "tagTypes": [
+        "THEATER"
+       ],
+       "tagFlags": null
+      },
+      "visaNumber": "163849"
+     }
+    ],
+    "synopsisFull": "<p class=\"bo-p\">Corinne Maclou est figurante. Elle enchaîne les tournages avec l’espoir d’être remarquée et de décrocher enfin un vrai rôle. Lorsque son chemin croise celui de Sandrine Kiberlain et qu’une relation commence à se nouer entre les deux, Corinne espère concrétiser son rêve. Mais la célèbre actrice va-t-elle vraiment l’aider à se faire une place au sein de la grande famille du cinéma ?</p>"
+   },
+   "showtimes": {
+    "original": [],
+    "original_st": [],
+    "original_sme": [],
+    "multiple": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204155,
+      "startsAt": "2026-10-07T09:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=09:00&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203578,
+      "startsAt": "2026-10-07T11:30:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=11:30&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203936,
+      "startsAt": "2026-10-07T14:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=14:00&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203619,
+      "startsAt": "2026-10-07T16:35:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=16:35&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204270,
+      "startsAt": "2026-10-07T19:10:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=19:10&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203621,
+      "startsAt": "2026-10-07T21:40:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000023992&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=21:40&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "multiple_st": [],
+    "multiple_sme": []
+   }
+  },
+  {
+   "movie": {
+    "synopsis": "Dans la campagne du Nord-Est de la France. Les sangliers qui ravagent les cultures provoquent une guerre ouverte entre chasseurs et agriculteurs. Brun, céréalier en faillite, lutte pour maintenir sa ferme à flot. Quand un notable du coin le pousse à bout, il déraille et disparaît. Un an plus tard, Fulda, un gendarme corse muté dans la région pour raisons disciplinaires, mène l’enquête. Entre intuitions fulgurantes et ratés spectaculaires, ses méthodes approximatives le mènent sur la piste des Attilas, des sangliers aux dimensions hors normes. Mais sa récente rupture amoureuse et la vodka dans laquelle flotte son cerveau n’aident pas. Heureusement, il y a Stéphane, la nouvelle psy de la gendarmerie : elle est là pour mettre un peu d’ordre dans son chaos — à moins que ce ne soit l’inverse ?",
+    "__typename": "Movie",
+    "internalId": 285141,
+    "id": "TW92aWU6Mjg1MTQx",
+    "poster": {
+     "__typename": "InternalImage",
+     "id": "SW1hZ2U6OTAwMjA1NzYzMw==",
+     "internalId": 9002057633,
+     "url": "https://fr.web.img2.acsta.net/img/45/96/4596f21ac87015ae6a3a4e833db30ba9.jpg",
+     "path": "/img/45/96/4596f21ac87015ae6a3a4e833db30ba9.jpg"
+    },
+    "title": "L'Espèce explosive",
+    "originalTitle": "L'Espèce explosive",
+    "type": "FEATURE_FILM",
+    "runtime": "1h 35min",
+    "genres": [
+     {
+      "id": 13005,
+      "translate": "Comédie",
+      "tag": "COMEDY"
+     },
+     {
+      "id": 13018,
+      "translate": "Policier",
+      "tag": "DETECTIVE"
+     }
+    ],
+    "languages": [
+     "FRENCH"
+    ],
+    "data": {
+     "__typename": "MovieData",
+     "seo": {
+      "__typename": "Seo",
+      "browsable": true,
+      "title": null
+     },
+     "productionYear": 2026,
+     "rules": {
+      "rating": {
+       "has_warning_message": false,
+       "has_mandatory_review": false
+      }
+     }
+    },
+    "releases": [
+     {
+      "__typename": "MovieRelease",
+      "releaseDate": {
+       "__typename": "PartialDate",
+       "date": "2026-10-07",
+       "precision": "day"
+      },
+      "name": "Released",
+      "certificate": {
+       "__typename": "Certificate",
+       "code": "UA",
+       "label": "Tout public avec avertissement"
+      },
+      "advice": "Plusieurs scènes sanglantes dans un climat général anxiogène peuvent heurter la sensibilité du jeune public.",
+      "companyLimitation": null,
+      "releaseTags": {
+       "tagTypes": [
+        "THEATER"
+       ],
+       "tagFlags": null
+      },
+      "visaNumber": "153722"
+     }
+    ],
+    "synopsisFull": "<p class=\"bo-p\">Dans la campagne du Nord-Est de la France. Les sangliers qui ravagent les cultures provoquent une guerre ouverte entre chasseurs et agriculteurs. Brun, céréalier en faillite, lutte pour maintenir sa ferme à flot. Quand un notable du coin le pousse à bout, il déraille et disparaît. Un an plus tard, Fulda, un gendarme corse muté dans la région pour raisons disciplinaires, mène l’enquête. Entre intuitions fulgurantes et ratés spectaculaires, ses méthodes approximatives le mènent sur la piste des Attilas, des sangliers aux dimensions hors normes. Mais sa récente rupture amoureuse et la vodka dans laquelle flotte son cerveau n’aident pas. Heureusement, il y a Stéphane, la nouvelle psy de la gendarmerie : elle est là pour mettre un peu d’ordre dans son chaos — à moins que ce ne soit l’inverse ?</p>"
+   },
+   "showtimes": {
+    "original": [],
+    "original_st": [],
+    "original_sme": [],
+    "multiple": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203824,
+      "startsAt": "2026-10-07T09:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=09:00&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203685,
+      "startsAt": "2026-10-07T11:10:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=11:10&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203854,
+      "startsAt": "2026-10-07T13:20:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=13:20&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204191,
+      "startsAt": "2026-10-07T15:35:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=15:35&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203597,
+      "startsAt": "2026-10-07T17:50:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=17:50&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204028,
+      "startsAt": "2026-10-07T20:05:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=20:05&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515204198,
+      "startsAt": "2026-10-07T22:15:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Version.French",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.285141&tags=Showtime.Accessibility.Accessible,Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=22:15&code=SME; AUDIO; PMR; 2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "multiple_st": [],
+    "multiple_sme": []
+   }
+  },
+  {
+   "movie": {
+    "synopsis": "Doraemon est un chat-robot bleu qui vient du futur. Il vit avec Nobita, un petit garçon maladroit, et ses parents. Grâce à ses gadgets secrets, Doraemon aide souvent Nobita à s’amuser ou à résoudre ses problèmes. Un été d’ennui, Doraemon propose à Nobita et leurs amis d’aller faire du camping sous la mer. En explorant les fonds marins, la bande découvre une épave et fait la rencontre des Thalassiens. C’est alors qu’une annonce très inquiétante survient : « Le Château sous-marin s’est réveillé ! ». Nobita et ses amis doivent se lancer dans une bataille qui décidera du sort de la Terre !",
+    "__typename": "Movie",
+    "internalId": 1000040606,
+    "id": "TW92aWU6MTAwMDA0MDYwNg==",
+    "poster": {
+     "__typename": "InternalImage",
+     "id": "SW1hZ2U6OTAwMjA0NDg5Mw==",
+     "internalId": 9002044893,
+     "url": "https://fr.web.img6.acsta.net/img/12/07/120736d4c8daa5a98e6d413e236ea509.jpg",
+     "path": "/img/12/07/120736d4c8daa5a98e6d413e236ea509.jpg"
+    },
+    "title": "Doraemon et le Château sous-marin",
+    "originalTitle": "Eiga Doraemon Shin Nobita no Kaiteiki Ganjô",
+    "type": "FEATURE_FILM",
+    "runtime": "1h 41min",
+    "genres": [
+     {
+      "id": 13026,
+      "translate": "Animation",
+      "tag": "ANIMATION"
+     },
+     {
+      "id": 13001,
+      "translate": "Aventure",
+      "tag": "ADVENTURE"
+     },
+     {
+      "id": 13008,
+      "translate": "Drame",
+      "tag": "DRAMA"
+     },
+     {
+      "id": 13036,
+      "translate": "Famille",
+      "tag": "FAMILY"
+     },
+     {
+      "id": 13012,
+      "translate": "Fantastique",
+      "tag": "FANTASY"
+     }
+    ],
+    "languages": [
+     "JAPANESE"
+    ],
+    "data": {
+     "__typename": "MovieData",
+     "seo": {
+      "__typename": "Seo",
+      "browsable": true,
+      "title": null
+     },
+     "productionYear": 2026,
+     "rules": {
+      "rating": {
+       "has_warning_message": false,
+       "has_mandatory_review": false
+      }
+     }
+    },
+    "releases": [
+     {
+      "__typename": "MovieRelease",
+      "releaseDate": {
+       "__typename": "PartialDate",
+       "date": "2026-10-07",
+       "precision": "day"
+      },
+      "name": "Released",
+      "certificate": null,
+      "advice": null,
+      "companyLimitation": null,
+      "releaseTags": {
+       "tagTypes": [
+        "THEATER"
+       ],
+       "tagFlags": null
+      },
+      "visaNumber": null
+     }
+    ],
+    "synopsisFull": "<p class=\"bo-p\">Doraemon est un chat-robot bleu qui vient du futur. Il vit avec Nobita, un petit garçon maladroit, et ses parents. Grâce à ses gadgets secrets, Doraemon aide souvent Nobita à s’amuser ou à résoudre ses problèmes. Un été d’ennui, Doraemon propose à Nobita et leurs amis d’aller faire du camping sous la mer. En explorant les fonds marins, la bande découvre une épave et fait la rencontre des Thalassiens. C’est alors qu’une annonce très inquiétante survient : « Le Château sous-marin s’est réveillé ! ». Nobita et ses amis doivent se lancer dans une bataille qui décidera du sort de la Terre !</p><p class=\"bo-p\"></p>"
+   },
+   "showtimes": {
+    "original": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203637,
+      "startsAt": "2026-10-07T09:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": null,
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000040606&tags=Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=09:00&code=2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "original_st": [],
+    "original_sme": [],
+    "multiple": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203355,
+      "startsAt": "2026-10-07T11:25:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": null,
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Localization.Version.French",
+       "Format.Projection.Digital"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000040606&tags=Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=11:25&code=2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203748,
+      "startsAt": "2026-10-07T13:45:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": null,
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Localization.Version.French",
+       "Format.Projection.Digital"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000040606&tags=Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=13:45&code=2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203354,
+      "startsAt": "2026-10-07T16:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": null,
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Localization.Version.French",
+       "Format.Projection.Digital"
+      ],
+      "diffusionVersion": "DUBBED",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000040606&tags=Localization.Version.French,Format.Projection.Digital&perfd=20261007&perft=16:00&code=2D; VF; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "multiple_st": [],
+    "multiple_sme": []
+   }
+  },
+  {
+   "movie": {
+    "synopsis": "Le film s'inspire de l'histoire vraie d'une jeune ingénieure chez Facebook, qui sollicite l'aide d'un journaliste au Wall Street Journal. Ensemble, ils se lancent dans une enquête pour révéler les secrets les mieux gardés du puissant réseau social.",
+    "__typename": "Movie",
+    "internalId": 1000026649,
+    "id": "TW92aWU6MTAwMDAyNjY0OQ==",
+    "poster": {
+     "__typename": "InternalImage",
+     "id": "SW1hZ2U6OTAwMjEyNzkzMg==",
+     "internalId": 9002127932,
+     "url": "https://fr.web.img6.acsta.net/img/9e/55/9e553042ac8f31f580cb0540fae60dc4.jpg",
+     "path": "/img/9e/55/9e553042ac8f31f580cb0540fae60dc4.jpg"
+    },
+    "title": "The Social Reckoning",
+    "originalTitle": "The Social Reckoning",
+    "type": "FEATURE_FILM",
+    "runtime": "1h 52min",
+    "genres": [
+     {
+      "id": 13008,
+      "translate": "Drame",
+      "tag": "DRAMA"
+     }
+    ],
+    "languages": [
+     "ENGLISH"
+    ],
+    "data": {
+     "__typename": "MovieData",
+     "seo": {
+      "__typename": "Seo",
+      "browsable": true,
+      "title": null
+     },
+     "productionYear": 2026,
+     "rules": {
+      "rating": {
+       "has_warning_message": false,
+       "has_mandatory_review": false
+      }
+     }
+    },
+    "releases": [
+     {
+      "__typename": "MovieRelease",
+      "releaseDate": {
+       "__typename": "PartialDate",
+       "date": "2026-10-07",
+       "precision": "day"
+      },
+      "name": "Released",
+      "certificate": null,
+      "advice": null,
+      "companyLimitation": null,
+      "releaseTags": {
+       "tagTypes": [
+        "THEATER"
+       ],
+       "tagFlags": null
+      },
+      "visaNumber": "168509"
+     }
+    ],
+    "synopsisFull": "<p class=\"bo-p\">Le film s'inspire de l'histoire vraie de Frances Haugen, une jeune ingénieure chez Facebook, qui sollicite l'aide de Jeff Horwitz, journaliste au Wall Street Journal. Ensemble, ils se lancent dans une enquête pleine de dangers qui les mènera à révéler au grand jour les secrets les mieux gardés du puissant réseau social.</p>"
+   },
+   "showtimes": {
+    "original": [
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203293,
+      "startsAt": "2026-10-07T09:05:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=09:05&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203662,
+      "startsAt": "2026-10-07T11:35:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=11:35&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203724,
+      "startsAt": "2026-10-07T14:10:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=14:10&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203506,
+      "startsAt": "2026-10-07T16:45:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=16:45&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203792,
+      "startsAt": "2026-10-07T19:25:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=19:25&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     },
+     {
+      "__typename": "Showtime",
+      "internalId": 82515203480,
+      "startsAt": "2026-10-07T22:00:00",
+      "timeBeforeStart": "PT0H0M0S",
+      "service": [
+       "DISABLED_ACCESS"
+      ],
+      "experience": null,
+      "comfort": null,
+      "projection": [
+       "DIGITAL"
+      ],
+      "picture": null,
+      "sound": null,
+      "tags": [
+       "Showtime.Accessibility.Accessible",
+       "Localization.Subtitle.French",
+       "Localization.Version.Original",
+       "Format.Projection.Digital",
+       "Theater.Service.DisabledAccess"
+      ],
+      "diffusionVersion": "ORIGINAL",
+      "data": {
+       "ticketing": [
+        {
+         "__typename": "Ticketing",
+         "urls": [
+          "https://relay.mvtx.us/ticketing/dbz?code_theater=C0159&gid_entity=movie.movie._.1000026649&tags=Showtime.Accessibility.Accessible,Localization.Subtitle.French,Localization.Version.Original,Format.Projection.Digital&perfd=20261007&perft=22:00&code=SME; AUDIO; PMR; 2D; VO; "
+         ],
+         "type": "DESKTOP",
+         "provider": "relay"
+        }
+       ]
+      },
+      "isPreview": false,
+      "isWeeklyMovieOuting": true
+     }
+    ],
+    "original_st": [],
+    "original_sme": [],
+    "multiple": [],
+    "multiple_st": [],
+    "multiple_sme": []
+   }
+  }
+ ],
+ "params": {
+  "experience": null,
+  "projection": null,
+  "comfort": null,
+  "picture": null,
+  "sound": null,
+  "versionDetail": null,
+  "page": 1
+ },
+ "facets": [],
+ "pagination": {
+  "page": 1,
+  "totalPages": 3,
+  "itemsPerPage": 15,
+  "totalItems": 34
+ },
+ "data": null
+}

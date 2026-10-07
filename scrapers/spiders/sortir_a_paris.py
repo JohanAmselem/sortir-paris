@@ -1,263 +1,227 @@
 """
 SortirAParis spider.
-Source: https://www.sortiraparis.com
-Major French events guide — extensive coverage of Paris events, expos,
-festivals, concerts, family activities, etc.
+Source: https://www.sortiraparis.com (editorial events guide, HTML scraping).
 
-Strategy: Scrape article listing pages by category. Each card is an <a> tag
-wrapping an image, h3/h4 title, and a description paragraph. Dates are
-extracted from the description text.
+Strategy:
+  1. Category listing pages (/<category>/page/N) → article URLs of that category.
+  2. Each article page carries schema.org/Event *microdata* (no JSON-LD Event —
+     the JSON-LD is a NewsArticle) with an "Informations pratiques" block:
+       - "Dates et Horaires" (visible text, e.g. "Du 6 octobre 2026 au 31 janvier 2027",
+         "Le 15 octobre 2026 à 20h"),
+       - "Lieu" (schema.org Place microdata: name, streetAddress, postalCode, locality),
+       - "Tarifs" (free text),
+       - map markers with lat/lng.
+  Articles without a real date in "Dates et Horaires" (venue guides showing
+  "Prochains jours", news) are skipped: we never default to today.
 """
 
-import re
-import time
-from datetime import datetime
-from typing import Generator, Optional
+from __future__ import annotations
 
-import httpx
+import json
+import re
+from datetime import date
+from typing import Generator, List, Optional
+
 from bs4 import BeautifulSoup
 
-from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    parse_price,
-    detect_category,
-    compute_quality_score,
-)
+from utils.dates import parse_date_fr
+from utils.event import make_event
+from utils.http import BudgetExceeded, PoliteClient
+from utils.jsonld import extract_jsonld
+from utils.normalize import absolute_url, clean_text, extract_zip, in_idf, parse_price_fr, IDF_DEPARTMENTS
 
+SOURCE = "sortiraparis"
 BASE_URL = "https://www.sortiraparis.com"
 
-# Updated URL paths (site restructured)
+# (listing path, category slug or None → detect_category)
 LISTING_PAGES = [
-    (f"{BASE_URL}/arts-culture/exposition", "expos"),
-    (f"{BASE_URL}/scenes/concert-musique", "concerts"),
-    (f"{BASE_URL}/scenes/theatre", "theatre"),
-    (f"{BASE_URL}/loisirs/salon", "expos"),
-    (f"{BASE_URL}/musique-nuit", "concerts"),
-    (f"{BASE_URL}/loisirs/sport", "sport"),
-    (f"{BASE_URL}/bons-plans/sorties-gratuites", None),
-    (f"{BASE_URL}/arts-culture", None),
+    ("/arts-culture/exposition", "expos"),
+    ("/scenes/concert-musique", "concerts"),
+    ("/scenes/theatre", "theatre"),
+    ("/loisirs/salon", None),
+    ("/bons-plans/sorties-gratuites", None),
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "fr-FR,fr;q=0.9",
-}
-
-# French month mapping for date extraction from descriptions
-MONTHS_FR = {
-    "janvier": 1, "février": 2, "mars": 3, "avril": 4,
-    "mai": 5, "juin": 6, "juillet": 7, "août": 8,
-    "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
-}
+_ARTICLE_RE = re.compile(r"/articles/(\d+)-")
 
 
-def fetch_events(max_pages: int = 3) -> Generator[dict, None, None]:
-    """Fetch events from SortirAParis category pages."""
+# ─────────────────────────── pure parsers ───────────────────────────
 
-    seen_slugs: set[str] = set()
-
-    with httpx.Client(headers=HEADERS, follow_redirects=True, timeout=30) as client:
-        for listing_url, default_category in LISTING_PAGES:
-            cat_name = listing_url.rstrip("/").split("/")[-1]
-            print(f"  Fetching SortirAParis: {cat_name}...")
-
-            for page in range(1, max_pages + 1):
-                url = f"{listing_url}?page={page}" if page > 1 else listing_url
-
-                try:
-                    resp = client.get(url)
-                    resp.raise_for_status()
-                except Exception as e:
-                    print(f"  Error: {e}")
-                    break
-
-                soup = BeautifulSoup(resp.text, "html.parser")
-
-                # Find article links with meaningful text content
-                # SortirAParis uses <a href="/category/articles/ID-slug">Title text</a>
-                cards = []
-                seen_hrefs = set()
-                for a_tag in soup.find_all("a", href=re.compile(r"/articles/\d+")):
-                    href = a_tag.get("href", "")
-                    text = a_tag.get_text(strip=True)
-                    if href in seen_hrefs:
-                        continue
-                    # Only keep links that have meaningful title text (not just images)
-                    if text and len(text) > 10:
-                        seen_hrefs.add(href)
-                        cards.append(a_tag)
-
-                if not cards:
-                    print(f"    Page {page}: no cards found, stopping")
-                    break
-
-                count = 0
-                for card in cards:
-                    event = parse_card(card, default_category)
-                    if event and event["slug"] not in seen_slugs:
-                        seen_slugs.add(event["slug"])
-                        yield event
-                        count += 1
-
-                print(f"    Page {page}: {count} events")
-                if count == 0:
-                    break
-
-                time.sleep(0.5)
+def parse_listing(html: str, listing_path: str = "") -> List[str]:
+    """Article URLs from a category listing page (same category only, no guides)."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    urls: List[str] = []
+    seen = set()
+    prefix = listing_path.rstrip("/") + "/articles/" if listing_path else "/articles/"
+    for a in soup.find_all("a", href=True):
+        url = absolute_url(BASE_URL, a["href"])
+        if not url or not url.startswith(BASE_URL):
+            continue
+        path = url[len(BASE_URL):].split("?")[0].split("#")[0]
+        if prefix not in path or not _ARTICLE_RE.search(path):
+            continue
+        url = BASE_URL + path
+        if url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
 
 
-def parse_card(card, default_category: Optional[str]) -> Optional[dict]:
-    """Parse a SortirAParis article card.
+def _block_text(practical, label: str) -> Optional[str]:
+    """Text of the <p> whose <strong> title starts with `label` (title removed)."""
+    for strong in practical.find_all("strong"):
+        if clean_text(strong.get_text() or "").lower().startswith(label.lower()):
+            p = strong.find_parent("p")
+            if p is None:
+                continue
+            parts = []
+            for node in p.children:
+                if node is strong:
+                    continue
+                txt = node.get_text(" ", strip=True) if hasattr(node, "get_text") else str(node)
+                if txt and txt.strip():
+                    parts.append(txt.strip())
+            return clean_text(" ".join(parts))
+    return None
 
-    Cards are <a> tags where the title is either in h3/h4 children
-    or is the direct text content of the link itself.
-    """
 
-    # Title: try h3/h4 first, then the link text itself
-    title_el = card.find(["h2", "h3", "h4"])
-    if title_el:
-        title = clean_text(title_el.get_text())
-    else:
-        title = clean_text(card.get_text())
-
-    if not title or len(title) < 10:
+def _prop(scope, name: str) -> Optional[str]:
+    el = scope.find(attrs={"itemprop": name}) if scope is not None else None
+    if el is None:
         return None
-
-    # Skip listicle/guide titles
-    if re.match(r"^\d+\s+(meilleur|best|top|idée)", title.lower()):
-        return None
-
-    # Link
-    href = card.get("href", "")
-    event_url = href if href.startswith("http") else f"{BASE_URL}{href}"
-
-    # Image from CDN
-    img_el = card.find("img")
-    image_url = None
-    if img_el:
-        src = img_el.get("src") or img_el.get("data-src") or img_el.get("data-lazy-src")
-        if src:
-            image_url = src if src.startswith("http") else f"{BASE_URL}{src}"
-
-    # Description
-    desc_el = card.find("p")
-    description = clean_text(desc_el.get_text()) if desc_el else None
-
-    # Extract dates from description text (common pattern: "Du X au Y mois 2026")
-    all_text = f"{title} {description or ''}"
-    start_date, end_date = extract_dates_from_text(all_text)
-
-    # Free detection
-    is_free = False
-    if "gratuit" in all_text.lower() or "entrée libre" in all_text.lower():
-        is_free = True
-
-    # Category
-    category_slug = default_category or detect_category(None, title, description)
-
-    slug = generate_slug(title, start_date)
-    quality = compute_quality_score(
-        title=title, description=description, image_url=image_url,
-        start_date=start_date, price_raw=None, booking_url=event_url,
-    )
-
-    return {
-        "title": title,
-        "slug": slug,
-        "description": description,
-        "short_desc": truncate(description),
-        "image_url": image_url,
-        "start_date": start_date,
-        "end_date": end_date,
-        "price_min": None,
-        "price_max": None,
-        "is_free": is_free,
-        "booking_url": event_url,
-        "source": "sortiraparis",
-        "source_url": event_url,
-        "source_id": slug,
-        "venue_name": None,
-        "venue_address": None,
-        "venue_city": "Paris",
-        "venue_zip": None,
-        "venue_arrondissement": None,
-        "venue_lat": None,
-        "venue_lng": None,
-        "raw_category": default_category,
-        "category_slug": category_slug,
-        "tags": [],
-        "quality_score": quality,
-    }
+    return clean_text(el.get("content") or el.get_text(" ", strip=True))
 
 
-def extract_dates_from_text(text: str) -> tuple[Optional[str], Optional[str]]:
-    """Extract start/end dates from French text.
-
-    Patterns:
-        - "du 3 avril au 13 septembre 2026"
-        - "dès le 31 mars 2026"
-        - "le 15 avril 2026"
-        - "3 avril 2026"
-    """
-    if not text:
+def _map_marker(html: str):
+    m = re.search(r'"markers"\s*:\s*\[\s*\{\s*"l"\s*:\s*([\d.\-]+)\s*,\s*"L"\s*:\s*([\d.\-]+)', html)
+    if not m:
         return None, None
+    return float(m.group(1)), float(m.group(2))
 
-    lower = text.lower()
-    month_pattern = "|".join(MONTHS_FR.keys())
 
-    # Range: "du X month au Y month 2026"
-    range_diff = re.search(
-        rf"du\s+(\d{{1,2}})\s+({month_pattern})\s+au\s+(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
-        lower,
-    )
-    if range_diff:
-        try:
-            start = datetime(
-                int(range_diff.group(5)),
-                MONTHS_FR[range_diff.group(2)],
-                int(range_diff.group(1)), 10, 0,
-            )
-            end = datetime(
-                int(range_diff.group(5)),
-                MONTHS_FR[range_diff.group(4)],
-                int(range_diff.group(3)), 22, 0,
-            )
-            return start.isoformat(), end.isoformat()
-        except ValueError:
-            pass
+def _in_idf_place(zip_code: Optional[str], lat, lng) -> bool:
+    if lat is not None and lng is not None:
+        return in_idf(lat, lng)
+    return bool(zip_code) and zip_code[:2] in IDF_DEPARTMENTS
 
-    # Range same month: "du X au Y month 2026"
-    range_same = re.search(
-        rf"du\s+(\d{{1,2}})\s+au\s+(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
-        lower,
-    )
-    if range_same:
-        try:
-            month = MONTHS_FR[range_same.group(3)]
-            year = int(range_same.group(4))
-            start = datetime(year, month, int(range_same.group(1)), 10, 0)
-            end = datetime(year, month, int(range_same.group(2)), 22, 0)
-            return start.isoformat(), end.isoformat()
-        except ValueError:
-            pass
 
-    # Single date: "dès le X month 2026" or "le X month 2026" or "X month 2026"
-    single = re.search(
-        rf"(?:dès\s+le\s+|le\s+)?(\d{{1,2}})\s+({month_pattern})\s+(\d{{4}})",
-        lower,
-    )
-    if single:
-        try:
-            dt = datetime(
-                int(single.group(3)),
-                MONTHS_FR[single.group(2)],
-                int(single.group(1)), 10, 0,
-            )
-            return dt.isoformat(), None
-        except ValueError:
-            pass
+def parse_detail(
+    html: str,
+    url: str,
+    category_slug: Optional[str] = None,
+    today: Optional[date] = None,
+) -> List[dict]:
+    """One article page → [event] or [] (no real date / no IDF venue)."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    scope = soup.find(attrs={"itemtype": re.compile(r"schema\.org/Event$", re.I)})
+    practical = soup.find(id="practical-info")
+    if scope is None or practical is None:
+        return []
 
-    return None, None
+    h1 = soup.find("h1")
+    title = clean_text(h1.get_text(" ", strip=True)) if h1 else _prop(scope, "name")
+    if not title:
+        return []
+
+    dates_text = _block_text(practical, "Dates")
+    when = parse_date_fr(dates_text, today=today) if dates_text else None
+    if when is None or when.start is None:
+        return []  # "Prochains jours", "jusqu'au …" only, or no date at all
+
+    place = practical.find(attrs={"itemprop": "location"})
+    venue_name = _prop(place, "name")
+    street = _prop(place, "streetAddress")
+    zip_code = _prop(place, "postalCode") or extract_zip(_block_text(practical, "Lieu"))
+    locality = _prop(place, "addressLocality")
+    lat, lng = _map_marker(html)
+    if not venue_name or not _in_idf_place(zip_code, lat, lng):
+        return []
+    city = "Paris" if locality and locality.lower().startswith("paris") else locality
+
+    price_text = _block_text(practical, "Tarif")
+    price = parse_price_fr(price_text) if price_text else None
+
+    desc = None
+    for o in extract_jsonld(soup):
+        if "article" in str(o.get("@type") or "").lower() and o.get("description"):
+            desc = o["description"]
+            break
+    if not desc:
+        meta = soup.find("meta", attrs={"property": "og:description"}) or soup.find(
+            "meta", attrs={"name": "description"})
+        desc = meta.get("content") if meta else None
+    img = soup.find("meta", attrs={"property": "og:image"})
+    image = absolute_url(url, img["content"]) if img and img.get("content") else None
+
+    m = _ARTICLE_RE.search(url)
+    source_id = m.group(1) if m else None
+
+    return [make_event(
+        source=SOURCE,
+        source_id=source_id,
+        title=title,
+        when=when,
+        description=desc,
+        image_url=image,
+        price=price,
+        source_url=url,
+        booking_url=url,
+        venue_name=venue_name,
+        venue_address=street,
+        venue_city=city,
+        venue_zip=zip_code,
+        venue_lat=lat,
+        venue_lng=lng,
+        category_slug=category_slug,
+    )]
+
+
+# ─────────────────────────── network ───────────────────────────
+
+def fetch_events(max_pages: int = 3, max_details: int = 120) -> Generator[dict, None, None]:
+    """Listing pages (max_pages per category) → article pages (max_details total)."""
+    jobs = []  # (url, category)
+    seen = set()
+    skipped = errors = 0
+    with PoliteClient() as client:
+        for path, cat in LISTING_PAGES:
+            for page in range(1, max_pages + 1):
+                url = f"{BASE_URL}{path}" + (f"/page/{page}" if page > 1 else "")
+                html = client.get_text(url)
+                if html is None:
+                    if page == 1 and not jobs:
+                        print(f"  [{SOURCE}] listing unavailable: {url}")
+                    break
+                found = [u for u in parse_listing(html, path) if u not in seen]
+                if not found:
+                    break
+                for u in found:
+                    seen.add(u)
+                    jobs.append((u, cat))
+        print(f"  [{SOURCE}] {len(jobs)} article URLs, fetching up to {max_details}")
+
+        count = 0
+        for url, cat in jobs[:max_details]:
+            try:
+                html = client.get_text(url)
+                if html is None:
+                    errors += 1
+                    continue
+                events = parse_detail(html, url, category_slug=cat)
+            except BudgetExceeded:
+                raise
+            except Exception as e:  # one bad page never kills the run
+                errors += 1
+                print(f"  [{SOURCE}] parse error {url}: {e}")
+                continue
+            if not events:
+                skipped += 1
+            for ev in events:
+                count += 1
+                yield ev
+    print(f"  [{SOURCE}] {count} events, {skipped} articles without real date/venue skipped, {errors} errors")
+
+
+if __name__ == "__main__":
+    for i, ev in enumerate(fetch_events(max_pages=1, max_details=5)):
+        print(json.dumps(ev, ensure_ascii=False, indent=1))

@@ -1,166 +1,225 @@
 """
-Daily cron job — scrapes all sources and syncs to Meilisearch.
-Designed to run on Railway/Render as a scheduled task.
+Scraping orchestrator (GitHub Actions entry point).
 
 Usage:
-    python cron.py              # Run all sources
-    python cron.py --source paris_opendata   # Run one source only
+    python cron.py --group official            # one matrix group
+    python cron.py --source paris_opendata     # one (or several, comma-separated) sources
+    python cron.py --all                       # every enabled source
+    python cron.py --post                      # geocode + promote + dedup + expiry + Meilisearch sync
+    python cron.py --source dice --dry-run     # fetch + validate only, no database
+    python cron.py --list
+
+Exit code 1 when:
+  - a key source (paris_opendata, openagenda) returns 0 events,
+  - a source drops > 60 % vs its last successful run (when that run had ≥ 20 events),
+  - a source crashes before producing anything,
+  - a --post step fails.
 """
 
+from __future__ import annotations
+
+import argparse
 import os
 import sys
 import time
-import argparse
-from datetime import datetime
+import traceback
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from run import SOURCES, run_paris_opendata, run_openagenda
+from sources import GROUPS, SOURCES, select  # noqa: E402
+from utils.http import BudgetExceeded, set_budget  # noqa: E402
+
+DROP_THRESHOLD = 0.6
+DROP_MIN_PREVIOUS = 20
 
 
-def sync_meilisearch():
-    """Re-sync all active events to Meilisearch after scraping."""
-    import httpx
-    import psycopg2
-    import psycopg2.extras
+def collect(spec) -> tuple:
+    """Run a spider within its budget. Returns (events, crashed, error_messages)."""
+    events, errors, crashed = [], [], False
+    set_budget(spec.budget)
+    try:
+        for ev in spec.fetch() or []:
+            events.append(ev)
+    except BudgetExceeded:
+        errors.append(f"time budget of {spec.budget}s exhausted after {len(events)} events")
+        print(f"  [{spec.name}] budget exhausted — keeping {len(events)} events")
+    except Exception as e:
+        crashed = True
+        errors.append(f"{type(e).__name__}: {e}")
+        print(f"  [{spec.name}] CRASH: {e}")
+        traceback.print_exc()
+    finally:
+        set_budget(None)
+    return events, crashed, errors
 
-    db_url = os.getenv("DATABASE_URL", "")
-    meili_host = os.getenv("MEILISEARCH_HOST", "")
-    meili_key = os.getenv("MEILISEARCH_API_KEY", "")
 
-    if not meili_host or "localhost" in meili_host:
-        print("Meilisearch not configured, skipping sync")
-        return
+def dry_run_report(name: str, events: list) -> None:
+    from validation import decide_status, validate
 
-    print("\nSyncing all active events to Meilisearch...")
-    conn = psycopg2.connect(db_url)
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    statuses, reasons = Counter(), Counter()
+    for ev in events:
+        _, hard, soft, score = validate(ev)
+        statuses[decide_status(hard, score)] += 1
+        reasons.update(hard + soft)
+    print(f"  [{name}] {len(events)} events — status {dict(statuses)}")
+    print(f"  [{name}] reasons {dict(reasons.most_common(12))}")
+    for ev in events[:3]:
+        print(f"    · {ev.get('start_date')} | {ev.get('title', '')[:70]} | {ev.get('venue_name')} "
+              f"| {ev.get('price_status')} {ev.get('price_min')}-{ev.get('price_max')}")
 
-    cursor.execute("""
-        SELECT
-            e.id, e.title, e.slug, e.short_desc, e.description,
-            e.image_url, e.start_date, e.end_date,
-            e.price_min, e.price_max, e.is_free,
-            e.booking_url, e.save_count, e.view_count,
-            e.quality_score, e.source, e.source_url,
-            c.name AS category_name, c.slug AS category_slug, c.icon AS category_icon,
-            v.name AS venue_name, v.address AS venue_address,
-            v.arrondissement, v.lat, v.lng, v.city
-        FROM events e
-        LEFT JOIN categories c ON c.id = e.category_id
-        LEFT JOIN venues v ON v.id = e.venue_id
-        WHERE e.status = 'active'
-    """)
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
 
-    print(f"  Found {len(rows)} active events")
+def run_sources(specs, dry_run: bool = False) -> list:
+    """Run sources sequentially. Returns list of health problems (strings)."""
+    problems = []
+    conn = None
+    if not dry_run:
+        from pipelines.ingest import get_db_connection
 
-    # Transform for Meilisearch
-    documents = []
-    for r in rows:
-        start_ts = None
-        if r["start_date"]:
+        conn = get_db_connection()
+
+    for spec in specs:
+        missing = [v for v in spec.env if not os.getenv(v)]
+        if missing:
+            print(f"\n[{spec.name}] skipped: missing env {', '.join(missing)}")
+            continue
+        print(f"\n{'#' * 60}\n# {spec.name} (group {spec.group}, budget {spec.budget}s)\n{'#' * 60}")
+        t0 = time.monotonic()
+        started_at = datetime.now(timezone.utc)  # real start time, written in ingestion_logs
+        events, crashed, errors = collect(spec)
+        print(f"  [{spec.name}] fetched {len(events)} events in {time.monotonic() - t0:.0f}s")
+
+        # One spider may emit several DB sources (venue_<key>): group by event source.
+        by_source = defaultdict(list)
+        for ev in events:
+            by_source[ev.get("source") or spec.name].append(ev)
+        if not by_source:
+            by_source[spec.name] = []
+
+        if dry_run:
+            for name, evs in by_source.items():
+                dry_run_report(name, evs)
+            if spec.key and not events:
+                problems.append(f"{spec.name}: key source returned 0 events")
+            if crashed and not events:
+                problems.append(f"{spec.name}: crashed ({errors[-1] if errors else '?'})")
+            continue
+
+        from pipelines.ingest import last_successful_found, log_finish, log_start, run_pipeline
+
+        for name, evs in by_source.items():
+            log_id = log_start(conn, name, started_at)
+            previous = last_successful_found(conn, name)
+            stats = {"found": len(evs), "new": 0, "updated": 0, "duplicate": 0, "errors": 0, "error_list": []}
             try:
-                start_ts = int(r["start_date"].timestamp())
-            except (ValueError, AttributeError):
+                if evs:
+                    stats = run_pipeline(evs, name, conn=conn)
+            except Exception as e:
+                crashed = True
+                errors.append(f"ingest {type(e).__name__}: {e}")
+                traceback.print_exc()
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            finally:
+                status = log_finish(conn, log_id, name, stats, crashed, errors + stats.get("error_list", []))
+            print(f"  [{name}] log status: {status}")
+            found = stats.get("found", 0)
+            if spec.key and found == 0:
+                problems.append(f"{name}: key source returned 0 events")
+            if previous and previous >= DROP_MIN_PREVIOUS and found < (1 - DROP_THRESHOLD) * previous:
+                problems.append(f"{name}: dropped from {previous} to {found} events (> {DROP_THRESHOLD:.0%})")
+            if crashed and found == 0:
+                problems.append(f"{name}: crashed ({errors[-1] if errors else '?'})")
+
+    if conn is not None:
+        conn.close()
+    return problems
+
+
+def run_post() -> list:
+    """Geocode → promote → dedup → expire → Meilisearch. Each step isolated; failures reported."""
+    from pipelines.dedup import run_dedup
+    from pipelines.ingest import get_db_connection
+    from pipelines.maintenance import expire_events, promote_geocoded
+    from pipelines.meili import sync
+    from utils.geocode import geocode_missing_venues
+
+    problems = []
+    conn = get_db_connection()
+    steps = [
+        ("geocode", lambda: geocode_missing_venues(conn)),
+        ("promote", lambda: promote_geocoded(conn)),
+        ("dedup", lambda: run_dedup(conn)),
+        ("expire", lambda: expire_events(conn)),
+    ]
+    for name, step in steps:
+        set_budget(15 * 60)
+        try:
+            step()
+        except Exception as e:
+            problems.append(f"post/{name}: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            try:
+                conn.rollback()
+            except Exception:
                 pass
-
-        doc = {
-            "id": r["id"],
-            "title": r["title"],
-            "slug": r["slug"],
-            "shortDesc": r["short_desc"],
-            "description": (r["description"] or "")[:500],
-            "imageUrl": r["image_url"],
-            "startDate": start_ts,
-            "startDateISO": r["start_date"].isoformat() if r["start_date"] else None,
-            "priceMin": r["price_min"] or 0,
-            "priceMax": r["price_max"] or 0,
-            "isFree": r["is_free"] or False,
-            "bookingUrl": r["booking_url"],
-            "saveCount": r["save_count"] or 0,
-            "viewCount": r["view_count"] or 0,
-            "qualityScore": r["quality_score"] or 0,
-            "source": r["source"],
-            "sourceUrl": r["source_url"],
-            "category": r["category_name"],
-            "categorySlug": r["category_slug"],
-            "categoryIcon": r["category_icon"],
-            "venueName": r["venue_name"],
-            "venueAddress": r["venue_address"],
-            "arrondissement": r["arrondissement"],
-            "city": r["city"],
-        }
-        if r["lat"] and r["lng"]:
-            doc["_geo"] = {"lat": r["lat"], "lng": r["lng"]}
-        documents.append(doc)
-
-    # Send in batches of 500
-    BATCH_SIZE = 500
-    for i in range(0, len(documents), BATCH_SIZE):
-        batch = documents[i:i + BATCH_SIZE]
-        resp = httpx.post(
-            f"{meili_host}/indexes/events/documents",
-            json=batch,
-            headers={
-                "Authorization": f"Bearer {meili_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        print(f"  Batch {i // BATCH_SIZE + 1}: sent {len(batch)} docs")
-
-    print(f"  Meilisearch sync complete: {len(documents)} events")
+        finally:
+            set_budget(None)
+    try:
+        sync(conn)
+    except Exception as e:
+        problems.append(f"post/meili: {type(e).__name__}: {e}")
+        traceback.print_exc()
+    conn.close()
+    return problems
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Sortir Paris — Daily Cron")
-    parser.add_argument("--source", choices=list(SOURCES.keys()), help="Run one source only")
-    parser.add_argument("--all", action="store_true", help="Run all sources")
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Paname Club — scraping cron")
+    parser.add_argument("--source", help="source name(s), comma-separated")
+    parser.add_argument("--group", choices=GROUPS)
+    parser.add_argument("--all", action="store_true")
+    parser.add_argument("--post", action="store_true", help="geocode + dedup + expiry + Meilisearch sync")
+    parser.add_argument("--dry-run", action="store_true", help="fetch + validate only (no DB)")
+    parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
 
-    start = datetime.now()
-    print(f"\n{'='*60}")
-    print(f"  Sortir Paris — Cron Job")
-    print(f"  Started: {start.isoformat()}")
-    print(f"{'='*60}")
+    if args.list:
+        for s in SOURCES:
+            flag = "" if s.enabled else "  [disabled]"
+            print(f"{s.name:18} {s.group:10} key={s.key!s:5} env={','.join(s.env) or '-'}{flag}  {s.notes}")
+        return 0
 
-    # 1. Scrape
-    if args.source:
-        print(f"\nRunning source: {args.source}")
-        SOURCES[args.source]()
-    elif args.all:
-        print("\nRunning all sources...")
-        for name, runner in SOURCES.items():
-            try:
-                runner()
-            except Exception as e:
-                print(f"Error running {name}: {e}")
+    start = datetime.now(timezone.utc)
+    print(f"{'=' * 60}\n  Paname Club cron — started {start.isoformat()}\n{'=' * 60}")
+    problems = []
+    if args.source or args.group or args.all:
+        names = [n.strip() for n in args.source.split(",")] if args.source else None
+        specs = select(names, None if args.all else args.group)
+        problems += run_sources(specs, dry_run=args.dry_run)
+    if args.post and not args.dry_run:
+        problems += run_post()
 
-    # 2. Geocode venues with missing coordinates
-    try:
-        from utils.geocode import geocode_missing_venues
-        geocode_missing_venues()
-    except Exception as e:
-        print(f"Geocoding error: {e}")
-
-    # 3. Full Meilisearch re-sync
-    try:
-        sync_meilisearch()
-    except Exception as e:
-        print(f"Meilisearch sync error: {e}")
-
-    elapsed = (datetime.now() - start).total_seconds()
-    print(f"\n{'='*60}")
-    print(f"  Cron complete in {elapsed:.1f}s")
-    print(f"{'='*60}\n")
+    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+    print(f"\n{'=' * 60}\n  Done in {elapsed:.0f}s")
+    if problems:
+        print("  HEALTH PROBLEMS:")
+        for p in problems:
+            print(f"   - {p}")
+        if os.getenv("GITHUB_STEP_SUMMARY"):
+            with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+                f.write("### Scraper health problems\n" + "\n".join(f"- {p}" for p in problems) + "\n")
+        return 1
+    print("  All healthy.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

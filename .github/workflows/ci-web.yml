@@ -1,0 +1,43 @@
+name: CI web
+
+on:
+  pull_request:
+    paths: ['apps/web/**', 'packages/**', 'pnpm-lock.yaml', '.github/workflows/ci-web.yml']
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'packages/**', 'pnpm-lock.yaml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm --filter @sortir/web typecheck && pnpm --filter @sortir/db typecheck && pnpm --filter @sortir/shared typecheck
+      - name: Lint
+        run: pnpm --filter @sortir/web lint
+      - name: Unit tests
+        run: pnpm --filter @sortir/web test
+      - name: Build
+        run: pnpm --filter @sortir/web build
+        env:
+          # The build must not need the database (every page is dynamic or ISR on demand).
+          DATABASE_URL: postgres://build:build@127.0.0.1:5432/build
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-placeholder

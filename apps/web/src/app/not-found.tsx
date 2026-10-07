@@ -1,28 +1,25 @@
 import Link from 'next/link'
+import { SearchBox } from '@/components/search/search-box'
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-      <p className="text-7xl">🏙️</p>
-      <h1 className="mt-6 text-2xl font-bold text-text-primary">
-        Perdu dans Paris ?
-      </h1>
-      <p className="mt-2 max-w-sm text-sm text-text-secondary">
-        Cette page n&apos;existe pas ou a été déplacée. Pas de panique, il y a plein de choses à découvrir.
+    <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col justify-center px-4">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Erreur 404</p>
+      <h1 className="font-display mt-1 text-[3.2rem] text-ink">Perdu dans Paris ?</h1>
+      <p className="mt-3 text-[16px] text-text-secondary">
+        Cette page n’existe pas, ou l’événement a été retiré par son organisateur.
       </p>
-      <div className="mt-8 flex gap-3">
-        <Link
-          href="/"
-          className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-accent/90 transition-all"
-        >
-          Retour à l&apos;accueil
-        </Link>
-        <Link
-          href="/evenements"
-          className="rounded-xl border border-border px-6 py-3 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-all"
-        >
-          Explorer
-        </Link>
+      <SearchBox className="mt-6" />
+      <div className="mt-4 flex flex-wrap gap-2">
+        {[
+          { href: '/ce-soir', label: 'Ce soir' },
+          { href: '/ce-week-end', label: 'Ce week-end' },
+          { href: '/carte', label: 'La carte' },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="inline-flex h-11 items-center rounded-full border border-border-strong bg-surface px-4 text-[15px] font-semibold text-ink hover:border-ink">
+            {l.label}
+          </Link>
+        ))}
       </div>
     </div>
   )

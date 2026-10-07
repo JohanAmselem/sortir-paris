@@ -1,110 +1,93 @@
-import { Metadata } from 'next'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, asc, sql } from 'drizzle-orm'
-import { SurpriseCard } from './surprise-card'
-import { SurpriseFilters } from './surprise-filters'
+import Link from 'next/link'
+import { Dices } from 'lucide-react'
+import { EventCard } from '@/components/events/event-card'
+import { DataUnavailable, EmptyState } from '@/components/events/blocks'
+import { bucketNow, safeQueryEvents } from '@/lib/events/query'
+import { cn } from '@/lib/utils'
 
-export const metadata: Metadata = {
-  title: 'Surprise moi — Paname Club',
-  description: 'Laisse le hasard décider. Découvre un événement culturel à Paris choisi pour toi.',
+export const metadata = {
+  title: 'Surprends-moi : une idée de sortie au hasard à Paris',
+  description: 'Une seule idée de sortie, tirée au sort parmi les meilleurs événements à Paris. Pas convaincu ? Relance.',
   alternates: { canonical: '/surprise' },
 }
 
-export const dynamic = 'force-dynamic'
+type Props = { searchParams: Promise<Record<string, string | undefined>> }
 
-interface Props {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-}
-
-async function getRandomEvent(filters: { category?: string; free?: string; tonight?: string }) {
-  const now = new Date()
-
-  const conditions = [
-    eq(events.status, 'active'),
-    gte(events.startDate, now),
-  ]
-
-  if (filters.category) {
-    const cat = await db.query.categories?.findFirst({
-      where: eq(categories.slug, filters.category),
-    })
-    if (cat) conditions.push(eq(events.categoryId, cat.id))
-  }
-
-  if (filters.free === '1') {
-    conditions.push(eq(events.isFree, true))
-  }
-
-  if (filters.tonight === '1') {
-    const endOfDay = new Date(now)
-    endOfDay.setHours(23, 59, 59, 999)
-    const { lte } = await import('drizzle-orm')
-    conditions.push(lte(events.startDate, endOfDay))
-  }
-
-  const results = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(and(...conditions))
-    .orderBy(sql`RANDOM()`)
-    .limit(1)
-
-  if (results.length === 0) return null
-
-  const { event, venue, category } = results[0]
-  return {
-    ...event,
-    venue,
-    category,
-    tags: [] as { slug: string; name: string }[],
-    ambiances: [] as { slug: string; name: string; emoji: string | null }[],
-  }
-}
+const MODES = [
+  { id: 'tonight', label: 'Ce soir' },
+  { id: 'weekend', label: 'Ce week-end' },
+  { id: 'week', label: 'Cette semaine' },
+] as const
 
 export default async function SurprisePage({ searchParams }: Props) {
-  const params = await searchParams
-  const event = await getRandomEvent({
-    category: params.category,
-    free: params.free,
-    tonight: params.tonight,
-  })
+  const sp = await searchParams
+  const when = MODES.some((m) => m.id === sp.when) ? sp.when! : 'week'
+  const free = sp.free === '1'
+  const n = Math.max(0, Math.min(Number(sp.n) || 0, 500))
+  const now = bucketNow()
 
-  const allCategories = await db.select().from(categories).orderBy(asc(categories.position))
+  // Only good candidates: picture, known time, decent quality. Deterministic per hour + n.
+  const pool = await safeQueryEvents({ when, free, withImage: true, oneOffOnly: when === 'tonight', sort: 'random', limit: 1, offset: n })
+  const total = pool.total
+  const pick = pool.events[0] ?? null
+  const next = (overrides: Record<string, string | number | null>) => {
+    const s = new URLSearchParams()
+    const merged = { when, free: free ? '1' : null, n: n + 1, ...overrides }
+    for (const [k, v] of Object.entries(merged)) if (v != null && v !== '' && v !== 0) s.set(k, String(v))
+    return `/surprise?${s}`
+  }
 
   return (
-    <div className="flex min-h-[70vh] flex-col items-center px-4 py-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-black text-text-primary">
-          🎲 Surprise !
-        </h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          On a choisi un événement au hasard pour toi
-        </p>
+    <div className="mx-auto max-w-xl px-4 pt-6">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neon">Le hasard fait bien les choses</p>
+      <h1 className="font-display mt-1 text-[3rem] text-ink">Surprends-moi</h1>
+
+      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Quand ?">
+        {MODES.map((m) => (
+          <Link
+            key={m.id}
+            href={next({ when: m.id, n: null })}
+            aria-current={when === m.id ? 'true' : undefined}
+            className={cn(
+              'inline-flex h-10 items-center rounded-full border px-4 text-[14px] font-medium',
+              when === m.id ? 'border-ink bg-ink text-paper' : 'border-border-strong bg-surface text-ink'
+            )}
+          >
+            {m.label}
+          </Link>
+        ))}
+        <Link
+          href={next({ free: free ? null : '1', n: null })}
+          aria-current={free ? 'true' : undefined}
+          className={cn('inline-flex h-10 items-center rounded-full border px-4 text-[14px] font-medium', free ? 'border-ink bg-ink text-paper' : 'border-border-strong bg-surface text-ink')}
+        >
+          Gratuit
+        </Link>
       </div>
 
-      {/* Filters */}
-      <SurpriseFilters
-        categories={allCategories}
-        activeCategory={params.category}
-        activeFree={params.free === '1'}
-        activeTonight={params.tonight === '1'}
-      />
+      <div className="mt-6 animate-scale-in" key={pick?.id ?? 'none'}>
+        {pool.error ? (
+          <DataUnavailable />
+        ) : !pick ? (
+          <EmptyState title="Plus rien dans le chapeau" actions={[{ href: '/surprise', label: 'Recommencer' }]}>
+            On a fait le tour des idées pour ces critères.
+          </EmptyState>
+        ) : (
+          <EventCard event={pick} variant="feature" priority now={now} />
+        )}
+      </div>
 
-      {event ? (
-        <SurpriseCard event={event as never} />
-      ) : (
-        <div className="mt-12 text-center">
-          <p className="text-5xl">😢</p>
-          <p className="mt-4 text-lg font-medium text-text-primary">
-            Aucun événement trouvé
-          </p>
-          <p className="mt-1 text-sm text-text-muted">
-            Essaie avec moins de filtres
-          </p>
-        </div>
+      {pick && (
+        <Link
+          href={total > n + 1 ? next({}) : next({ n: null })}
+          className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-ink text-[16px] font-semibold text-paper transition-colors hover:bg-ink-soft"
+          data-analytics="surprise"
+        >
+          <Dices className="h-5 w-5" aria-hidden />
+          Une autre idée
+        </Link>
       )}
+      {total > 0 && <p className="mt-2 text-center text-[13px] text-text-muted">Tirée parmi {total.toLocaleString('fr-FR')} sorties</p>}
     </div>
   )
 }

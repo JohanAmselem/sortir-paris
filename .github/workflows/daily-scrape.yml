@@ -1,37 +1,102 @@
-name: Daily Scraper
+name: Scrape events
 
 on:
   schedule:
-    # Tous les jours à 6h du matin (UTC) = 8h heure de Paris
-    - cron: '0 6 * * *'
-  workflow_dispatch: # Permet de lancer manuellement depuis GitHub
+    # 05:30 and 15:30 UTC (07:30 / 17:30 Paris in summer, 06:30 / 16:30 in winter)
+    - cron: '30 5 * * *'
+    - cron: '30 15 * * *'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Run a single source (name from `python cron.py --list`), empty = all groups'
+        required: false
+        default: ''
+      skip_post:
+        description: 'Skip geocode / dedup / expiry / Meilisearch sync'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scrape-events
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: '1'
 
 jobs:
   scrape:
+    name: scrape (${{ matrix.group }})
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.source == '' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [official, ticketing, media, venues, cinema]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: scrapers/requirements.txt
+      - run: pip install -r scrapers/requirements.txt
+      - name: Scrape group ${{ matrix.group }}
+        working-directory: scrapers
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAGENDA_API_KEY: ${{ secrets.OPENAGENDA_API_KEY }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python cron.py --group ${{ matrix.group }}
 
-      - name: Install dependencies
-        run: pip install -r scrapers/requirements.txt
+  scrape-one:
+    name: scrape (${{ inputs.source }})
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.source != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scrapers/requirements.txt
+      - run: pip install -r scrapers/requirements.txt
+      - name: Scrape ${{ inputs.source }}
+        working-directory: scrapers
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAGENDA_API_KEY: ${{ secrets.OPENAGENDA_API_KEY }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          SOURCE: ${{ inputs.source }}
+        run: python cron.py --source "$SOURCE"
 
-      - name: Run scraper + Meilisearch sync
+  post:
+    name: geocode + dedup + expiry + search sync
+    needs: [scrape, scrape-one]
+    # run even if a scrape group failed (one broken source must not block publication)
+    if: ${{ always() && !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.skip_post) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scrapers/requirements.txt
+      - run: pip install -r scrapers/requirements.txt
+      - name: Post-processing
         working-directory: scrapers
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MEILISEARCH_HOST: ${{ secrets.MEILISEARCH_HOST }}
+          MEILISEARCH_WRITE_KEY: ${{ secrets.MEILISEARCH_WRITE_KEY }}
           MEILISEARCH_API_KEY: ${{ secrets.MEILISEARCH_API_KEY }}
-          OPENAGENDA_API_KEY: ${{ secrets.OPENAGENDA_API_KEY }}
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          PYTHONUNBUFFERED: '1'
-        run: python cron.py --all
+        run: python cron.py --post

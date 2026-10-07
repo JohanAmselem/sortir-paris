@@ -1,26 +1,17 @@
 {
-  "name": "Paname Club",
-  "short_name": "Paname",
-  "description": "Sorties culturelles à Paris — Concerts, expos, spectacles, soirées",
+  "name": "Paname Club · Que faire à Paris ?",
+  "short_name": "Paname Club",
+  "description": "Les meilleures idées de sorties culturelles à Paris, ce soir, demain ou ce week-end.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAFAFA",
-  "theme_color": "#0A0A0A",
+  "background_color": "#f7f5ef",
+  "theme_color": "#1c1730",
   "orientation": "portrait-primary",
   "categories": ["entertainment", "lifestyle"],
   "lang": "fr",
   "icons": [
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

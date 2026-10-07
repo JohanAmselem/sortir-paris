@@ -4,11 +4,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-MEILISEARCH_HOST = os.getenv("MEILISEARCH_HOST", "http://localhost:7700")
-MEILISEARCH_API_KEY = os.getenv("MEILISEARCH_API_KEY", "")
+MEILISEARCH_HOST = os.getenv("MEILISEARCH_HOST", "")
+# Prefer a scoped write key (see pipelines/meili.py); falls back to the legacy variable.
+MEILISEARCH_WRITE_KEY = os.getenv("MEILISEARCH_WRITE_KEY") or os.getenv("MEILISEARCH_API_KEY", "")
 
-# Scraping settings
-REQUEST_DELAY = 1.0  # seconds between requests per domain
-CONCURRENT_REQUESTS = 4
-USER_AGENT = "SortirParis/1.0 (+https://sortir.paris)"
+# Optional API keys (sources are skipped with a log line when missing)
+OPENAGENDA_API_KEY = os.getenv("OPENAGENDA_API_KEY", "")
+TICKETMASTER_API_KEY = os.getenv("TICKETMASTER_API_KEY", "")
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
+
+# Scraping settings (see utils/http.py)
+REQUEST_DELAY = 1.0  # seconds between requests per host
+USER_AGENT = "PanameClubBot/1.0 (+https://www.panameclub.fr)"

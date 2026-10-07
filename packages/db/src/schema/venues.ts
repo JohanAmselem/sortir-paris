@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   doublePrecision,
+  smallint,
   timestamp,
   index,
 } from 'drizzle-orm/pg-core'
@@ -21,10 +22,13 @@ export const venues = pgTable(
     lng: doublePrecision('lng'),
     website: text('website'),
     imageUrl: text('image_url'),
+    normalizedName: text('normalized_name'),
+    geocodeStatus: text('geocode_status', { enum: ['pending', 'ok', 'failed', 'manual'] })
+      .default('pending')
+      .notNull(),
+    geocodeAttempts: smallint('geocode_attempts').default(0).notNull(),
+    canonicalVenueId: uuid('canonical_venue_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [
-    index('idx_venues_slug').on(table.slug),
-    index('idx_venues_arrondissement').on(table.arrondissement),
-  ]
+  (table) => [index('idx_venues_arrondissement').on(table.arrondissement)]
 )

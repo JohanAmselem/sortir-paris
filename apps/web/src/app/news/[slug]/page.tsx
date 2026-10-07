@@ -1,12 +1,15 @@
+import { safeJsonLd } from '@/lib/json-ld'
+import { sanitizeArticleHtml } from '@/lib/sanitize'
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Clock, Eye, Tag, Share2 } from 'lucide-react'
+import { ArrowLeft, Clock, Tag } from 'lucide-react'
 import { ShareButton } from '@/components/ui/share-button'
-import { EventCard } from '@/components/events/event-card'
-import { db, articles, events, venues, categories } from '@sortir/db'
-import { eq, and, desc, inArray, sql } from 'drizzle-orm'
+import { EventRail, SectionHeader } from '@/components/events/blocks'
+import { bucketNow, safeQueryEvents } from '@/lib/events/query'
+import { db, articles } from '@sortir/db'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { cache } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -32,16 +35,13 @@ const getArticle = cache(async function getArticle(slug: string) {
   return result[0] ?? null
 })
 
-async function getRelatedEvents(eventIds: string) {
-  const ids = eventIds.split(',').map((id) => id.trim()).filter(Boolean)
-  if (ids.length === 0) return []
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  return db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(inArray(events.id, ids))
+/** Only the related events that are still upcoming. */
+async function getRelatedEvents(eventIds: string) {
+  const ids = eventIds.split(',').map((id) => id.trim()).filter((id) => UUID.test(id)).slice(0, 40)
+  if (ids.length === 0) return []
+  return (await safeQueryEvents({ ids, limit: 12 })).events
 }
 
 async function getMoreArticles(currentId: string, type: string) {
@@ -63,7 +63,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!article) return { title: 'Article introuvable' }
 
   return {
-    title: article.metaTitle ?? `${article.title} — Paname Club`,
+    title: (article.metaTitle ?? article.title).replace(/\s*[—|-]\s*Paname Club$/, ''),
+    robots: isArchived(article) ? { index: false, follow: true } : undefined,
     description: article.metaDescription ?? article.excerpt,
     keywords: article.keywords ?? undefined,
     alternates: { canonical: `/news/${slug}` },
@@ -79,13 +80,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export const revalidate = 600
 
+/** Seasonal articles older than 4 months are kept for links but not indexed. */
+function isArchived(a: { publishedAt: Date | null }) {
+  return !a.publishedAt || Date.now() - new Date(a.publishedAt).getTime() > 120 * 86400_000
+}
+
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params
   const article = await getArticle(slug)
   if (!article) notFound()
 
-  // Increment view count (fire and forget)
-  db.execute(sql`UPDATE articles SET view_count = view_count + 1 WHERE id = ${article.id}`).catch(() => {})
 
   const typeCfg = TYPE_CONFIG[article.type]
   const publishedDate = new Date(article.publishedAt)
@@ -120,7 +124,7 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
 
       <article className="pb-16">
         {/* Back */}
@@ -156,12 +160,19 @@ export default async function ArticlePage({ params }: Props) {
             )}
             <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
               <Clock className="h-3 w-3" />
-              {publishedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {publishedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })}
             </div>
           </div>
 
+          {isArchived(article) && (
+            <p className="mt-4 rounded-lg bg-paper-deep px-4 py-3 text-[15px] text-text-secondary" role="note">
+              Article d’archive : les dates et programmations citées peuvent être dépassées.{' '}
+              <Link href="/ce-week-end" className="font-semibold text-accent underline underline-offset-2">Voir les sorties de ce week-end</Link>
+            </p>
+          )}
+
           {/* Title */}
-          <h1 className="mt-4 text-2xl font-bold leading-tight text-text-primary md:text-3xl">
+          <h1 className="font-display mt-4 text-[2.4rem] text-ink md:text-[3rem]">
             {article.title}
           </h1>
 
@@ -173,12 +184,7 @@ export default async function ArticlePage({ params }: Props) {
           {/* Actions */}
           <div className="mt-4 flex items-center gap-3">
             <ShareButton title={article.title} text={article.excerpt} className="h-9 w-9" />
-            {article.viewCount > 0 && (
-              <span className="flex items-center gap-1.5 text-[12px] text-text-muted">
-                <Eye className="h-3 w-3" />
-                {article.viewCount} vue{article.viewCount > 1 ? 's' : ''}
-              </span>
-            )}
+
           </div>
 
           {/* Tags */}
@@ -209,7 +215,7 @@ export default async function ArticlePage({ params }: Props) {
               prose-li:mb-1
               prose-blockquote:border-l-accent prose-blockquote:bg-surface prose-blockquote:rounded-r-xl prose-blockquote:py-3 prose-blockquote:px-4 prose-blockquote:not-italic
               prose-blockquote:text-text-secondary"
-            dangerouslySetInnerHTML={{ __html: article.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.content) }}
           />
 
           {/* Source */}
@@ -229,27 +235,11 @@ export default async function ArticlePage({ params }: Props) {
           )}
         </div>
 
-        {/* Related events */}
         {relatedEvents.length > 0 && (
-          <div className="mt-12">
-            <h2 className="px-4 text-lg font-bold text-text-primary">Événements liés</h2>
-            <div className="scrollbar-hide mt-4 flex gap-3 overflow-x-auto px-4 snap-x snap-mandatory">
-              {relatedEvents.map((r) => (
-                <EventCard
-                  key={r.event.id}
-                  event={{
-                    ...r.event,
-                    category: r.category,
-                    venue: r.venue,
-                    tags: [],
-                    ambiances: [],
-                  } as never}
-                  className="w-[260px] flex-shrink-0 snap-start sm:w-[280px]"
-                />
-              ))}
-              <div className="w-1 flex-shrink-0" />
-            </div>
-          </div>
+          <section className="mt-12 px-4" aria-labelledby="related-title">
+            <SectionHeader id="related-title" kicker="Toujours à l’affiche" title="Les sorties de l’article" />
+            <EventRail events={relatedEvents} now={bucketNow()} className="mt-5" />
+          </section>
         )}
 
         {/* More articles */}

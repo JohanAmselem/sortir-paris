@@ -1,46 +1,29 @@
-import { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
-import { COLLECTIONS } from './collections-data'
+import { PageIntro } from '@/components/events/listing'
+import { COLLECTIONS } from '@/lib/collections'
 
-export const metadata: Metadata = {
-  title: 'Collections — Paname Club',
-  description: 'Nos sélections thématiques des meilleures sorties culturelles à Paris. Expos, jazz, gratuit, famille...',
+export const metadata = {
+  title: 'Nos sélections de sorties à Paris',
+  description: 'Expos du moment, sorties gratuites, jazz, théâtre, en famille, en amoureux, insolite : nos sélections thématiques mises à jour chaque jour.',
   alternates: { canonical: '/collections' },
 }
 
 export default function CollectionsPage() {
   return (
-    <div className="px-4 py-8">
-      <h1 className="text-2xl font-bold text-text-primary">Collections</h1>
-      <p className="mt-1 text-[13px] text-text-muted">
-        Nos sélections thématiques pour ne rien rater
-      </p>
-
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {COLLECTIONS.map((col) => (
-          <Link
-            key={col.slug}
-            href={`/collections/${col.slug}`}
-            className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-accent/20"
-          >
-            <div className={`absolute inset-0 bg-gradient-to-br ${col.gradient} opacity-50`} />
-            <div className="relative">
-              <span className="text-4xl">{col.emoji}</span>
-              <h2 className="mt-3 text-lg font-bold text-text-primary group-hover:text-accent transition-colors">
-                {col.title}
-              </h2>
-              <p className="mt-1 text-[13px] text-text-secondary line-clamp-2">
-                {col.subtitle}
-              </p>
-              <div className="mt-4 flex items-center gap-1.5 text-[13px] font-medium text-accent">
-                Découvrir
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-          </Link>
+    <div className="px-4">
+      <PageIntro kicker="Envie de…" title="Nos sélections">
+        Des listes thématiques recalculées chaque jour à partir de l’agenda : seuls les événements à venir y figurent.
+      </PageIntro>
+      <ul className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
+        {COLLECTIONS.map((c) => (
+          <li key={c.slug} className="bg-surface">
+            <Link href={`/collections/${c.slug}`} className="block p-5 transition-colors hover:bg-surface-hover">
+              <span className="font-display block text-[2rem] text-ink">{c.title}</span>
+              <span className="mt-1 block text-[15px] text-text-secondary">{c.tagline}</span>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDailyArticles, generateArticle, saveArticles } from '@/lib/article-generator'
 
@@ -7,7 +8,9 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const expectedKey = process.env.ARTICLE_GEN_SECRET ?? process.env.CRON_SECRET
 
-  if (!expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+  const expected = Buffer.from(`Bearer ${expectedKey ?? ''}`)
+  const given = Buffer.from(authHeader ?? '')
+  if (!expectedKey || given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[API Generate] Error:', error)
     return NextResponse.json(
-      { error: 'Generation failed', details: String(error) },
+      { error: 'Generation failed' },
       { status: 500 }
     )
   }

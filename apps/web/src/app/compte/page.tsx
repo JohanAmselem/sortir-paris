@@ -1,190 +1,107 @@
-'use client'
-
-import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import Image from 'next/image'
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import {
-  Bookmark,
-  Settings,
-  LogOut,
-  ChevronRight,
-  User,
-  Sparkles,
-  Heart,
-  Dna,
-  Gift,
-  Zap,
-  Trophy,
-  Target,
-} from 'lucide-react'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { Bookmark, ChevronRight, Dna, Settings, Sparkles } from 'lucide-react'
+import { DataUnavailable } from '@/components/events/blocks'
+import { ARCHETYPES } from '@/lib/taste-quiz-data'
+import { requireUser } from '@/app/club/_lib/api'
+import { getMemberOverview } from '@/app/club/_lib/member'
+import { BadgeGrid, LevelMeter, StatTiles } from '@/app/club/_components/member-ui'
+import { LogoutButton } from './_components/logout-button'
 
-export default function ComptePage() {
-  const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
+export const dynamic = 'force-dynamic'
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      setLoading(false)
-    })
-  }, [supabase])
+export const metadata: Metadata = {
+  title: 'Mon compte',
+  robots: { index: false, follow: false },
+}
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
-  }
+const dateFmt = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', month: 'long', year: 'numeric' })
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-      </div>
-    )
-  }
+export default async function ComptePage() {
+  const user = await requireUser('/compte')
+  const overview = await getMemberOverview(user.id)
+  const name = overview?.name ?? user.email?.split('@')[0] ?? 'Membre'
+  const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
 
-  // Not logged in
-  if (!user) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/10">
-          <User className="h-10 w-10 text-accent" />
-        </div>
-        <h1 className="mt-6 text-xl font-bold text-text-primary">
-          Rejoins Paname Club
-        </h1>
-        <p className="mt-2 max-w-xs text-sm text-text-secondary">
-          Crée ton compte pour sauvegarder tes événements, recevoir des recommandations personnalisées et ne rien rater.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 hover:bg-accent/90 transition-all active:scale-[0.98]"
-        >
-          <Sparkles className="h-4 w-4" />
-          Se connecter / Créer un compte
-        </Link>
-      </div>
-    )
-  }
-
-  // Logged in
-  const avatarUrl =
-    user.user_metadata?.avatar_url || user.user_metadata?.picture
-  const displayName =
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email?.split('@')[0]
-
-  const MENU_ITEMS = [
-    {
-      href: '/compte/adn',
-      icon: Dna,
-      label: 'Mon ADN Paname',
-      desc: 'Profil culturel, badges, XP',
-      color: 'text-accent',
-    },
+  const links = [
     {
       href: '/compte/sauvegardes',
       icon: Bookmark,
-      label: 'Mes favoris',
-      desc: 'Événements sauvegardés',
-      color: 'text-blue-500',
+      label: 'Mes sorties',
+      desc: overview ? `${overview.upcomingSaved} à venir` : 'Tes événements gardés',
     },
-    {
-      href: '/drop',
-      icon: Gift,
-      label: 'Mon Drop hebdo',
-      desc: '5 sorties choisies pour toi',
-      color: 'text-neon',
-    },
-    {
-      href: '/match',
-      icon: Heart,
-      label: 'Match Culturel',
-      desc: 'Swipe et découvre',
-      color: 'text-pink-500',
-    },
-    {
-      href: '/quiz',
-      icon: Target,
-      label: 'Quiz — Tu préfères',
-      desc: 'Découvre ton profil culturel',
-      color: 'text-orange-500',
-    },
-    {
-      href: '/onboarding',
-      icon: Sparkles,
-      label: 'Mes goûts',
-      desc: 'Modifier mes préférences',
-      color: 'text-amber-500',
-    },
-    {
-      href: '/compte/parametres',
-      icon: Settings,
-      label: 'Paramètres',
-      desc: 'Notifications, email',
-      color: 'text-text-muted',
-    },
+    { href: '/compte/adn', icon: Dna, label: 'Mon ADN culturel', desc: archetype ? archetype.name : 'Ce que tu aimes vraiment' },
+    { href: '/club', icon: Sparkles, label: 'Le Club', desc: 'Match, quiz, Drop du lundi' },
+    { href: '/compte/parametres', icon: Settings, label: 'Préférences', desc: 'Catégories, ambiances, quartiers' },
   ]
 
   return (
-    <div className="px-4 py-8">
-      {/* Profile card */}
-      <div className="rounded-2xl border border-border bg-surface p-6">
-        <div className="flex items-center gap-4">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt=""
-              width={56}
-              height={56}
-              className="rounded-full"
-            />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10">
-              <User className="h-7 w-7 text-accent" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold text-text-primary">{displayName}</h1>
-            <p className="text-sm text-text-muted">{user.email}</p>
-          </div>
+    <div className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:pt-12">
+      <header className="flex items-center gap-4">
+        <span
+          className="font-display flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent text-[2rem] text-paper"
+          aria-hidden
+        >
+          {name.charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0">
+          <h1 className="font-display truncate text-[2.6rem] text-ink">{name}</h1>
+          <p className="truncate text-[14px] text-text-secondary">
+            {user.email}
+            {overview?.memberSince && ` · membre depuis ${dateFmt.format(new Date(overview.memberSince))}`}
+          </p>
         </div>
-      </div>
+      </header>
 
-      {/* Menu items */}
-      <div className="mt-6 space-y-2">
-        {MENU_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-all hover:shadow-md hover:border-accent/20"
-          >
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-surface-hover">
-              <item.icon className={`h-5 w-5 ${item.color}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-text-primary">{item.label}</p>
-              <p className="text-xs text-text-muted">{item.desc}</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-text-muted" />
-          </Link>
-        ))}
-      </div>
+      {overview ? (
+        <>
+          <LevelMeter xp={overview.xp} className="mt-8 rounded-2xl border border-border bg-surface p-5" />
+          <StatTiles
+            className="mt-4"
+            items={[
+              { label: 'Sorties gardées', value: overview.stats.saves, href: '/compte/sauvegardes' },
+              { label: '« J’y vais »', value: overview.stats.attendances },
+              { label: 'Avis', value: overview.stats.reviews },
+              { label: 'Swipes', value: overview.stats.swipes, href: '/match' },
+            ]}
+          />
+        </>
+      ) : (
+        <DataUnavailable className="mt-8" />
+      )}
 
-      {/* Logout */}
-      <button
-        onClick={handleLogout}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm font-medium text-red-600 transition-all hover:bg-red-100"
-      >
-        <LogOut className="h-4 w-4" />
-        Se déconnecter
-      </button>
+      <nav aria-label="Mon compte" className="mt-8">
+        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+          {links.map((l) => {
+            const Icon = l.icon
+            return (
+              <li key={l.href}>
+                <Link href={l.href} className="flex min-h-[64px] items-center gap-4 px-5 py-3 transition-colors hover:bg-surface-hover">
+                  <Icon className="h-5 w-5 shrink-0 text-accent" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-ink">{l.label}</span>
+                    <span className="block truncate text-[13px] text-text-secondary">{l.desc}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+
+      {overview && (
+        <section aria-labelledby="badges-title" className="mt-10">
+          <h2 id="badges-title" className="font-display text-[2rem] text-ink">
+            Badges
+          </h2>
+          <BadgeGrid earned={overview.badges} stats={overview.stats} className="mt-4" />
+        </section>
+      )}
+
+      <div className="mt-10">
+        <LogoutButton />
+      </div>
     </div>
   )
 }

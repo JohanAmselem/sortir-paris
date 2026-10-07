@@ -1,42 +1,42 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
+import { SaveButton } from './save-button'
+import { ShareButton } from '@/components/ui/share-button'
+import { OutboundLink } from './outbound-link'
 
-interface StickyBookingCTAProps {
-  href: string
+interface EventActionBarProps {
+  eventId: string
+  title: string
+  href: string | null
   label: string
-  targetId: string
+  source: string
 }
 
-export function StickyBookingCTA({ href, label, targetId }: StickyBookingCTAProps) {
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const target = document.getElementById(targetId)
-    if (!target) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => setVisible(!entry.isIntersecting),
-      { threshold: 0 }
-    )
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [targetId])
-
-  if (!visible) return null
-
+/** Mobile action bar for the event page. Replaces the bottom navigation there. */
+export function EventActionBar({ eventId, title, href, label, source }: EventActionBarProps) {
   return (
-    <div className="fixed bottom-[4.5rem] left-0 right-0 z-40 border-t border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-lg md:hidden animate-slide-up">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-[14px] font-bold text-white shadow-lg shadow-accent/20 transition-all active:scale-[0.98]"
-      >
-        <ExternalLink className="h-4 w-4" />
-        {label}
-      </a>
+    <div className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:hidden">
+      <div className="flex items-center gap-2">
+        <SaveButton eventId={eventId} className="h-12 w-12 border border-border-strong bg-surface shadow-none" />
+        <ShareButton title={title} className="h-12 w-12 rounded-full" />
+        {href ? (
+          <OutboundLink
+            href={href}
+            eventId={eventId}
+            source={source}
+            kind="booking"
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-paper"
+          >
+            {label}
+            <ExternalLink className="h-4 w-4" aria-hidden />
+          </OutboundLink>
+        ) : (
+          <span className="flex h-12 flex-1 items-center justify-center rounded-full bg-paper-deep text-[14px] text-text-secondary">
+            Pas de lien de réservation
+          </span>
+        )}
+      </div>
     </div>
   )
 }

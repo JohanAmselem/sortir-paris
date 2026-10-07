@@ -1,103 +1,34 @@
-import { SectionRow } from '@/components/events/section-row'
-import { db, events, venues, categories, userPreferences } from '@sortir/db'
-import { eq, and, gte, desc, inArray, or, sql } from 'drizzle-orm'
+import { EventRail, SectionHeader } from '@/components/events/blocks'
+import { bucketNow } from '@/lib/events/query'
+import { getPersonalPicks } from '@/lib/recommendations'
 
 interface PourToiSectionProps {
-  userId: string
+  userId: string | null
+  /** Ids already shown on the page. */
+  excludeIds?: string[]
+  /** Time window (default: next 7 days). */
+  when?: string
+  className?: string
 }
 
-export async function PourToiSection({ userId }: PourToiSectionProps) {
-  // Fetch user preferences
-  const prefs = await db.query.userPreferences?.findFirst({
-    where: eq(userPreferences.userId, userId),
+/**
+ * « Pour toi »: personal picks (quiz profile, preferences, saves, swipes) with
+ * the reason of each pick. Server component; renders nothing when we know
+ * nothing about the person or when there is nothing to show, so it can be
+ * dropped anywhere (ideally inside <Suspense fallback={null}>).
+ */
+export async function PourToiSection({ userId, excludeIds, when = 'week', className }: PourToiSectionProps) {
+  if (!userId) return null
+  const picks = await getPersonalPicks({ userId, when, limit: 8, excludeIds }).catch((err) => {
+    console.error('[pour-toi] failed', err)
+    return null
   })
-
-  if (!prefs) return null
-
-  const now = new Date()
-  const conditions = [eq(events.status, 'active'), gte(events.startDate, now)]
-
-  // Filter by preferred categories
-  // Onboarding stores category slugs as text in a uuid[] column
-  // We match by joining categories and checking slugs
-  const prefCatSlugs = prefs.categories as unknown as string[]
-  if (prefCatSlugs && prefCatSlugs.length > 0) {
-    // Get category IDs from slugs
-    const matchingCats = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(inArray(categories.slug, prefCatSlugs))
-
-    if (matchingCats.length > 0) {
-      const catIds = matchingCats.map((c) => c.id)
-      conditions.push(inArray(events.categoryId, catIds))
-    }
-  }
-
-  // Filter by preferred zones (arrondissements)
-  const prefZones = prefs.zones
-  if (prefZones && prefZones.length > 0) {
-    // Zones are stored as e.g. ["9e-10e", "3e-4e", "5e-6e"]
-    // Need to expand to individual arrondissements
-    const arrondissements: string[] = []
-    for (const zone of prefZones) {
-      // Parse "9e-10e" → ["9e", "10e"]
-      const matches = zone.match(/\d+/g)
-      if (matches) {
-        for (const num of matches) {
-          arrondissements.push(`${num}e`)
-        }
-      }
-    }
-    if (arrondissements.length > 0) {
-      conditions.push(
-        or(...arrondissements.map((a) => eq(venues.arrondissement, a)))!
-      )
-    }
-  }
-
-  // Prefer free events if user prefers free
-  const orderBy = prefs.prefFree
-    ? [desc(events.isFree), desc(events.qualityScore)]
-    : [desc(events.qualityScore)]
-
-  let results = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(and(...conditions))
-    .orderBy(...orderBy)
-    .limit(12)
-
-  // Fallback: popular events if no personalized results
-  if (results.length < 3) {
-    results = await db
-      .select({ event: events, venue: venues, category: categories })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(eq(events.status, 'active'), gte(events.startDate, now)))
-      .orderBy(desc(sql`${events.saveCount} + ${events.viewCount}`))
-      .limit(12)
-  }
-
-  if (results.length === 0) return null
-
-  const mapped = results.map((r) => ({
-    ...r.event,
-    category: r.category,
-    venue: r.venue,
-    tags: [],
-    ambiances: [],
-  })) as never[]
+  if (!picks || !picks.plan.personalized || picks.events.length < 3) return null
 
   return (
-    <SectionRow
-      title="Pour toi"
-      icon="✨"
-      href="/evenements"
-      events={mapped}
-    />
+    <section aria-labelledby="pour-toi-title" className={className}>
+      <SectionHeader id="pour-toi-title" kicker="Choisi pour toi" title="Pour toi cette semaine" href="/drop" linkLabel="Ton drop" />
+      <EventRail events={picks.events} now={bucketNow()} className="mt-5" />
+    </section>
   )
 }

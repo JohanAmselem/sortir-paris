@@ -1,0 +1,13 @@
+[
+  {"_comment": "SYNTHETIC fixture hand-written from the Bandsintown API v3 documentation (artist events). Not real data.",
+   "id": "100000001", "artist_id": "1", "url": "https://www.bandsintown.com/e/100000001?app_id=x",
+   "on_sale_datetime": "2026-09-01T10:00:00", "datetime": "2026-11-14T20:00:00", "description": "",
+   "venue": {"name": "Salle Test", "latitude": "48.8822", "longitude": "2.3400", "city": "Paris", "region": "", "country": "France",
+             "street_address": "1 boulevard Test", "postal_code": "75009"},
+   "offers": [{"type": "Tickets", "url": "https://www.bandsintown.com/t/100000001?app_id=x", "status": "available"}],
+   "lineup": ["Groupe Test"]},
+  {"id": "100000002", "artist_id": "1", "url": "https://www.bandsintown.com/e/100000002?app_id=x",
+   "datetime": "2026-11-20T20:00:00", "description": "",
+   "venue": {"name": "Hall Test Lyon", "latitude": "45.7640", "longitude": "4.8357", "city": "Lyon", "region": "", "country": "France"},
+   "offers": [], "lineup": ["Groupe Test"]}
+]

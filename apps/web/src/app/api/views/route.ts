@@ -1,38 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, events, userViews } from '@sortir/db'
+import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
+import { db, events, userViews } from '@sortir/db'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
+import { errors, getSessionUser, idSchema, parseBody } from '@/app/club/_lib/api'
 
-// POST /api/views — Track an event view
+export const dynamic = 'force-dynamic'
+
+const BOT_UA =
+  /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|whatsapp|telegram|discord|preview|headless|lighthouse|pingdom|uptime|monitor|curl|wget|python-requests|httpclient|go-http|axios|node-fetch/i
+
+const bodySchema = z.object({ eventId: idSchema })
+
+// POST /api/views — count a view (no bots, once per IP + event per hour).
 export async function POST(request: NextRequest) {
-  const { eventId } = await request.json()
+  const ua = request.headers.get('user-agent') ?? ''
+  if (!ua || BOT_UA.test(ua)) return NextResponse.json({ ok: true, counted: false })
 
-  if (!eventId) {
-    return NextResponse.json({ error: 'eventId required' }, { status: 400 })
-  }
+  const ip = clientIp(request.headers)
+  // Global burst protection per IP, then per-event dedupe.
+  if (!rateLimit(`views:${ip}`, 120, 60_000).ok) return NextResponse.json({ ok: true, counted: false })
 
-  // Increment viewCount on the event (works for all users, even anonymous)
-  await db
-    .update(events)
-    .set({ viewCount: sql`${events.viewCount} + 1` })
-    .where(eq(events.id, eventId))
+  const body = await parseBody(request, bodySchema)
+  if (!body.ok) return body.response
+  const { eventId } = body.data
 
-  // If user is logged in, also track in user_views
+  if (!rateLimit(`view:${ip}:${eventId}`, 1, 3600_000).ok) return NextResponse.json({ ok: true, counted: false })
+
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const updated = await db
+      .update(events)
+      .set({ viewCount: sql`${events.viewCount} + 1` })
+      .where(eq(events.id, eventId))
+      .returning({ id: events.id })
+    if (!updated.length) return errors.notFound('Événement introuvable.')
 
+    const user = await getSessionUser()
     if (user) {
-      await db.insert(userViews).values({
-        userId: user.id,
-        eventId,
-      })
+      // Member history (best effort: the users row may not exist yet).
+      await db
+        .insert(userViews)
+        .values({ userId: user.id, eventId })
+        .catch(() => {})
     }
-  } catch {
-    // Auth errors are non-critical for view tracking
+    return NextResponse.json({ ok: true, counted: true })
+  } catch (err) {
+    console.error('[api/views] failed', err)
+    return errors.server()
   }
-
-  return NextResponse.json({ ok: true })
 }

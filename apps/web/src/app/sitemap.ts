@@ -1,137 +1,42 @@
 import type { MetadataRoute } from 'next'
-import { db, events, venues, categories, articles } from '@sortir/db'
-import { eq, desc, gte, and } from 'drizzle-orm'
+import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
+import { COLLECTIONS } from '@/lib/collections'
+import { getActiveVenues } from '@/lib/venues'
+import { SITE_URL } from '@/lib/site'
 
-export const revalidate = 3600 // Regenerate every hour
+export const revalidate = 3600
 
+/**
+ * Hub pages + venues with upcoming events. Events live in /sitemap-events.xml
+ * (with their real lastmod). No lastModified on hub pages: a fake "now" teaches
+ * Google to ignore the signal.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.panameclub.fr'
-  const now = new Date()
-
-  // Static pages
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
-    { url: `${baseUrl}/evenements`, lastModified: now, changeFrequency: 'hourly', priority: 0.9 },
-    { url: `${baseUrl}/ce-soir`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    { url: `${baseUrl}/ce-week-end`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    { url: `${baseUrl}/gratuit`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
-    { url: `${baseUrl}/carte`, lastModified: now, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${baseUrl}/surprise`, lastModified: now, changeFrequency: 'daily', priority: 0.6 },
-    { url: `${baseUrl}/top`, lastModified: now, changeFrequency: 'hourly', priority: 0.8 },
-    { url: `${baseUrl}/match`, lastModified: now, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${baseUrl}/drop`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
-    { url: `${baseUrl}/quiz`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${baseUrl}/collections`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
-    { url: `${baseUrl}/lieux`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
-    { url: `${baseUrl}/news`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
-    { url: `${baseUrl}/newsletter`, lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
+  const hubs: MetadataRoute.Sitemap = [
+    { url: SITE_URL, changeFrequency: 'hourly', priority: 1 },
+    { url: `${SITE_URL}/ce-soir`, changeFrequency: 'hourly', priority: 0.9 },
+    { url: `${SITE_URL}/ce-week-end`, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE_URL}/gratuit`, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${SITE_URL}/evenements`, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${SITE_URL}/carte`, changeFrequency: 'daily', priority: 0.6 },
+    { url: `${SITE_URL}/collections`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${SITE_URL}/lieux`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${SITE_URL}/club`, changeFrequency: 'weekly', priority: 0.4 },
+    { url: `${SITE_URL}/news`, changeFrequency: 'weekly', priority: 0.4 },
+    ...CATEGORIES.map((c) => ({ url: `${SITE_URL}/categories/${c.slug}`, changeFrequency: 'daily' as const, priority: 0.8 })),
+    ...ARRONDISSEMENTS.map((a) => ({ url: `${SITE_URL}/paris/${a}`, changeFrequency: 'daily' as const, priority: 0.7 })),
+    ...COLLECTIONS.map((c) => ({ url: `${SITE_URL}/collections/${c.slug}`, changeFrequency: 'daily' as const, priority: 0.6 })),
   ]
 
-  // Collection pages
-  const collectionSlugs = [
-    'expos-printemps', 'sorties-gratuites', 'concerts-jazz',
-    'theatre-comedie', 'sorties-en-famille', 'soirees-dansantes',
-  ]
-  const collectionPages: MetadataRoute.Sitemap = collectionSlugs.map((slug) => ({
-    url: `${baseUrl}/collections/${slug}`,
-    lastModified: now,
-    changeFrequency: 'weekly' as const,
-    priority: 0.6,
-  }))
-
-  // Category pages
-  let categoryPages: MetadataRoute.Sitemap = []
-  try {
-    const cats = await db.select({ slug: categories.slug }).from(categories)
-    categoryPages = cats.map((cat) => ({
-      url: `${baseUrl}/categories/${cat.slug}`,
-      lastModified: now,
-      changeFrequency: 'daily' as const,
-      priority: 0.7,
-    }))
-  } catch {
-    // DB unavailable, skip
-  }
-
-  // Arrondissement pages
-  const arrondissements = Array.from({ length: 20 }, (_, i) => {
-    const n = i + 1
-    return n === 1 ? '1er' : `${n}e`
-  })
-  const arrPages: MetadataRoute.Sitemap = arrondissements.map((arr) => ({
-    url: `${baseUrl}/paris/${arr}`,
-    lastModified: now,
-    changeFrequency: 'daily' as const,
-    priority: 0.6,
-  }))
-
-  // Active events (top 2000 by quality)
-  let eventPages: MetadataRoute.Sitemap = []
-  try {
-    const activeEvents = await db
-      .select({ slug: events.slug, updatedAt: events.updatedAt })
-      .from(events)
-      .where(and(eq(events.status, 'active'), gte(events.startDate, now)))
-      .orderBy(desc(events.qualityScore))
-      .limit(2000)
-
-    eventPages = activeEvents.map((e) => ({
-      url: `${baseUrl}/evenements/${e.slug}`,
-      lastModified: e.updatedAt ?? now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.5,
-    }))
-  } catch {
-    // DB unavailable, skip
-  }
-
-  // Venues with events
   let venuePages: MetadataRoute.Sitemap = []
   try {
-    const activeVenues = await db
-      .select({ slug: venues.slug })
-      .from(venues)
-      .limit(500)
-
-    venuePages = activeVenues
-      .filter((v) => v.slug)
-      .map((v) => ({
-        url: `${baseUrl}/lieux/${v.slug}`,
-        lastModified: now,
-        changeFrequency: 'weekly' as const,
-        priority: 0.4,
-      }))
+    const venues = await getActiveVenues(2000)
+    venuePages = venues
+      .filter((v) => v.upcoming >= 1)
+      .map((v) => ({ url: `${SITE_URL}/lieux/${v.slug}`, changeFrequency: 'weekly' as const, priority: 0.5 }))
   } catch {
-    // DB unavailable, skip
+    // Keep the hub pages if the DB is unavailable.
   }
 
-  // Published articles
-  let articlePages: MetadataRoute.Sitemap = []
-  try {
-    const publishedArticles = await db
-      .select({ slug: articles.slug, updatedAt: articles.updatedAt })
-      .from(articles)
-      .where(eq(articles.status, 'published'))
-      .orderBy(desc(articles.publishedAt))
-      .limit(500)
-
-    articlePages = publishedArticles.map((a) => ({
-      url: `${baseUrl}/news/${a.slug}`,
-      lastModified: a.updatedAt ?? now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.6,
-    }))
-  } catch {
-    // DB unavailable, skip
-  }
-
-  return [
-    ...staticPages,
-    ...collectionPages,
-    ...categoryPages,
-    ...arrPages,
-    ...eventPages,
-    ...venuePages,
-    ...articlePages,
-  ]
+  return [...hubs, ...venuePages]
 }

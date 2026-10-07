@@ -1,0 +1,94 @@
+{
+  "_comment": "SYNTHETIC fixture hand-written from the Ticketmaster Discovery API v2 documentation (event search response shape). Not real data.",
+  "_embedded": {
+    "events": [
+      {
+        "name": "Concert Test Orchestre",
+        "type": "event",
+        "id": "Z698xZ2qZaaaA",
+        "url": "https://www.ticketmaster.fr/fr/manifestation/concert-test-billet/idmanif/000001",
+        "locale": "fr-fr",
+        "info": "Description du concert (synthétique).",
+        "images": [
+          {"ratio": "3_2", "url": "https://s1.ticketm.net/dam/a/aaa/3_2_640.jpg", "width": 640, "height": 427, "fallback": false},
+          {"ratio": "16_9", "url": "https://s1.ticketm.net/dam/a/aaa/16_9_640.jpg", "width": 640, "height": 360, "fallback": false},
+          {"ratio": "16_9", "url": "https://s1.ticketm.net/dam/a/aaa/16_9_2048.jpg", "width": 2048, "height": 1152, "fallback": false}
+        ],
+        "dates": {
+          "start": {"localDate": "2026-11-20", "localTime": "20:00:00", "dateTime": "2026-11-20T19:00:00Z", "dateTBD": false, "dateTBA": false, "timeTBA": false, "noSpecificTime": false},
+          "timezone": "Europe/Paris",
+          "status": {"code": "onsale"},
+          "spanMultipleDays": false
+        },
+        "classifications": [
+          {"primary": true, "segment": {"id": "KZFzniwnSyZfZ7v7nJ", "name": "Music"}, "genre": {"id": "KnvZfZ7vAeA", "name": "Rock"}, "subGenre": {"id": "KZazBEonSMnZfZ7v6dt", "name": "Alternative Rock"}}
+        ],
+        "priceRanges": [{"type": "standard", "currency": "EUR", "min": 35.5, "max": 79.0}],
+        "_embedded": {
+          "venues": [
+            {"name": "Salle Test Paris", "type": "venue", "id": "KovZ9177aaa", "locale": "fr-fr", "postalCode": "75019",
+             "timezone": "Europe/Paris", "city": {"name": "Paris"}, "country": {"name": "France", "countryCode": "FR"},
+             "address": {"line1": "1 rue de Test"}, "location": {"longitude": "2.3933", "latitude": "48.8944"}}
+          ],
+          "attractions": [{"name": "Artiste Test", "type": "attraction", "id": "K8vZ917aaa"}]
+        }
+      },
+      {
+        "name": "Pièce de théâtre test",
+        "type": "event",
+        "id": "Z698xZ2qZaaaB",
+        "url": "https://www.ticketmaster.fr/fr/manifestation/piece-test-billet/idmanif/000002",
+        "images": [{"ratio": "16_9", "url": "https://s1.ticketm.net/dam/a/bbb/16_9_1024.jpg", "width": 1024, "height": 576}],
+        "dates": {
+          "start": {"localDate": "2026-12-05", "dateTBD": false, "dateTBA": false, "timeTBA": true, "noSpecificTime": false},
+          "status": {"code": "cancelled"}
+        },
+        "classifications": [
+          {"primary": true, "segment": {"name": "Arts & Theatre"}, "genre": {"name": "Theatre"}, "subGenre": {"name": "Comedy"}}
+        ],
+        "_embedded": {
+          "venues": [
+            {"name": "Théâtre Test", "postalCode": "92100", "city": {"name": "Boulogne-Billancourt"},
+             "address": {"line1": "2 avenue Test"}}
+          ]
+        }
+      },
+      {
+        "name": "Ballet test",
+        "type": "event",
+        "id": "Z698xZ2qZaaaC",
+        "url": "https://www.ticketmaster.fr/fr/manifestation/ballet-test-billet/idmanif/000003",
+        "dates": {
+          "start": {"localDate": "2026-12-10", "localTime": "19:30:00", "dateTBD": false, "dateTBA": false, "timeTBA": false, "noSpecificTime": false},
+          "status": {"code": "onsale"}
+        },
+        "classifications": [{"primary": true, "segment": {"name": "Arts & Theatre"}, "genre": {"name": "Dance"}}],
+        "priceRanges": [{"type": "standard", "currency": "EUR", "min": 25, "max": 25}],
+        "_embedded": {"venues": [{"name": "Opéra Test", "postalCode": "75012", "city": {"name": "Paris"},
+                                  "location": {"longitude": "2.3700", "latitude": "48.8530"}}]}
+      },
+      {
+        "name": "Match de football test",
+        "type": "event",
+        "id": "Z698xZ2qZaaaD",
+        "url": "https://www.ticketmaster.fr/fr/manifestation/match-test/idmanif/000004",
+        "dates": {"start": {"localDate": "2026-11-22", "localTime": "21:00:00", "dateTime": "2026-11-22T20:00:00Z"}, "status": {"code": "onsale"}},
+        "classifications": [{"primary": true, "segment": {"name": "Sports"}, "genre": {"name": "Soccer"}}],
+        "_embedded": {"venues": [{"name": "Stade Test", "postalCode": "93200", "city": {"name": "Saint-Denis"},
+                                  "location": {"longitude": "2.3601", "latitude": "48.9244"}}]}
+      },
+      {
+        "name": "Concert hors Île-de-France test",
+        "type": "event",
+        "id": "Z698xZ2qZaaaE",
+        "url": "https://www.ticketmaster.fr/fr/manifestation/concert-rouen-test/idmanif/000005",
+        "dates": {"start": {"localDate": "2026-11-25", "localTime": "20:00:00", "dateTime": "2026-11-25T19:00:00Z"}, "status": {"code": "onsale"}},
+        "classifications": [{"primary": true, "segment": {"name": "Music"}, "genre": {"name": "Pop"}}],
+        "_embedded": {"venues": [{"name": "Salle Rouen Test", "postalCode": "76000", "city": {"name": "Rouen"},
+                                  "location": {"longitude": "1.0993", "latitude": "49.4431"}}]}
+      }
+    ]
+  },
+  "_links": {"self": {"href": "/discovery/v2/events.json?page=0&size=200"}},
+  "page": {"size": 200, "totalElements": 5, "totalPages": 1, "number": 0}
+}

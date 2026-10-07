@@ -44,11 +44,16 @@ const schema = {
   ...tasteProfileSchema,
 }
 
+// Pool sizing: Vercel Fluid compute shares one instance between concurrent
+// requests, so a pool of 3 queued requests forever when a connection stalled.
+// Connections are recycled; the server-side statement_timeout is set on the
+// role (see packages/db/sql/0004) because Supavisor drops startup parameters.
 const client = postgres(connectionString, {
-  prepare: false,
-  connect_timeout: 10,
+  prepare: false, // required by the Supavisor transaction pooler
+  connect_timeout: 5,
   idle_timeout: 20,
-  max: 3,
+  max_lifetime: 60 * 10,
+  max: Number(process.env.DB_POOL_MAX ?? 8),
   connection: {
     application_name: 'panameclub-web',
   },

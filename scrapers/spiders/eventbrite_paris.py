@@ -1,381 +1,323 @@
 """
 Eventbrite Paris spider.
-Source: https://www.eventbrite.fr/d/france--paris/events/
-Major event ticketing platform — concerts, soirées, ateliers, expos, sport.
+Source: https://www.eventbrite.fr/d/france--paris/<category>--events/
 
-Scrapes listings via embedded JSON-LD structured data and HTML fallback.
-Multiple category pages for broad coverage.
+Legal basis: public structured data embedded in the public listing pages
+(window.__SERVER_DATA__ JSON + schema.org JSON-LD) and schema.org JSON-LD on event
+pages (prices: AggregateOffer lowPrice/highPrice).
+
+Filters (pure functions, tested):
+- geography: Île-de-France only — venue lat/lng in the IDF bbox, else postcode prefix
+  75/77/78/91/92/93/94/95; events with no location at all are dropped; online → dropped.
+- off-topic: is_off_topic(title, desc) drops business/career/finance events.
+Dates: start_date + start_time are local to the event timezone (Europe/Paris);
+no time (or hide_start_date) → time unknown, never midnight UTC.
 """
 
-import httpx
-import re
-import json
-from datetime import datetime
-from typing import Generator, Optional
-from bs4 import BeautifulSoup
+from __future__ import annotations
 
+import json
+import re
+from datetime import date, datetime
+from typing import Generator, List, Optional
+from zoneinfo import ZoneInfo
+
+from unidecode import unidecode
+
+from utils.dates import PARIS
+from utils.event import make_event
+from utils.http import BudgetExceeded, PoliteClient
+from utils.jsonld import event_from_jsonld, extract_jsonld, iter_events
 from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    parse_price,
-    detect_category,
-    compute_quality_score,
+    IDF_DEPARTMENTS,
+    UNKNOWN_PRICE,
+    extract_zip,
+    in_idf,
+    price_from_numbers,
+    price_from_offers,
 )
 
+SOURCE = "eventbrite"
 BASE_URL = "https://www.eventbrite.fr"
 
-# Category-specific listing URLs for comprehensive coverage
-LISTING_URLS = [
-    "/d/france--paris/events/",
-    "/d/france--paris/music--events/",
-    "/d/france--paris/performing-arts--events/",
-    "/d/france--paris/arts--events/",
-    "/d/france--paris/nightlife--events/",
-    "/d/france--paris/film-and-media--events/",
-    "/d/france--paris/sports-and-fitness--events/",
-    "/d/france--paris/food-and-drink--events/",
+# (listing path, explicit category or None = detect from Eventbrite format/title)
+LISTINGS = [
+    ("/d/france--paris/music--events/", "concerts"),
+    ("/d/france--paris/performing-arts--events/", None),
+    ("/d/france--paris/arts--events/", None),
+    ("/d/france--paris/film-and-media--events/", "cinema"),
+    ("/d/france--paris/nightlife--events/", None),
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "fr-FR,fr;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+# Eventbrite "format" tag → our category (overrides the listing category)
+FORMAT_MAP = {
+    "screening": "cinema",
+    "class, training, or workshop": "ateliers",
+    "conference": "conferences",
+    "seminar or talk": "conferences",
+    "festival or fair": "festivals",
+    "tour": "visites",
 }
 
+# ───────────────────────────── filters ─────────────────────────────
 
-def fetch_events(max_pages: int = 5) -> Generator[dict, None, None]:
-    """Fetch events from Eventbrite Paris."""
+_OFF_TOPIC_RE = re.compile(
+    r"\b("
+    r"career fair|job fair|job dating|jobdating|salon de l.?emploi|forum (?:de l.?)?emploi|"
+    r"recrutement|recruitment|recruiting|hiring|"
+    r"networking|business|entrepreneur\w*|investor\w*|investisseur\w*|startup pitch|pitch night|"
+    r"webinar|webinaire|formation certifiante|certification|masterclass business|"
+    r"crypto\w*|bitcoin|ethereum|web3|blockchain|nft|trading|forex|"
+    r"immobilier|real estate|leadership|marketing digital|growth hacking|"
+    r"speed.?dating"
+    r")\b"
+)
 
-    seen_slugs = set()
 
-    for listing_path in LISTING_URLS:
-        for page in range(1, max_pages + 1):
-            url = f"{BASE_URL}{listing_path}"
-            if page > 1:
-                url += f"?page={page}"
+def is_off_topic(title: Optional[str], desc: Optional[str] = None) -> bool:
+    """True for business / career / finance events that are not cultural outings."""
+    text = unidecode(f"{title or ''} {desc or ''}").lower()
+    return bool(_OFF_TOPIC_RE.search(text))
 
-            cat_name = listing_path.split("/")[-2] if listing_path != "/d/france--paris/events/" else "all"
-            print(f"  Fetching Eventbrite {cat_name} page {page}...")
 
-            try:
-                resp = httpx.get(url, headers=HEADERS, timeout=30, follow_redirects=True)
-                resp.raise_for_status()
-            except Exception as e:
-                print(f"  Error: {e}")
-                break
+def in_paris_region(lat=None, lng=None, zip_code: Optional[str] = None) -> bool:
+    """IDF check: geo first (when present), else postcode prefix. No location → False."""
+    try:
+        has_geo = lat not in (None, "") and lng not in (None, "") and float(lat) and float(lng)
+    except (TypeError, ValueError):
+        has_geo = False
+    if has_geo:
+        return in_idf(lat, lng)
+    z = str(zip_code or "").strip()
+    return bool(re.match(r"^\d{5}$", z)) and z[:2] in IDF_DEPARTMENTS
 
-            soup = BeautifulSoup(resp.text, "html.parser")
-            count = 0
 
-            # Strategy 1: Extract from JSON-LD
-            for script in soup.select('script[type="application/ld+json"]'):
-                try:
-                    data = json.loads(script.string or "")
-                    events_data = []
-                    if isinstance(data, list):
-                        events_data = data
-                    elif isinstance(data, dict):
-                        if data.get("@type") == "Event":
-                            events_data = [data]
-                        elif "itemListElement" in data:
-                            events_data = [item.get("item", item) for item in data["itemListElement"] if isinstance(item, dict)]
+# ───────────────────────────── parsing ─────────────────────────────
 
-                    for ev in events_data:
-                        if ev.get("@type") != "Event":
-                            continue
-                        event = parse_jsonld_event(ev)
-                        if event and event["slug"] not in seen_slugs:
-                            seen_slugs.add(event["slug"])
-                            yield event
-                            count += 1
-                except (json.JSONDecodeError, TypeError):
-                    continue
+_SERVER_DATA_RE = re.compile(r"window\.__SERVER_DATA__\s*=\s*(\{.*?\});\s*\n", re.S)
 
-            # Strategy 2: Extract from __SERVER_DATA__
-            if count == 0:
-                for script in soup.select("script"):
-                    text = script.string or ""
-                    if "__SERVER_DATA__" in text or "window.__NEXT_DATA__" in text:
+
+def _server_data(html: str) -> Optional[dict]:
+    m = _SERVER_DATA_RE.search(html or "")
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
+
+
+def _local(d: Optional[str], t: Optional[str], tz: Optional[str]):
+    """Eventbrite local date + optional HH:MM in the event timezone → datetime/date."""
+    if not d:
+        return None
+    try:
+        day = date.fromisoformat(d)
+    except ValueError:
+        return None
+    if not t:
+        return day
+    try:
+        hh, mm = (int(x) for x in t.split(":")[:2])
+        zone = ZoneInfo(tz) if tz else PARIS
+    except Exception:
+        return day
+    return datetime(day.year, day.month, day.day, hh, mm, tzinfo=zone)
+
+
+def _tags(result: dict) -> dict:
+    out = {"category": None, "subcategory": None, "format": None, "organizer": []}
+    for t in result.get("tags") or []:
+        prefix, name = t.get("prefix"), t.get("display_name")
+        if prefix == "EventbriteCategory":
+            out["category"] = name
+        elif prefix == "EventbriteSubCategory":
+            out["subcategory"] = name
+        elif prefix == "EventbriteFormat":
+            out["format"] = name
+        elif prefix == "OrganizerTag" and name:
+            out["organizer"].append(name)
+    return out
+
+
+def _ticket_price(result: dict) -> dict:
+    ta = result.get("ticket_availability") or {}
+    if not isinstance(ta, dict) or not ta:
+        return dict(UNKNOWN_PRICE)
+    lo, hi = ta.get("minimum_ticket_price") or {}, ta.get("maximum_ticket_price") or {}
+    if (lo.get("currency") or "EUR") != "EUR":
+        return dict(UNKNOWN_PRICE)
+    if ta.get("is_free") is True:
+        return price_from_numbers(0)
+    return price_from_numbers(lo.get("major_value"), hi.get("major_value"))
+
+
+def event_from_result(result: dict, category_slug: Optional[str] = None) -> Optional[dict]:
+    """One __SERVER_DATA__ search result → event dict, or None if filtered out."""
+    title = result.get("name")
+    if not title or result.get("is_online_event"):
+        return None
+    desc = result.get("summary") or result.get("full_description")
+    if is_off_topic(title, desc):
+        return None
+
+    venue = result.get("primary_venue") or {}
+    addr = venue.get("address") or {}
+    lat, lng = addr.get("latitude"), addr.get("longitude")
+    zip_code = addr.get("postal_code") or extract_zip(addr.get("localized_address_display"))
+    if not in_paris_region(lat, lng, zip_code):
+        return None
+
+    tz = result.get("timezone") or "Europe/Paris"
+    start = None if result.get("hide_start_date") else _local(result.get("start_date"), result.get("start_time"), tz)
+    if start is None:
+        return None
+    end = None if result.get("hide_end_date") else _local(result.get("end_date"), result.get("end_time"), tz)
+
+    tags = _tags(result)
+    cat = FORMAT_MAP.get((tags["format"] or "").lower()) or category_slug
+    image = (result.get("image") or {})
+    image_url = (image.get("original") or {}).get("url") or image.get("url")
+    eid = result.get("eventbrite_event_id") or result.get("id")
+    url = result.get("url")
+
+    return make_event(
+        source=SOURCE,
+        source_id=f"eb-{eid}" if eid else None,
+        title=title,
+        start=start,
+        end=end,
+        description=desc,
+        image_url=image_url,
+        price=_ticket_price(result),
+        booking_url=url,
+        source_url=url,
+        venue_name=venue.get("name"),
+        venue_address=addr.get("address_1"),
+        venue_city=addr.get("city"),
+        venue_zip=zip_code,
+        venue_lat=lat,
+        venue_lng=lng,
+        category_slug=cat,
+        category_raw=tags["subcategory"] or tags["category"],
+        tags=[x for x in (tags["category"], tags["subcategory"], tags["format"]) if x] + tags["organizer"][:5],
+        event_status="cancelled" if result.get("is_cancelled") else "scheduled",
+        is_online=False,
+    )
+
+
+def _jsonld_fallback(html: str, category_slug: Optional[str]) -> List[dict]:
+    out = []
+    for obj in iter_events(extract_jsonld(html)):
+        if is_off_topic(obj.get("name"), obj.get("description")):
+            continue
+        ev = event_from_jsonld(obj, source=SOURCE, base_url=BASE_URL, category_slug=category_slug)
+        if not ev or ev["is_online"]:
+            continue
+        if not in_paris_region(ev["venue_lat"], ev["venue_lng"], ev["venue_zip"]):
+            continue
+        m = re.search(r"-(\d{6,})(?:[/?]|$)", ev["source_url"] or "")
+        if m:
+            ev["source_id"] = f"eb-{m.group(1)}"
+        out.append(ev)
+    return out
+
+
+def parse_listing(html: str, category_slug: Optional[str] = None) -> List[dict]:
+    """Listing page → filtered event dicts (deduplicated by Eventbrite id)."""
+    data = _server_data(html)
+    results: List[dict] = []
+    if data:
+        for block in (data.get("event_data") or {}).values():
+            if isinstance(block, dict):
+                results.extend(((block.get("events") or {}).get("results")) or [])
+    if not results:
+        return _jsonld_fallback(html, category_slug)
+    out, seen = [], set()
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        eid = r.get("eventbrite_event_id") or r.get("id")
+        if eid in seen:
+            continue
+        seen.add(eid)
+        try:
+            ev = event_from_result(r, category_slug)
+        except Exception as e:
+            print(f"  [{SOURCE}] bad result {eid}: {e}")
+            continue
+        if ev:
+            out.append(ev)
+    return out
+
+
+def has_next_page(html: str) -> bool:
+    data = _server_data(html) or {}
+    for block in (data.get("event_data") or {}).values():
+        pag = ((block or {}).get("events") or {}).get("pagination") or {}
+        if pag.get("continuation"):
+            return True
+    return bool(data.get("rel_next_cat_browse"))
+
+
+def parse_detail(html: str) -> dict:
+    """Event page JSON-LD → {'price': dict, 'start': str|None, 'end': str|None, 'cancelled': bool}."""
+    for obj in iter_events(extract_jsonld(html)):
+        return {
+            "price": price_from_offers(obj.get("offers")),
+            "start": obj.get("startDate"),
+            "end": obj.get("endDate"),
+            "cancelled": "cancel" in str(obj.get("eventStatus") or "").lower(),
+        }
+    return {"price": dict(UNKNOWN_PRICE), "start": None, "end": None, "cancelled": False}
+
+
+def apply_detail(ev: dict, info: dict) -> dict:
+    """Merge the event page's price/status (and exact start with offset) into a listing event."""
+    if ev["price_status"] == "unknown" and info["price"]["price_status"] != "unknown":
+        ev.update({k: info["price"][k] for k in ("price_min", "price_max", "is_free", "price_status")})
+    if info["cancelled"]:
+        ev["event_status"] = "cancelled"
+    if info["start"] and not ev["time_known"]:
+        from utils.dates import normalize_when
+
+        iso, tk = normalize_when(info["start"])
+        if iso and tk:
+            ev["start_date"], ev["time_known"] = iso, True
+    return ev
+
+
+# ───────────────────────────── network ─────────────────────────────
+
+def fetch_events(max_pages: int = 5, fetch_details: bool = True, max_details: int = 200) -> Generator[dict, None, None]:
+    """Listing pages (8–20 events each) + event pages for prices (bounded by max_details)."""
+    seen: set = set()
+    details = 0
+    with PoliteClient() as client:
+        for path, category in LISTINGS:
+            for page in range(1, max_pages + 1):
+                url = f"{BASE_URL}{path}" + (f"?page={page}" if page > 1 else "")
+                html = client.get_text(url)
+                if html is None:
+                    if not seen and path == LISTINGS[0][0] and page == 1:
+                        print(f"  [{SOURCE}] blocked: {url} unreachable")
+                        return
+                    break
+                evs = parse_listing(html, category)
+                new = [e for e in evs if e["source_id"] not in seen]
+                for ev in new:
+                    seen.add(ev["source_id"])
+                    if fetch_details and details < max_details and ev["source_url"]:
+                        details += 1
                         try:
-                            json_match = re.search(r'=\s*({.+?})\s*;?\s*$', text, re.DOTALL)
-                            if json_match:
-                                server_data = json.loads(json_match.group(1))
-                                for event in extract_from_server_data(server_data, seen_slugs):
-                                    yield event
-                                    count += 1
-                        except (json.JSONDecodeError, TypeError):
-                            continue
-
-            # Strategy 3: Parse HTML cards
-            if count == 0:
-                cards = soup.select("[class*='event-card'], [class*='eds-card'], article, [data-testid*='event']")
-                for card in cards:
-                    try:
-                        event = parse_html_card(card)
-                        if event and event["slug"] not in seen_slugs:
-                            seen_slugs.add(event["slug"])
-                            yield event
-                            count += 1
-                    except Exception:
-                        continue
-
-            print(f"  Found {count} events")
-            if count == 0:
-                break
-
-
-def parse_jsonld_event(data: dict) -> Optional[dict]:
-    """Parse a JSON-LD Event object."""
-    title = data.get("name", "")
-    if not title or len(title) < 3:
-        return None
-
-    description = clean_text(data.get("description", ""))
-    image_url = None
-    if data.get("image"):
-        img = data["image"]
-        if isinstance(img, list):
-            image_url = img[0] if img else None
-        elif isinstance(img, str):
-            image_url = img
-        elif isinstance(img, dict):
-            image_url = img.get("url")
-
-    # Dates
-    start_date = data.get("startDate")
-    end_date = data.get("endDate")
-    if start_date:
-        try:
-            start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00")).isoformat()
-        except (ValueError, AttributeError):
-            pass
-
-    if end_date:
-        try:
-            end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00")).isoformat()
-        except (ValueError, AttributeError):
-            end_date = None
-
-    # Location
-    venue_name = None
-    venue_address = None
-    venue_city = "Paris"
-    venue_zip = None
-    venue_lat = None
-    venue_lng = None
-    arrondissement = None
-
-    location = data.get("location", {})
-    if isinstance(location, dict):
-        venue_name = location.get("name")
-        address = location.get("address", {})
-        if isinstance(address, dict):
-            venue_address = address.get("streetAddress")
-            venue_city = address.get("addressLocality", "Paris")
-            venue_zip = address.get("postalCode")
-        elif isinstance(address, str):
-            venue_address = address
-        geo = location.get("geo", {})
-        if isinstance(geo, dict):
-            venue_lat = geo.get("latitude")
-            venue_lng = geo.get("longitude")
-
-    if venue_zip and re.match(r"750\d{2}", venue_zip):
-        arr_num = int(venue_zip[-2:])
-        if 1 <= arr_num <= 20:
-            arrondissement = f"{arr_num}e"
-    elif venue_address:
-        arr_match = re.search(r"750(\d{2})", venue_address)
-        if arr_match:
-            arr_num = int(arr_match.group(1))
-            if 1 <= arr_num <= 20:
-                arrondissement = f"{arr_num}e"
-
-    # Price
-    price_min = 0
-    price_max = 0
-    is_free = False
-    offers = data.get("offers", {})
-    if isinstance(offers, dict):
-        price_val = offers.get("price")
-        if price_val is not None:
-            try:
-                price_min = int(float(price_val) * 100)
-                price_max = price_min
-            except (ValueError, TypeError):
-                pass
-        if offers.get("priceCurrency") == "EUR" and price_min == 0:
-            is_free = True
-    elif isinstance(offers, list):
-        prices = []
-        for offer in offers:
-            p = offer.get("price")
-            if p is not None:
-                try:
-                    prices.append(int(float(p) * 100))
-                except (ValueError, TypeError):
-                    pass
-        if prices:
-            price_min = min(prices)
-            price_max = max(prices)
-            is_free = price_min == 0
-        else:
-            is_free = True
-
-    event_url = data.get("url", "")
-    category_slug = detect_category(None, title, description)
-
-    slug = generate_slug(title, start_date)
-    quality = compute_quality_score(
-        title=title, description=description, image_url=image_url,
-        start_date=start_date, price_raw=str(price_min) if price_min else None,
-        booking_url=event_url,
-    )
-
-    # Extract source_id from URL
-    source_id = slug
-    id_match = re.search(r"-(\d+)(?:\?|$)", event_url)
-    if id_match:
-        source_id = f"eb-{id_match.group(1)}"
-
-    return {
-        "title": title, "slug": slug, "description": description,
-        "short_desc": truncate(description),
-        "image_url": image_url, "start_date": start_date, "end_date": end_date,
-        "price_min": price_min, "price_max": price_max, "is_free": is_free,
-        "booking_url": event_url, "source": "eventbrite",
-        "source_url": event_url, "source_id": source_id,
-        "venue_name": venue_name, "venue_address": venue_address,
-        "venue_city": venue_city, "venue_zip": venue_zip,
-        "venue_arrondissement": arrondissement,
-        "venue_lat": venue_lat, "venue_lng": venue_lng,
-        "raw_category": None, "category_slug": category_slug,
-        "tags": [], "quality_score": quality,
-    }
-
-
-def extract_from_server_data(data: dict, seen_slugs: set) -> Generator[dict, None, None]:
-    """Recursively search server data for event objects."""
-
-    def find_events(obj, depth=0):
-        if depth > 10:
-            return
-        if isinstance(obj, dict):
-            if obj.get("@type") == "Event" or (obj.get("name") and obj.get("startDate")):
-                event = parse_jsonld_event(obj)
-                if event and event["slug"] not in seen_slugs:
-                    seen_slugs.add(event["slug"])
-                    yield event
-            else:
-                for v in obj.values():
-                    yield from find_events(v, depth + 1)
-        elif isinstance(obj, list):
-            for item in obj:
-                yield from find_events(item, depth + 1)
-
-    yield from find_events(data)
-
-
-def parse_html_card(card) -> Optional[dict]:
-    """Fallback: parse an HTML event card."""
-    # Title
-    title_el = card.select_one("h2, h3, [class*='title']")
-    if not title_el:
-        return None
-    title = clean_text(title_el.get_text())
-    if not title or len(title) < 5:
-        return None
-
-    # Link
-    link_el = card.select_one("a[href*='/e/'], a[href*='eventbrite']")
-    if card.name == "a":
-        link_el = card
-    event_url = None
-    if link_el and link_el.get("href"):
-        href = link_el["href"]
-        event_url = href if href.startswith("http") else f"{BASE_URL}{href}"
-
-    # Image
-    img_el = card.select_one("img[src]")
-    image_url = None
-    if img_el:
-        src = img_el.get("src") or img_el.get("data-src")
-        if src and "img.evbuc.com" in src:
-            image_url = src
-
-    # Date text
-    date_text = None
-    for el in card.select("time, [class*='date'], [class*='time']"):
-        date_text = el.get("datetime") or clean_text(el.get_text())
-        if date_text:
-            break
-
-    start_date = None
-    if date_text:
-        try:
-            start_date = datetime.fromisoformat(date_text).isoformat()
-        except (ValueError, TypeError):
-            start_date = parse_french_date(date_text)
-
-    # Venue
-    venue_name = None
-    venue_el = card.select_one("[class*='venue'], [class*='location']")
-    if venue_el:
-        venue_name = clean_text(venue_el.get_text())
-
-    category_slug = detect_category(None, title)
-    slug = generate_slug(title, start_date)
-    quality = compute_quality_score(
-        title=title, description=None, image_url=image_url,
-        start_date=start_date, price_raw=None, booking_url=event_url,
-    )
-
-    return {
-        "title": title, "slug": slug, "description": None,
-        "short_desc": None,
-        "image_url": image_url, "start_date": start_date, "end_date": None,
-        "price_min": 0, "price_max": 0, "is_free": False,
-        "booking_url": event_url, "source": "eventbrite",
-        "source_url": event_url or BASE_URL, "source_id": slug,
-        "venue_name": venue_name, "venue_address": None,
-        "venue_city": "Paris", "venue_zip": None,
-        "venue_arrondissement": None,
-        "venue_lat": None, "venue_lng": None,
-        "raw_category": None, "category_slug": category_slug,
-        "tags": [], "quality_score": quality,
-    }
-
-
-def parse_french_date(text: str) -> Optional[str]:
-    """Parse French date strings."""
-    if not text:
-        return None
-    months = {
-        "janvier": 1, "février": 2, "mars": 3, "avril": 4,
-        "mai": 5, "juin": 6, "juillet": 7, "août": 8,
-        "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
-        "janv": 1, "févr": 2, "avr": 4, "juil": 7,
-        "sept": 9, "oct": 10, "nov": 11, "déc": 12,
-    }
-    text_lower = text.lower()
-    for month_name, month_num in months.items():
-        if month_name in text_lower:
-            day_match = re.search(r"(\d{1,2})\s*" + re.escape(month_name), text_lower)
-            if day_match:
-                day = int(day_match.group(1))
-                year = datetime.now().year
-                year_match = re.search(r"(\d{4})", text)
-                if year_match:
-                    year = int(year_match.group(1))
-                # Time
-                hour, minute = 20, 0
-                time_match = re.search(r"(\d{1,2})[h:](\d{2})?", text_lower)
-                if time_match:
-                    hour = int(time_match.group(1))
-                    minute = int(time_match.group(2) or 0)
-                try:
-                    return datetime(year, month_num, day, hour, minute).isoformat()
-                except ValueError:
-                    pass
-    return None
+                            detail = client.get_text(ev["source_url"])
+                            if detail:
+                                apply_detail(ev, parse_detail(detail))
+                        except BudgetExceeded:
+                            raise
+                        except Exception as e:
+                            print(f"  [{SOURCE}] detail failed {ev['source_url']}: {e}")
+                    yield ev
+                print(f"  [{SOURCE}] {path} page {page}: {len(new)} kept")
+                if not has_next_page(html):
+                    break

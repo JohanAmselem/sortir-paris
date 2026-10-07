@@ -1,435 +1,404 @@
-import { Metadata } from 'next'
-import { notFound } from 'next/navigation'
-import Image from 'next/image'
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Calendar, MapPin, ExternalLink, Euro, ArrowLeft, Clock, CalendarPlus, Heart, Users } from 'lucide-react'
+import Image from 'next/image'
+import { notFound, permanentRedirect } from 'next/navigation'
+import { CalendarPlus, ExternalLink, MapPin } from 'lucide-react'
+import { EventImage } from '@/components/ui/event-image'
 import { SaveButton } from '@/components/events/save-button'
 import { ShareButton } from '@/components/ui/share-button'
-import { Countdown } from '@/components/ui/countdown'
 import { ViewTracker } from '@/components/events/view-tracker'
-import { EventCard } from '@/components/events/event-card'
 import { EventReviews } from '@/components/events/event-reviews'
 import { AttendButton } from '@/components/events/attend-button'
-import { StickyBookingCTA } from '@/components/events/sticky-booking-cta'
-import { formatPriceRange, formatEventDate } from '@/lib/utils'
-import { db, events, venues, categories, eventTags, tags, eventAmbiances, ambiances } from '@sortir/db'
-import { eq, and, ne, gte, desc } from 'drizzle-orm'
-import { cache } from 'react'
+import { EventActionBar } from '@/components/events/sticky-booking-cta'
+import { OutboundLink } from '@/components/events/outbound-link'
+import { EventRail, SectionHeader } from '@/components/events/blocks'
+import { getEventBySlug, type EventDetail } from '@/lib/events/detail'
+import { bucketNow, diversify, safeQueryEvents } from '@/lib/events/query'
+import { effectiveEnd, formatFullWhen, isLongRun, urgencyBadge } from '@/lib/paris-time'
+import { formatPrice, safeUrl, sourceLabel } from '@/lib/format'
+import { safeJsonLd } from '@/lib/json-ld'
+import { absoluteUrl } from '@/lib/site'
+
+export const revalidate = 600
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
-const getEvent = cache(async function getEvent(slug: string) {
-  const result = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(eq(events.slug, slug))
-    .limit(1)
+/** No pages at build time: each one is rendered on first visit, then cached (ISR). */
+export function generateStaticParams() {
+  return []
+}
 
-  if (result.length === 0) return null
+const HIDDEN = new Set(['rejected', 'draft'])
 
-  const { event, venue, category } = result[0]
+function cta(e: EventDetail): { href: string | null; label: string } {
+  const booking = safeUrl(e.bookingUrl)
+  const source = safeUrl(e.sourceUrl)
+  if (booking) return { href: booking, label: e.priceStatus === 'free' ? 'Infos & inscription' : 'Réserver' }
+  if (source) return { href: source, label: 'Infos pratiques' }
+  return { href: null, label: '' }
+}
 
-  // Fetch tags and ambiances in parallel
-  const [eventTagsList, eventAmbiancesList] = await Promise.all([
-    db.select({ tag: tags })
-      .from(eventTags)
-      .innerJoin(tags, eq(eventTags.tagId, tags.id))
-      .where(eq(eventTags.eventId, event.id)),
-    db.select({ ambiance: ambiances })
-      .from(eventAmbiances)
-      .innerJoin(ambiances, eq(eventAmbiances.ambianceId, ambiances.id))
-      .where(eq(eventAmbiances.eventId, event.id)),
-  ])
-
-  return {
-    ...event,
-    venue,
-    category,
-    tags: eventTagsList.map(t => t.tag),
-    ambiances: eventAmbiancesList.map(a => a.ambiance),
-  }
-})
-
-async function getSimilarEvents(event: { id: string; categoryId: string | null }) {
-  if (!event.categoryId) return []
-
-  const similar = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(and(
-      eq(events.categoryId, event.categoryId),
-      eq(events.status, 'active'),
-      ne(events.id, event.id),
-      gte(events.startDate, new Date()),
-    ))
-    .orderBy(desc(events.qualityScore))
-    .limit(6)
-
-  return similar.map((r) => ({
-    ...r.event,
-    category: r.category,
-    venue: r.venue,
-    tags: [],
-    ambiances: [],
-  }))
+function description(e: EventDetail): string {
+  const text = e.shortDesc || e.description || ''
+  const clean = text.replace(/\s+/g, ' ').trim()
+  const where = e.venue ? ` à ${e.venue.name}${e.venue.arrondissement ? ` (${e.venue.arrondissement})` : ''}` : ' à Paris'
+  const base = clean.length > 40 ? clean : `${e.title}${where}. ${clean}`
+  return base.length > 158 ? base.slice(0, 155).replace(/\s+\S*$/, '') + '…' : base
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const event = await getEvent(slug)
-  if (!event) return { title: 'Événement introuvable' }
-
+  const e = await getEventBySlug(slug).catch(() => null)
+  if (!e || HIDDEN.has(e.status)) return { title: 'Événement introuvable', robots: { index: false } }
+  const past = effectiveEnd(e) < new Date()
+  const title = `${e.title}${e.venue ? ` · ${e.venue.name}` : ''}`
   return {
-    title: `${event.title} — ${event.venue?.name ?? 'Paris'}`,
-    description: event.shortDesc ?? event.description?.slice(0, 160) ?? '',
-    openGraph: {
-      title: event.title,
-      description: event.shortDesc ?? undefined,
-      images: event.imageUrl ? [event.imageUrl] : undefined,
-      type: 'article',
-    },
+    title,
+    description: description(e),
+    alternates: { canonical: `/evenements/${e.canonicalSlug ?? e.slug}` },
+    robots: past || e.status === 'expired' || e.status === 'cancelled' ? { index: false, follow: true } : undefined,
+    openGraph: { title, description: description(e), type: 'website', url: `/evenements/${e.slug}` },
+  }
+}
+
+function googleCalendarUrl(e: EventDetail): string {
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const start = new Date(e.startDate)
+  const end = effectiveEnd(e)
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: e.title,
+    dates: `${fmt(start)}/${fmt(isLongRun(e) ? new Date(start.getTime() + 2 * 3600_000) : end)}`,
+    details: `${absoluteUrl(`/evenements/${e.slug}`)}`,
+    location: [e.venue?.name, e.venue?.address, e.venue?.zipCode].filter(Boolean).join(', '),
+    ctz: 'Europe/Paris',
+  })
+  return `https://calendar.google.com/calendar/render?${params}`
+}
+
+function eventJsonLd(e: EventDetail, past: boolean) {
+  const price = formatPrice(e)
+  const href = cta(e).href
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: e.title,
+    description: description(e),
+    startDate: e.timeKnown ? e.startDate : e.startDate.slice(0, 10),
+    ...(e.endDate ? { endDate: e.endDate } : {}),
+    eventStatus: e.status === 'cancelled' ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    url: absoluteUrl(`/evenements/${e.slug}`),
+    image: e.imageUrl ? [e.imageUrl] : [absoluteUrl('/og-default.png')],
+    location: e.venue
+      ? {
+          '@type': 'Place',
+          name: e.venue.name,
+          url: absoluteUrl(`/lieux/${e.venue.slug}`),
+          address: {
+            '@type': 'PostalAddress',
+            ...(e.venue.address ? { streetAddress: e.venue.address } : {}),
+            addressLocality: e.venue.city || 'Paris',
+            ...(e.venue.zipCode ? { postalCode: e.venue.zipCode } : {}),
+            addressCountry: 'FR',
+          },
+          ...(e.venue.lat != null && e.venue.lng != null
+            ? { geo: { '@type': 'GeoCoordinates', latitude: e.venue.lat, longitude: e.venue.lng } }
+            : {}),
+        }
+      : { '@type': 'Place', name: 'Paris', address: { '@type': 'PostalAddress', addressLocality: 'Paris', addressCountry: 'FR' } },
+    ...(price.tone !== 'unknown' && !past
+      ? {
+          offers: {
+            '@type': 'Offer',
+            price: price.tone === 'free' ? '0' : (Math.min(e.priceMin || e.priceMax, e.priceMax || e.priceMin) / 100).toFixed(2),
+            priceCurrency: 'EUR',
+            ...(href ? { url: href } : {}),
+          },
+        }
+      : {}),
+    ...(e.venue ? { organizer: { '@type': 'Organization', name: e.venue.name, url: safeUrl(e.venue.website) ?? absoluteUrl(`/lieux/${e.venue.slug}`) } } : {}),
   }
 }
 
 export default async function EventPage({ params }: Props) {
   const { slug } = await params
-  const event = await getEvent(slug)
-
-  if (!event) notFound()
-
-  const startDate = event.startDate ? new Date(event.startDate) : null
-  const endDate = event.endDate ? new Date(event.endDate) : null
-  const isSoon = startDate && (startDate.getTime() - Date.now()) < 12 * 60 * 60 * 1000 && startDate.getTime() > Date.now()
-
-  const similarEvents = await getSimilarEvents({ id: event.id, categoryId: event.categoryId })
-
-  const jsonLd: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'Event',
-    name: event.title,
-    description: event.shortDesc ?? event.description?.slice(0, 300) ?? '',
-    startDate: startDate?.toISOString(),
-    endDate: endDate?.toISOString() ?? (startDate ? new Date(startDate.getTime() + 2 * 3600000).toISOString() : undefined),
-    eventStatus: 'https://schema.org/EventScheduled',
-    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    location: event.venue ? {
-      '@type': 'Place',
-      name: event.venue.name,
-      address: {
-        '@type': 'PostalAddress',
-        streetAddress: event.venue.address ?? '',
-        addressLocality: event.venue.city ?? 'Paris',
-        postalCode: event.venue.zipCode ?? '',
-        addressCountry: 'FR',
-      },
-      ...(event.venue.lat && event.venue.lng ? {
-        geo: {
-          '@type': 'GeoCoordinates',
-          latitude: Number(event.venue.lat),
-          longitude: Number(event.venue.lng),
-        },
-      } : {}),
-    } : {
-      '@type': 'Place',
-      name: 'Paris',
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Paris',
-        addressCountry: 'FR',
-      },
-    },
-    offers: {
-      '@type': 'Offer',
-      url: event.bookingUrl ?? event.sourceUrl ?? `https://www.panameclub.fr/evenements/${event.slug}`,
-      price: event.priceMin ? (event.priceMin / 100).toFixed(2) : '0',
-      priceCurrency: 'EUR',
-      availability: 'https://schema.org/InStock',
-      validFrom: event.createdAt?.toISOString() ?? startDate?.toISOString(),
-    },
-    performer: event.category ? {
-      '@type': 'PerformingGroup',
-      name: event.title,
-    } : undefined,
-    organizer: event.venue ? {
-      '@type': 'Organization',
-      name: event.venue.name,
-      url: event.venue.website || `https://www.panameclub.fr/lieux/${event.venue.slug}`,
-    } : {
-      '@type': 'Organization',
-      name: 'Paname Club',
-      url: 'https://www.panameclub.fr',
-    },
-    image: event.imageUrl ? [event.imageUrl] : ['https://www.panameclub.fr/og-default.png'],
+  let event: EventDetail | null = null
+  try {
+    event = await getEventBySlug(slug)
+  } catch (err) {
+    console.error('[event page]', err)
+    throw new Error('Impossible de charger cet événement')
   }
+  if (!event || HIDDEN.has(event.status)) notFound()
+  if (event.canonicalSlug && event.canonicalSlug !== event.slug) permanentRedirect(`/evenements/${event.canonicalSlug}`)
+
+  const now = bucketNow()
+  const past = effectiveEnd(event) < now
+  const cancelled = event.status === 'cancelled'
+  const when = formatFullWhen(event, now)
+  const price = formatPrice(event)
+  const action = cta(event)
+  const badge = past ? null : urgencyBadge(event, now)
+
+  const [similar, sameVenue] = await Promise.all([
+    event.category
+      ? safeQueryEvents({ categories: [event.category.slug], when: 'month', excludeIds: [event.id], withImage: true, limit: 12 })
+      : Promise.resolve({ events: [], total: 0, hasMore: false }),
+    event.venue
+      ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], sort: 'soon', limit: 6 })
+      : Promise.resolve({ events: [], total: 0, hasMore: false }),
+  ])
+  const sameVenueIds = new Set(sameVenue.events.map((e) => e.id))
+  const similarEvents = diversify(similar.events.filter((e) => !sameVenueIds.has(e.id)), 8)
+
+  const crumbs = [
+    { name: 'Accueil', href: '/' },
+    ...(event.category ? [{ name: event.category.name, href: `/categories/${event.category.slug}` }] : []),
+    { name: event.title, href: `/evenements/${event.slug}` },
+  ]
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: absoluteUrl(c.href) })),
+  }
+  const mapToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  const hasGeo = event.venue?.lat != null && event.venue?.lng != null
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(eventJsonLd(event, past)) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }} />
       <ViewTracker eventId={event.id} />
 
-      <article className="pb-36 md:pb-24">
-        {/* Back */}
-        <div className="px-4 py-3">
-          <Link href="/evenements" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </Link>
-        </div>
+      <article className="pb-28 md:pb-16">
+        <nav aria-label="Fil d’Ariane" className="px-4 py-3">
+          <ol className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-secondary">
+            {crumbs.slice(0, -1).map((c) => (
+              <li key={c.href} className="flex items-center gap-1.5">
+                <Link href={c.href} className="hover:text-ink hover:underline">
+                  {c.name}
+                </Link>
+                <span aria-hidden>/</span>
+              </li>
+            ))}
+            <li className="truncate text-text-muted" aria-current="page">
+              {event.title}
+            </li>
+          </ol>
+        </nav>
 
-        {/* Hero image */}
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-surface-hover md:aspect-[2.5/1] md:rounded-2xl md:mx-4 md:max-w-[calc(100%-2rem)]">
-          {event.imageUrl ? (
-            <Image src={event.imageUrl} alt={event.title} fill className="object-cover" priority sizes="100vw" />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-accent/5 to-neon/5">
-              <span className="text-7xl opacity-30">{event.category?.icon ?? '🎭'}</span>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+        <div className="md:grid md:grid-cols-[1.1fr_1fr] md:gap-10 md:px-4">
+          <div className="relative aspect-[4/3] w-full overflow-hidden bg-paper-deep md:aspect-[4/5] md:rounded-xl">
+            <EventImage src={event.imageUrl} alt={event.title} sizes="(max-width: 768px) 100vw, 600px" priority categorySlug={event.category?.slug} />
+            {badge && (
+              <span className="absolute left-3 top-3 rounded bg-neon px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-paper">{badge}</span>
+            )}
+          </div>
 
-          {/* Countdown overlay */}
-          {isSoon && startDate && (
-            <div className="absolute bottom-4 right-4">
-              <div className="rounded-xl bg-black/60 px-3.5 py-2 backdrop-blur-sm">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-accent-glow" />
-                  <Countdown targetDate={startDate} className="text-[13px] font-bold text-white" />
-                </div>
+          <div className="px-4 pt-5 md:px-0 md:pt-0">
+            {(past || cancelled) && (
+              <div className="mb-4 rounded-lg border border-neon/40 bg-neon-soft px-4 py-3 text-[15px] text-ink" role="status">
+                {cancelled ? 'Cet événement a été annulé par l’organisateur.' : 'Cet événement est terminé.'}{' '}
+                {similarEvents.length > 0 && (
+                  <a href="#similaires" className="font-semibold text-accent underline underline-offset-2">
+                    Voir des sorties similaires à venir
+                  </a>
+                )}
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        <div className="mx-auto max-w-3xl px-4 pt-6">
-          {/* Badges */}
-          <div className="flex flex-wrap gap-1.5">
             {event.category && (
-              <Link href={`/categories/${event.category.slug}`} className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accent hover:bg-accent/20 transition-colors">
-                {event.category.icon} {event.category.name}
+              <Link href={`/categories/${event.category.slug}`} className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent hover:underline">
+                {event.category.name}
               </Link>
             )}
-            {event.isFree && (
-              <span className="rounded-lg bg-free/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-free">
-                Gratuit
-              </span>
-            )}
-            {event.ambiances.map(a => (
-              <span key={a.slug} className="rounded-lg bg-surface-hover px-2.5 py-1 text-[11px] font-medium text-text-secondary">
-                {a.emoji} {a.name}
-              </span>
-            ))}
-          </div>
+            <h1 className="font-display mt-1 text-[2.6rem] text-ink sm:text-[3.2rem]">{event.title}</h1>
 
-          {/* Social proof */}
-          {event.saveCount > 0 && (
-            <div className="mt-2 flex items-center gap-1.5 text-[12px] text-text-muted">
-              <Users className="h-3 w-3" />
-              <span>{event.saveCount} personne{event.saveCount > 1 ? 's' : ''} intéressée{event.saveCount > 1 ? 's' : ''}</span>
-            </div>
-          )}
-
-          {/* Title */}
-          <h1 className="mt-3 text-2xl font-bold leading-tight text-text-primary md:text-3xl">
-            {event.title}
-          </h1>
-
-          {/* Short description */}
-          {event.shortDesc && (
-            <p className="mt-2 text-[14px] leading-relaxed text-text-secondary">{event.shortDesc}</p>
-          )}
-
-          {/* Info card */}
-          <div className="mt-5 divide-y divide-border/60 rounded-2xl border border-border/60 bg-surface shadow-sm">
-            {startDate && (
-              <div className="flex items-center gap-3.5 px-4 py-3.5">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/8">
-                  <Calendar className="h-4.5 w-4.5 text-accent" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-semibold text-text-primary">{formatEventDate(startDate)}</p>
-                  {endDate && (
-                    <p className="text-[12px] text-text-muted">Jusqu&apos;au {formatEventDate(endDate)}</p>
-                  )}
-                </div>
+            <dl className="mt-5 divide-y divide-border border-y border-border">
+              <div className="flex gap-3 py-3">
+                <dt className="w-16 shrink-0 text-[13px] font-semibold uppercase tracking-wide text-text-muted">Quand</dt>
+                <dd>
+                  <p className="text-[16px] font-semibold text-ink">{when.primary}</p>
+                  {when.secondary && <p className="text-[15px] text-text-secondary">{when.secondary}</p>}
+                </dd>
               </div>
-            )}
-
-            {event.venue && (
-              <div className="flex items-center gap-3.5 px-4 py-3.5">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-neon/8">
-                  <MapPin className="h-4.5 w-4.5 text-neon" />
-                </div>
-                <div className="min-w-0">
-                  <Link href={`/lieux/${event.venue.slug}`} className="text-[14px] font-semibold text-text-primary hover:text-accent transition-colors">
-                    {event.venue.name}
-                  </Link>
-                  {(event.venue.address || event.venue.arrondissement) && (
-                    <p className="text-[12px] text-text-muted truncate">
-                      {event.venue.address}{event.venue.arrondissement ? ` · ${event.venue.arrondissement}` : ''}
+              {event.venue && (
+                <div className="flex gap-3 py-3">
+                  <dt className="w-16 shrink-0 text-[13px] font-semibold uppercase tracking-wide text-text-muted">Où</dt>
+                  <dd className="min-w-0">
+                    <Link href={`/lieux/${event.venue.slug}`} className="text-[16px] font-semibold text-ink hover:underline">
+                      {event.venue.name}
+                    </Link>
+                    <p className="text-[15px] text-text-secondary">
+                      {[event.venue.address, event.venue.zipCode && `${event.venue.zipCode} ${event.venue.city}`].filter(Boolean).join(', ') ||
+                        event.venue.arrondissement ||
+                        event.venue.city}
                     </p>
-                  )}
+                  </dd>
                 </div>
+              )}
+              <div className="flex gap-3 py-3">
+                <dt className="w-16 shrink-0 text-[13px] font-semibold uppercase tracking-wide text-text-muted">Prix</dt>
+                <dd className={price.tone === 'free' ? 'text-[16px] font-semibold text-free' : price.tone === 'unknown' ? 'text-[15px] text-text-secondary' : 'text-[16px] font-semibold text-ink'}>
+                  {price.tone === 'unknown' ? 'Non communiqué, à vérifier auprès de l’organisateur' : price.label}
+                </dd>
+              </div>
+            </dl>
+
+            {!past && (
+              <div className="mt-5 hidden flex-wrap items-center gap-2 md:flex">
+                {action.href && (
+                  <OutboundLink
+                    href={action.href}
+                    eventId={event.id}
+                    source={event.source}
+                    kind="booking"
+                    className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-6 text-[15px] font-semibold text-paper transition-colors hover:bg-accent-hover"
+                  >
+                    {action.label}
+                    <ExternalLink className="h-4 w-4" aria-hidden />
+                  </OutboundLink>
+                )}
+                <SaveButton eventId={event.id} appearance="button" />
+                <ShareButton title={event.title} className="h-11 w-11" />
               </div>
             )}
 
-            <div className="flex items-center gap-3.5 px-4 py-3.5">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-free/8">
-                <Euro className="h-4.5 w-4.5 text-free" />
+            {!past && (
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <AttendButton eventId={event.id} />
+                <a
+                  href={googleCalendarUrl(event)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-11 items-center gap-2 text-[14px] font-semibold text-ink hover:text-accent"
+                >
+                  <CalendarPlus className="h-4 w-4" aria-hidden />
+                  Ajouter à l’agenda
+                </a>
               </div>
-              <p className="text-[14px] font-semibold text-text-primary">
-                {formatPriceRange(event.priceMin, event.priceMax, event.isFree)}
+            )}
+
+            {(event.saveCount > 1 || event.attendanceCount > 1) && (
+              <p className="mt-3 text-[14px] text-text-secondary">
+                {event.attendanceCount > 1 ? `${event.attendanceCount} membres y vont` : `${event.saveCount} membres l’ont gardé`}
               </p>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div id="inline-cta" className="mt-5 flex gap-2">
-            {(event.bookingUrl || event.sourceUrl) ? (
-              <a
-                href={event.bookingUrl ?? event.sourceUrl!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[14px] font-bold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent-hover active:scale-[0.98]"
-              >
-                <ExternalLink className="h-4 w-4" />
-                {event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
-              </a>
-            ) : (
-              <div className="flex-1" />
             )}
-            <SaveButton eventId={event.id} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface hover:border-accent/30 hover:shadow-sm transition-all" />
-            <ShareButton title={event.title} text={event.shortDesc ?? event.title} className="h-11 w-11" />
           </div>
+        </div>
 
-          {/* J'y vais */}
-          <div className="mt-4">
-            <AttendButton eventId={event.id} />
-          </div>
-
-          {/* Add to calendar */}
-          {startDate && (
-            <div className="mt-3">
-              <a
-                href={`https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}${endDate ? `/${endDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}` : `/${new Date(startDate.getTime() + 2 * 3600000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`}&details=${encodeURIComponent(event.shortDesc ?? '')}&location=${encodeURIComponent(event.venue?.name ?? '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-[13px] font-medium text-text-secondary hover:text-text-primary hover:border-accent/30 transition-all"
-              >
-                <CalendarPlus className="h-4 w-4 text-accent" />
-                Ajouter au calendrier
-              </a>
-            </div>
-          )}
-
-          {/* Tags */}
-          {event.tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {event.tags.map(tag => (
-                <span key={tag.slug} className="rounded-full bg-surface-hover px-3 py-1 text-[11px] font-medium text-text-muted">
-                  #{tag.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Description */}
-          {event.description && (
-            <div className="mt-8">
-              <h2 className="text-[15px] font-bold text-text-primary">À propos</h2>
-              <div className="mt-3 whitespace-pre-line text-[14px] leading-[1.7] text-text-secondary">
-                {event.description}
+        <div className="mx-auto max-w-3xl px-4">
+          {(event.description || event.shortDesc) && (
+            <section className="mt-10" aria-labelledby="about-title">
+              <h2 id="about-title" className="font-display text-[1.8rem] text-ink">
+                À propos
+              </h2>
+              <div className="mt-3 max-w-[68ch] whitespace-pre-line text-[16px] leading-[1.7] text-ink-soft">
+                {event.description || event.shortDesc}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Venue */}
           {event.venue && (
-            <div className="mt-8">
-              <h2 className="text-[15px] font-bold text-text-primary">Lieu</h2>
-              <div className="mt-3 rounded-2xl border border-border/60 bg-surface overflow-hidden">
-                {/* Mini-map */}
-                {event.venue.lat && event.venue.lng && (
+            <section className="mt-10" aria-labelledby="venue-title">
+              <h2 id="venue-title" className="font-display text-[1.8rem] text-ink">
+                Le lieu
+              </h2>
+              <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
+                {hasGeo && mapToken && (
                   <Link
                     href={`/carte?lat=${event.venue.lat}&lng=${event.venue.lng}&zoom=15`}
-                    className="block relative aspect-[2.5/1] w-full bg-surface-hover overflow-hidden group"
+                    className="group relative block aspect-[5/2] w-full bg-paper-deep"
+                    aria-label={`Voir ${event.venue.name} sur la carte`}
                   >
                     <Image
-                      src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-s+e94560(${event.venue.lng},${event.venue.lat})/${event.venue.lng},${event.venue.lat},14,0/600x240@2x?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`}
-                      alt={`Carte — ${event.venue.name}`}
+                      src={`https://api.mapbox.com/styles/v1/mapbox/light-v11/static/pin-l+7c3aed(${event.venue.lng},${event.venue.lat})/${event.venue.lng},${event.venue.lat},14.5,0/640x256@2x?access_token=${mapToken}`}
+                      alt=""
                       fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      sizes="(max-width: 768px) 100vw, 600px"
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 640px"
+                      className="object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                    <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-                      <MapPin className="h-3 w-3" /> Voir sur la carte
+                    <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-paper">
+                      <MapPin className="h-3.5 w-3.5" aria-hidden /> Voir autour
                     </span>
                   </Link>
                 )}
                 <div className="p-4">
-                  <p className="font-semibold text-text-primary">{event.venue.name}</p>
-                  {event.venue.address && <p className="mt-1 text-[13px] text-text-secondary">{event.venue.address}</p>}
-                  {event.venue.city && (
-                    <p className="text-[13px] text-text-muted">{event.venue.city}{event.venue.zipCode ? ` ${event.venue.zipCode}` : ''}</p>
-                  )}
-                  {event.venue.website && (
-                    <a href={event.venue.website} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:text-accent-hover transition-colors">
-                      <ExternalLink className="h-3.5 w-3.5" /> Site du lieu
-                    </a>
-                  )}
+                  <Link href={`/lieux/${event.venue.slug}`} className="text-[17px] font-semibold text-ink hover:underline">
+                    {event.venue.name}
+                  </Link>
+                  {event.venue.address && <p className="mt-1 text-[15px] text-text-secondary">{event.venue.address}</p>}
+                  <p className="text-[15px] text-text-secondary">
+                    {[event.venue.zipCode, event.venue.city].filter(Boolean).join(' ')}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+                    {hasGeo && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${event.venue.lat},${event.venue.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-11 items-center text-[14px] font-semibold text-accent hover:underline"
+                      >
+                        Itinéraire
+                      </a>
+                    )}
+                    {safeUrl(event.venue.website) && (
+                      <OutboundLink
+                        href={safeUrl(event.venue.website)!}
+                        eventId={event.id}
+                        source={event.source}
+                        kind="venue"
+                        className="inline-flex h-11 items-center gap-1.5 text-[14px] font-semibold text-accent hover:underline"
+                      >
+                        Site du lieu <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                      </OutboundLink>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Reviews */}
           <EventReviews eventId={event.id} />
 
-          {/* Source */}
-          {event.sourceUrl && (
-            <div className="mt-6 rounded-xl bg-surface-hover/50 px-4 py-3">
-              <p className="text-[11px] text-text-muted">
-                Source : <a href={event.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                  {event.source === 'openagenda' ? 'OpenAgenda' : event.source === 'parisjazzclub' ? 'Paris Jazz Club' : event.source ?? 'Externe'}
-                </a>
-              </p>
-            </div>
-          )}
+          <p className="mt-8 text-[14px] text-text-secondary">
+            Informations fournies par{' '}
+            {safeUrl(event.sourceUrl) ? (
+              <OutboundLink href={safeUrl(event.sourceUrl)!} eventId={event.id} source={event.source} kind="source" className="font-medium text-ink underline underline-offset-2">
+                {sourceLabel(event.source)}
+              </OutboundLink>
+            ) : (
+              sourceLabel(event.source)
+            )}
+            . Horaires et tarifs peuvent changer : vérifie auprès de l’organisateur avant de te déplacer.
+          </p>
         </div>
 
-        {/* Similar events */}
+        {sameVenue.events.length > 0 && (
+          <section className="mt-14 px-4" aria-labelledby="venue-next-title">
+            <SectionHeader id="venue-next-title" kicker="Au même endroit" title={`Bientôt à ${event.venue!.name}`} href={`/lieux/${event.venue!.slug}`} />
+            <EventRail events={sameVenue.events} now={now} className="mt-5" />
+          </section>
+        )}
+
         {similarEvents.length > 0 && (
-          <div className="mt-12">
-            <h2 className="px-4 text-lg font-bold text-text-primary">Événements similaires</h2>
-            <div className="scrollbar-hide mt-4 flex gap-3 overflow-x-auto px-4 snap-x snap-mandatory">
-              {similarEvents.map((se) => (
-                <EventCard
-                  key={se.id}
-                  event={se as never}
-                  className="w-[260px] flex-shrink-0 snap-start sm:w-[280px]"
-                />
-              ))}
-              <div className="w-1 flex-shrink-0" />
-            </div>
-          </div>
+          <section id="similaires" className="mt-14 scroll-mt-20 px-4" aria-labelledby="similar-title">
+            <SectionHeader
+              id="similar-title"
+              kicker="Dans le même esprit"
+              title="Tu aimeras aussi"
+              href={event.category ? `/categories/${event.category.slug}` : '/evenements'}
+            />
+            <EventRail events={similarEvents} now={now} className="mt-5" />
+          </section>
         )}
       </article>
 
-      {/* Sticky mobile CTA — only visible when inline CTA scrolls out of view */}
-      {(event.bookingUrl || event.sourceUrl) && (
-        <StickyBookingCTA
-          href={event.bookingUrl ?? event.sourceUrl!}
-          label={event.bookingUrl ? (event.isFree ? 'Voir le site' : 'Réserver') : 'Voir la source'}
-          targetId="inline-cta"
-        />
-      )}
+      {!past && <EventActionBar eventId={event.id} title={event.title} href={action.href} label={action.label} source={event.source} />}
     </>
   )
 }

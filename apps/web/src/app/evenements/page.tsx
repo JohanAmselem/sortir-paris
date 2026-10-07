@@ -1,473 +1,88 @@
-import { Metadata } from 'next'
-import { Suspense } from 'react'
-import { InfiniteEventGrid } from '@/components/events/infinite-event-grid'
-import { EventCard } from '@/components/events/event-card'
-import { FilterBar } from '@/components/search/filter-bar'
-import { SearchBar } from '@/components/search/search-bar'
-import { EventGridSkeleton, FilterBarSkeleton } from '@/components/ui/skeleton'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq, and, gte, lte, desc, asc, sql, count, like, inArray } from 'drizzle-orm'
-import { eventAmbiances, ambiances } from '@sortir/db'
-import { aiSearch, type AIIntent, type SearchResult } from '@/lib/ai-search'
+import Link from 'next/link'
+import { Sparkles } from 'lucide-react'
+import { Listing, PageIntro } from '@/components/events/listing'
+import { SearchBox } from '@/components/search/search-box'
+import { parseEventParams, eventsHref } from '@/lib/events/params'
+import { parseOutingRequest } from '@/lib/ai/intent'
+import { intentToQuery } from '@/lib/ai/recommend'
+import { listingMetadata } from '@/lib/seo'
+import type { EventQuery } from '@/lib/events/types'
 
-export const metadata: Metadata = {
-  title: 'Explorer — Tous les événements',
-  description: 'Parcourez tous les événements culturels à Paris. Filtrez par date, catégorie, prix.',
-}
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
-export const dynamic = 'force-dynamic'
-
-interface Props {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-}
-
-async function getEvents(searchParams: { [key: string]: string | undefined }) {
-  const now = new Date()
-  const conditions = [eq(events.status, 'active')]
-
-  if (searchParams.date === 'today') {
-    const endOfDay = new Date(now)
-    endOfDay.setHours(23, 59, 59, 999)
-    conditions.push(gte(events.startDate, now))
-    conditions.push(lte(events.startDate, endOfDay))
-  } else if (searchParams.date === 'weekend') {
-    const dayOfWeek = now.getDay()
-    let weekendStart: Date
-    let weekendEnd: Date
-    if (dayOfWeek === 0) {
-      // Sunday: show remaining Sunday events
-      weekendStart = now
-      weekendEnd = new Date(now)
-      weekendEnd.setHours(23, 59, 59, 999)
-    } else if (dayOfWeek === 6) {
-      weekendStart = new Date(now)
-      weekendStart.setHours(0, 0, 0, 0)
-      weekendEnd = new Date(now)
-      weekendEnd.setDate(now.getDate() + 1)
-      weekendEnd.setHours(23, 59, 59, 999)
-    } else {
-      weekendStart = new Date(now)
-      weekendStart.setDate(now.getDate() + (6 - dayOfWeek))
-      weekendStart.setHours(0, 0, 0, 0)
-      weekendEnd = new Date(weekendStart)
-      weekendEnd.setDate(weekendStart.getDate() + 1)
-      weekendEnd.setHours(23, 59, 59, 999)
-    }
-    conditions.push(gte(events.startDate, weekendStart))
-    conditions.push(lte(events.startDate, weekendEnd))
-  } else if (searchParams.date === 'week') {
-    const endOfWeek = new Date(now)
-    endOfWeek.setDate(now.getDate() + 7)
-    conditions.push(gte(events.startDate, now))
-    conditions.push(lte(events.startDate, endOfWeek))
-  } else if (searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)) {
-    const target = new Date(searchParams.date + 'T00:00:00')
-    const endOfTarget = new Date(searchParams.date + 'T23:59:59.999')
-    conditions.push(gte(events.startDate, target))
-    conditions.push(lte(events.startDate, endOfTarget))
-  } else {
-    conditions.push(gte(events.startDate, now))
-  }
-
-  if (searchParams.category) {
-    const cat = await db.query.categories?.findFirst({
-      where: eq(categories.slug, searchParams.category),
-    })
-    if (cat) conditions.push(eq(events.categoryId, cat.id))
-  }
-
-  if (searchParams.free === 'true') {
-    conditions.push(eq(events.isFree, true))
-  }
-
-  // Ambiance filter — find events matching the ambiance
-  if (searchParams.ambiance) {
-    const amb = await db.query.ambiances?.findFirst({
-      where: eq(ambiances.slug, searchParams.ambiance),
-    })
-    if (amb) {
-      conditions.push(
-        sql`${events.id} IN (SELECT event_id FROM event_ambiances WHERE ambiance_id = ${amb.id})`
-      )
-    }
-  }
-
-  // Arrondissement join condition
-  const needsArrFilter = !!searchParams.arr
-
-  // Build venue conditions for arrondissement filter
-  const venueConditions = needsArrFilter
-    ? [like(venues.arrondissement, `%${searchParams.arr}%`)]
-    : []
-
-  const [eventsList, allCategories, totalCount] = await Promise.all([
-    needsArrFilter
-      ? db
-          .select({ event: events, venue: venues, category: categories })
-          .from(events)
-          .innerJoin(venues, eq(events.venueId, venues.id))
-          .leftJoin(categories, eq(events.categoryId, categories.id))
-          .where(and(...conditions, ...venueConditions))
-          .orderBy(desc(events.qualityScore))
-          .limit(48)
-      : db
-          .select({ event: events, venue: venues, category: categories })
-          .from(events)
-          .leftJoin(venues, eq(events.venueId, venues.id))
-          .leftJoin(categories, eq(events.categoryId, categories.id))
-          .where(and(...conditions))
-          .orderBy(desc(events.qualityScore))
-          .limit(48),
-    db.select().from(categories).orderBy(asc(categories.position)),
-    needsArrFilter
-      ? db
-          .select({ value: count() })
-          .from(events)
-          .innerJoin(venues, eq(events.venueId, venues.id))
-          .where(and(...conditions, ...venueConditions))
-      : db.select({ value: count() }).from(events).where(and(...conditions)),
-  ])
-
-  return { events: eventsList, categories: allCategories, total: Number(totalCount[0].value) }
-}
-
-const CATEGORY_ICONS: Record<string, string> = {
-  concerts: '🎵', concert: '🎵', expos: '🎨', expo: '🎨',
-  theatre: '🎭', cinema: '🎬', festivals: '🎪', festival: '🎪',
-  conferences: '🎤', conference: '🎤', danse: '💃',
-  spectacles: '🎪', spectacle: '🎪', ateliers: '🛠️', atelier: '🛠️',
-  visites: '🏛️', visite: '🏛️', sport: '⚽',
-}
-
-const DATE_LABELS: Record<string, string> = {
-  today: "Aujourd'hui", weekend: 'Ce week-end', week: 'Cette semaine',
-}
-
-const AMBIANCE_LABELS: Record<string, { emoji: string; label: string }> = {
-  romantique: { emoji: '💕', label: 'Romantique' },
-  festif: { emoji: '🎉', label: 'Festif' },
-  chill: { emoji: '😌', label: 'Chill' },
-  familial: { emoji: '👨‍👩‍👧‍👦', label: 'Familial' },
-  underground: { emoji: '🌑', label: 'Underground' },
-  chic: { emoji: '✨', label: 'Chic' },
-  culturel: { emoji: '📚', label: 'Culturel' },
-  sportif: { emoji: '💪', label: 'Sportif' },
-  pleinair: { emoji: '🌿', label: 'Plein air' },
-  immersif: { emoji: '🎭', label: 'Immersif' },
-}
-
-function AIIntentBanner({ intent, query }: { intent: AIIntent; query: string }) {
-  const pills: Array<{ icon: string; label: string }> = []
-
-  if (intent.category) {
-    const icon = CATEGORY_ICONS[intent.category] || '📌'
-    pills.push({ icon, label: intent.category.charAt(0).toUpperCase() + intent.category.slice(1) })
-  }
-
-  if (intent.arrondissements.length > 0) {
-    const arrLabel = intent.arrondissements.length === 1
-      ? `${intent.arrondissements[0]} arr.`
-      : intent.arrondissements.join(', ') + ' arr.'
-    pills.push({ icon: '📍', label: arrLabel })
-  }
-
-  if (intent.isFree === true) pills.push({ icon: '💰', label: 'Gratuit' })
-
-  if (intent.specificDate) {
-    const date = new Date(intent.specificDate)
-    pills.push({ icon: '📅', label: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) })
-  } else if (intent.dateFilter) {
-    pills.push({ icon: '📅', label: DATE_LABELS[intent.dateFilter] || intent.dateFilter })
-  }
-
-  if (intent.ambiance) {
-    const amb = AMBIANCE_LABELS[intent.ambiance]
-    if (amb) pills.push({ icon: amb.emoji, label: amb.label })
-  }
-
-  if (intent.audience) {
-    const audiences: Record<string, string> = {
-      couple: '💑 En couple', famille: '👨‍👩‍👧 En famille',
-      amis: '👯 Entre amis', solo: '🧍 Solo', enfants: '👶 Enfants',
-    }
-    pills.push({ icon: '', label: audiences[intent.audience] || intent.audience })
-  }
-
-  if (intent.keywords.length > 0) {
-    pills.push({ icon: '🔑', label: intent.keywords.join(', ') })
-  }
-
-  return (
-    <div className="mt-4 rounded-xl border border-accent/20 bg-gradient-to-r from-accent/5 to-transparent p-4">
-      {/* Intent summary */}
-      <div className="flex items-start gap-2">
-        <span className="text-lg">🧠</span>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-text-primary">{intent.intentSummary}</p>
-          {intent.isVague && (
-            <p className="mt-0.5 text-xs text-text-muted">
-              Requête générale — voici une sélection variée
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Filter pills */}
-      {pills.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {pills.map((pill, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-text-primary border border-border shadow-sm"
-            >
-              {pill.icon && <span>{pill.icon}</span>}
-              {pill.label}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Suggested queries */}
-      {intent.suggestedQueries.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="text-xs text-text-muted mr-1 self-center">Essaye aussi :</span>
-          {intent.suggestedQueries.slice(0, 3).map((sq, i) => (
-            <a
-              key={i}
-              href={`/evenements?q=${encodeURIComponent(sq)}&ai=1`}
-              className="rounded-full border border-accent/30 bg-accent/5 px-2.5 py-1 text-xs text-accent hover:bg-accent/10 transition-colors"
-            >
-              {sq}
-            </a>
-          ))}
-        </div>
-      )}
-    </div>
+export async function generateMetadata({ searchParams }: Props) {
+  const params = await searchParams
+  const meta = listingMetadata(
+    '/evenements',
+    'Toutes les sorties à Paris : agenda culturel',
+    'L’agenda des sorties culturelles à Paris : concerts, expositions, théâtre, cinéma, ateliers. Filtre par date, quartier, budget et ambiance.',
+    params
   )
+  if (typeof params.q === 'string' && params.q) meta.title = `« ${params.q.slice(0, 60)} » : sorties à Paris`
+  return meta
 }
 
-function AlternativesSuggestions({
-  alternatives,
-  intent,
-}: {
-  alternatives: SearchResult[]
-  intent: AIIntent
-}) {
-  if (alternatives.length === 0) return null
-
-  return (
-    <div className="mt-8">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-lg">💡</span>
-        <h2 className="text-base font-semibold text-text-primary">
-          {intent.category ? 'Autres idées de sorties' : 'Vous pourriez aussi aimer'}
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {alternatives.map((alt) => (
-          <EventCard
-            key={alt.event.id}
-            event={{
-              ...alt.event,
-              category: alt.category,
-              venue: alt.venue,
-              tags: [],
-              ambiances: [],
-            } as never}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function StrategyBadge({ strategy }: { strategy: string }) {
-  const labels: Record<string, string> = {
-    exact: 'Résultat exact',
-    expanded_keywords: 'Recherche élargie',
-    category_date_only: 'Par catégorie',
-    no_arrondissement: 'Tous quartiers',
-    no_date: 'Toutes dates',
-    category_only: 'Par catégorie',
-    popular_fallback: 'Suggestions populaires',
-  }
-
-  const parts = strategy.split('+')
-  const label = parts.map(p => labels[p] || p).join(' + ')
-
-  if (strategy.includes('fallback')) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs text-yellow-700 border border-yellow-200">
-        ⚡ {label}
-      </span>
-    )
-  }
-
-  return null
+/** A query that reads like a sentence ("un truc à deux ce soir dans le 11e") is turned into filters. */
+function looksLikeSentence(q: string): boolean {
+  return q.trim().split(/\s+/).length >= 3
 }
 
 export default async function EvenementsPage({ searchParams }: Props) {
   const params = await searchParams
-  const hasQuery = params.q && params.q.trim().length >= 2
-  const isAI = hasQuery && (params.ai === '1' || params.q!.trim().length >= 8)
+  let query = parseEventParams(params)
+  let understood: { summary: string; source: 'rules' | 'ai' | 'empty'; editHref: string } | null = null
 
-  let eventsList: Array<{
-    event: typeof events.$inferSelect
-    venue: typeof venues.$inferSelect | null
-    category: typeof categories.$inferSelect | null
-    relevanceReason?: string
-    relevanceScore?: number
-  }> = []
-  let cats: Awaited<ReturnType<typeof getEvents>>['categories'] = []
-  let totalEvents = 0
-  let aiIntent: AIIntent | null = null
-  let aiError = false
-  let searchStrategy = ''
-  let alternatives: SearchResult[] = []
-
-  if (isAI) {
-    try {
-      const result = await aiSearch(params.q!)
-      aiIntent = result.intent
-      eventsList = result.events
-      totalEvents = result.totalFound
-      searchStrategy = result.searchStrategy
-      alternatives = result.alternatives
-
-      cats = await db.select().from(categories).orderBy(asc(categories.position))
-    } catch (error) {
-      console.error('[AI Search Page] Error:', error)
-      aiError = true
-      const normalResult = await getEvents(params)
-      eventsList = normalResult.events
-      cats = normalResult.categories
-      totalEvents = normalResult.total
+  if (query.q && looksLikeSentence(query.q) && params.raw !== '1') {
+    const { intent, source } = await parseOutingRequest(query.q)
+    if (source !== 'empty') {
+      const fromIntent = intentToQuery(intent, query.near)
+      const merged: EventQuery = {
+        ...query,
+        ...fromIntent,
+        when: query.when ?? intent.date ?? intent.when ?? null,
+        categories: query.categories?.length ? query.categories : fromIntent.categories,
+        arrondissements: query.arrondissements?.length ? query.arrondissements : fromIntent.arrondissements,
+        near: query.near ?? fromIntent.near ?? null,
+      }
+      understood = {
+        summary: intent.summary,
+        source,
+        editHref: eventsHref({ ...merged }),
+      }
+      query = merged
     }
-  } else if (hasQuery) {
-    // Short query — use normal DB search with keyword column
-    const normalResult = await getEvents(params)
-    eventsList = normalResult.events
-    cats = normalResult.categories
-    totalEvents = normalResult.total
-  } else {
-    const normalResult = await getEvents(params)
-    eventsList = normalResult.events
-    cats = normalResult.categories
-    totalEvents = normalResult.total
   }
 
   return (
-    <div className="px-4 py-6">
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            {isAI ? 'Résultats' : 'Explorer'}
-          </h1>
-          <p className="mt-0.5 text-[13px] text-text-muted">
-            {totalEvents.toLocaleString('fr-FR')} événement{totalEvents !== 1 ? 's' : ''} trouvé{totalEvents !== 1 ? 's' : ''}
-            {searchStrategy.includes('fallback') && totalEvents > 0 && (
-              <> — <StrategyBadge strategy={searchStrategy} /></>
-            )}
-          </p>
-        </div>
-      </div>
+    <div className="px-4">
+      <PageIntro title={query.q || understood ? 'Résultats' : 'Explorer'}>
+        {!query.q && !understood && 'Toutes les sorties à venir à Paris. Commence par une envie, un quartier ou une date.'}
+      </PageIntro>
 
-      {/* Search bar */}
-      <div className="mt-4">
-        <SearchBar className="max-w-lg" />
-      </div>
+      <SearchBox initial={typeof params.q === 'string' ? params.q : ''} className="mb-4 max-w-2xl" />
 
-      {/* AI error */}
-      {aiError && (
-        <div className="mt-3 rounded-lg border border-yellow-200/80 bg-yellow-50 px-4 py-2.5 text-[13px] text-yellow-700">
-          La recherche IA n&apos;a pas pu analyser ta demande. Voici les résultats classiques.
+      {understood && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-accent-soft px-4 py-3 text-[15px]">
+          <Sparkles className="h-4 w-4 text-accent" aria-hidden />
+          <span>
+            On a compris : <strong className="font-semibold">{understood.summary}</strong>
+          </span>
+          <Link href={`/evenements?q=${encodeURIComponent(String(params.q))}&raw=1`} className="text-[14px] text-accent underline underline-offset-2">
+            Chercher le texte exact
+          </Link>
         </div>
       )}
 
-      {/* AI Intent Banner */}
-      {aiIntent && params.q && (
-        <AIIntentBanner intent={aiIntent} query={params.q} />
-      )}
-
-      {/* Alternative interpretations for ambiguous queries */}
-      {aiIntent?.alternativeInterpretations && aiIntent.alternativeInterpretations.length > 0 && aiIntent.isVague && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-text-muted">Interprétations possibles :</span>
-          {aiIntent.alternativeInterpretations.slice(0, 4).map((interp, i) => (
-            <a
-              key={i}
-              href={`/evenements?q=${encodeURIComponent(interp)}&ai=1`}
-              className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
-            >
-              {interp}
-            </a>
-          ))}
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="mt-4">
-        <Suspense fallback={<FilterBarSkeleton />}>
-          <FilterBar categories={cats} />
-        </Suspense>
-      </div>
-
-      {/* Results grid */}
-      {eventsList.length > 0 ? (
-        <div className="mt-6">
-          <InfiniteEventGrid
-            initialEvents={eventsList.map((item) => ({
-              ...item.event,
-              category: item.category,
-              venue: item.venue,
-              tags: [],
-              ambiances: [],
-              _relevanceReason: item.relevanceReason,
-            } as never))}
-            apiParams={{
-              ...(params.category ? { category: params.category } : {}),
-              ...(params.date ? { date: params.date } : {}),
-              ...(params.free === 'true' ? { free: 'true' } : {}),
-              ...(params.arr ? { arr: params.arr } : {}),
-              ...(params.lat ? { lat: params.lat } : {}),
-              ...(params.lng ? { lng: params.lng } : {}),
-              ...(params.ambiance ? { ambiance: params.ambiance } : {}),
-            }}
-            sort="quality"
-          />
-        </div>
-      ) : (
-        <div className="mt-20 text-center">
-          <p className="text-5xl">🔍</p>
-          <p className="mt-4 text-lg font-bold text-text-primary">
-            Aucun événement trouvé
-          </p>
-          <p className="mt-1 text-[13px] text-text-muted">
-            {isAI
-              ? 'Essaie de reformuler ta recherche'
-              : "Essaie avec d'autres filtres"}
-          </p>
-          {aiIntent?.suggestedQueries && aiIntent.suggestedQueries.length > 0 && (
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {aiIntent.suggestedQueries.map((sq, i) => (
-                <a
-                  key={i}
-                  href={`/evenements?q=${encodeURIComponent(sq)}&ai=1`}
-                  className="rounded-full border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 transition-colors"
-                >
-                  {sq}
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Alternatives section */}
-      {aiIntent && (
-        <AlternativesSuggestions alternatives={alternatives} intent={aiIntent} />
-      )}
+      <Listing
+        query={query}
+        basePath="/evenements"
+        emptyTitle="Aucune sortie trouvée"
+        emptyText={query.q ? 'Essaie un mot plus simple, ou retire un filtre.' : 'Essaie d’enlever un filtre ou d’élargir la période.'}
+        emptyActions={[
+          { href: '/ce-soir', label: 'Ce soir' },
+          { href: '/ce-week-end', label: 'Ce week-end' },
+        ]}
+      />
     </div>
   )
 }

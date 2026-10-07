@@ -1,179 +1,45 @@
 import { ImageResponse } from 'next/og'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq } from 'drizzle-orm'
+import { getEventBySlug } from '@/lib/events/detail'
+import { formatWhen } from '@/lib/paris-time'
+import { formatPrice } from '@/lib/format'
 
-export const runtime = 'nodejs'
-export const alt = 'Paname Club — Événement'
+export const alt = 'Paname Club : fiche de sortie'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
+export const revalidate = 3600
+
+const INK = '#1c1730'
+const PAPER = '#f7f5ef'
+const VIOLET = '#a78bfa'
 
 export default async function OGImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  const e = await getEventBySlug(slug).catch(() => null)
 
-  const result = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(eq(events.slug, slug))
-    .limit(1)
-
-  if (result.length === 0) {
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#0A0A0A',
-            color: 'white',
-            fontSize: 48,
-            fontWeight: 800,
-          }}
-        >
-          PANAME CLUB
-        </div>
-      ),
-      size
-    )
-  }
-
-  const { event, venue, category } = result[0]
-  const startDate = event.startDate
-    ? new Date(event.startDate).toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-    : null
+  const title = e?.title ?? 'Que faire à Paris ce soir ?'
+  const when = e ? formatWhen(e) : ''
+  const where = e?.venue ? `${e.venue.name}${e.venue.arrondissement ? ` · ${e.venue.arrondissement}` : ''}` : ''
+  const price = e ? formatPrice(e) : null
 
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end',
-          padding: '48px',
-          backgroundColor: '#0A0A0A',
-          color: 'white',
-          position: 'relative',
-        }}
-      >
-        {/* Background gradient */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'linear-gradient(135deg, #1A1A2E 0%, #0A0A0A 50%, #16213E 100%)',
-            display: 'flex',
-          }}
-        />
-
-        {/* Accent circle decoration */}
-        <div
-          style={{
-            position: 'absolute',
-            top: -100,
-            right: -100,
-            width: 400,
-            height: 400,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(233,69,96,0.3) 0%, transparent 70%)',
-            display: 'flex',
-          }}
-        />
-
-        {/* Content */}
-        <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
-          {/* Category + Price badge */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            {category && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: 'rgba(233,69,96,0.2)',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: '#E94560',
-                }}
-              >
-                {category.icon} {category.name}
-              </div>
-            )}
-            {event.isFree && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(16,185,129,0.2)',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: '#10B981',
-                }}
-              >
-                Gratuit
-              </div>
-            )}
+      <div style={{ width: '100%', height: '100%', display: 'flex', background: INK, color: PAPER }}>
+        {e?.imageUrl && (
+          <img src={e.imageUrl} alt="" width={460} height={630} style={{ width: 460, height: 630, objectFit: 'cover' }} />
+        )}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 56 }}>
+          <div style={{ display: 'flex', fontSize: 30, fontWeight: 800 }}>
+            PANAME<span style={{ color: VIOLET, fontWeight: 300 }}>CLUB</span>
           </div>
-
-          {/* Title */}
-          <div
-            style={{
-              fontSize: 52,
-              fontWeight: 800,
-              lineHeight: 1.1,
-              marginBottom: '16px',
-              maxWidth: '900px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {event.title}
-          </div>
-
-          {/* Venue + Date */}
-          <div style={{ display: 'flex', gap: '24px', fontSize: 24, color: 'rgba(255,255,255,0.7)' }}>
-            {venue && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                📍 {venue.name}
-              </div>
-            )}
-            {startDate && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                📅 {startDate}
-              </div>
-            )}
-          </div>
-
-          {/* Branding */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: '6px',
-              marginTop: '32px',
-            }}
-          >
-            <span style={{ fontSize: 28, fontWeight: 900, color: 'white' }}>PANAME</span>
-            <span style={{ fontSize: 28, fontWeight: 300, color: '#E94560' }}>CLUB</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {when && <div style={{ fontSize: 30, color: VIOLET, fontWeight: 700 }}>{when}</div>}
+            <div style={{ fontSize: title.length > 60 ? 50 : 64, fontWeight: 800, lineHeight: 1.02, marginTop: 12 }}>
+              {title.length > 110 ? title.slice(0, 107) + '…' : title}
+            </div>
+            <div style={{ display: 'flex', gap: 24, marginTop: 24, fontSize: 28, color: '#f7f5efcc' }}>
+              {where && <span>{where}</span>}
+              {price && price.tone !== 'unknown' && <span style={{ color: price.tone === 'free' ? '#7ee2b8' : PAPER }}>{price.label}</span>}
+            </div>
           </div>
         </div>
       </div>

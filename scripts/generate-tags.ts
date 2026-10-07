@@ -1,5 +1,7 @@
 /**
  * Auto-generate tags for all events and populate event_tags table.
+ * Manual script. Tags written here are picked up by the Python Meilisearch sync
+ * (scrapers/pipelines/meili.py, `tags` field) on its next run.
  * Usage: pnpm tsx scripts/generate-tags.ts
  */
 import { config } from 'dotenv'

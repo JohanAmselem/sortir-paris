@@ -1,283 +1,115 @@
 """
-BilletReduc spider.
+BilletReduc spider — theatre, humour and concerts in Paris.
 Source: https://www.billetreduc.com
-Major French discount ticketing platform — excellent for theatre, stand-up,
-spectacles, and comedy shows in Paris. Great coverage of small venues.
 
-Strategy: Fetch listing pages to collect show URLs, then fetch each detail page
-which contains JSON-LD structured data with full event info (dates, venue, price).
+Legal basis: public structured data (schema.org JSON-LD).
+- Listing pages (/theatre, /humour, /concerts — Paris) carry an ItemList JSON-LD
+  with the 20 show URLs of the page (?page=N for the next ones).
+- Each show page carries one schema.org Event: startDate = next performance (with
+  time and offset), endDate = last performance, Place + PostalAddress, AggregateOffer
+  lowPrice/highPrice in euros.
+
+Note: the JSON-LD <script> type is HTML-escaped ("application/ld&#x2B;json");
+BeautifulSoup decodes it, so utils.jsonld handles it.
 """
 
-import json
+from __future__ import annotations
+
 import re
-import time
-from datetime import datetime
-from typing import Generator, Optional
-from bs4 import BeautifulSoup
-import httpx
+from typing import Generator, List, Optional
 
-from utils.normalize import (
-    clean_text,
-    truncate,
-    generate_slug,
-    parse_price,
-    compute_quality_score,
-)
+from utils.http import BudgetExceeded, PoliteClient
+from utils.jsonld import events_from_html, extract_jsonld
+from utils.normalize import absolute_url
 
+SOURCE = "billetreduc"
 BASE_URL = "https://www.billetreduc.com"
 
-# Updated URLs — site moved from /theatre-paris.htm to /theatre etc.
-LISTING_URLS = [
-    (f"{BASE_URL}/theatre", "theatre"),
-    (f"{BASE_URL}/humour", "spectacles"),
-    (f"{BASE_URL}/spectacles", "spectacles"),
-    (f"{BASE_URL}/concerts", "concerts"),
-    (f"{BASE_URL}/comedie", "spectacles"),
-    (f"{BASE_URL}/a-paris/", None),
+# (listing path, explicit category for the shows listed there)
+LISTINGS = [
+    ("/theatre", "theatre"),
+    ("/humour", "spectacles"),
+    ("/concerts", "concerts"),
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "fr-FR,fr;q=0.9",
-}
+_SHOW_RE = re.compile(r"^https?://www\.billetreduc\.com/spectacle/[a-z0-9\-]+-(\d+)/?$")
 
 
-def fetch_events(max_pages_per_cat: int = 3) -> Generator[dict, None, None]:
-    """Fetch events from BilletReduc listing + detail pages with JSON-LD."""
-
-    seen_urls: set[str] = set()
-
-    with httpx.Client(headers=HEADERS, follow_redirects=True, timeout=30) as client:
-        for listing_url, default_category in LISTING_URLS:
-            cat_name = listing_url.rstrip("/").split("/")[-1]
-            print(f"  Fetching BilletReduc: {cat_name}...")
-
-            for page in range(1, max_pages_per_cat + 1):
-                url = f"{listing_url}?page={page}" if page > 1 else listing_url
-
-                try:
-                    resp = client.get(url)
-                    resp.raise_for_status()
-                except Exception as e:
-                    print(f"  Error fetching {url}: {e}")
-                    break
-
-                soup = BeautifulSoup(resp.text, "html.parser")
-
-                # Collect show detail links from listing
-                show_links = set()
-                for a_tag in soup.find_all("a", href=True):
-                    href = a_tag["href"]
-                    if "/spectacle/" in href:
-                        full_url = href if href.startswith("http") else f"{BASE_URL}{href}"
-                        if full_url not in seen_urls:
-                            show_links.add(full_url)
-
-                if not show_links:
-                    print(f"    Page {page}: no show links found, stopping")
-                    break
-
-                count = 0
-                for show_url in show_links:
-                    seen_urls.add(show_url)
-                    event = fetch_show_detail(client, show_url, default_category)
-                    if event:
-                        yield event
-                        count += 1
-                    time.sleep(0.3)  # polite delay
-
-                print(f"    Page {page}: {count} events from {len(show_links)} links")
-                time.sleep(0.5)
+def show_id(url: str) -> Optional[str]:
+    m = _SHOW_RE.match(url or "")
+    return m.group(1) if m else None
 
 
-def fetch_show_detail(client: httpx.Client, url: str, default_category: Optional[str]) -> Optional[dict]:
-    """Fetch a show detail page and extract JSON-LD Event data."""
-    try:
-        resp = client.get(url)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"    Error fetching detail {url}: {e}")
-        return None
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Extract JSON-LD structured data
-    json_ld = None
-    for script in soup.find_all("script", type="application/ld+json"):
-        try:
-            data = json.loads(script.string)
-            if isinstance(data, dict) and data.get("@type") == "Event":
-                json_ld = data
-                break
-            elif isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get("@type") == "Event":
-                        json_ld = item
-                        break
-        except (json.JSONDecodeError, TypeError):
+def parse_listing(html: str, base_url: str = BASE_URL) -> List[str]:
+    """Show URLs of a listing page (from its ItemList JSON-LD; anchors as fallback)."""
+    urls: List[str] = []
+    for obj in extract_jsonld(html):
+        if obj.get("@type") != "ItemList":
             continue
-
-    if json_ld:
-        return parse_json_ld(json_ld, url, default_category)
-
-    # Fallback: parse HTML directly
-    return parse_detail_html(soup, url, default_category)
-
-
-def parse_json_ld(data: dict, url: str, default_category: Optional[str]) -> Optional[dict]:
-    """Parse a JSON-LD Event object into our standard format."""
-    title = clean_text(data.get("name"))
-    if not title:
-        return None
-
-    description = clean_text(data.get("description"))
-    start_date = data.get("startDate")
-    end_date = data.get("endDate")
-    image_url = data.get("image")
-    if isinstance(image_url, list):
-        image_url = image_url[0] if image_url else None
-
-    # Venue
-    location = data.get("location", {})
-    venue_name = None
-    venue_address = None
-    venue_zip = None
-    if isinstance(location, dict):
-        venue_name = location.get("name")
-        address = location.get("address", {})
-        if isinstance(address, dict):
-            venue_address = address.get("streetAddress")
-            venue_zip = address.get("postalCode")
-        elif isinstance(address, str):
-            venue_address = address
-
-    # Price from offers
-    price_min = None
-    price_max = None
-    is_free = False
-    offers = data.get("offers", {})
-    if isinstance(offers, dict):
-        price_val = offers.get("price")
-        if price_val is not None:
-            try:
-                price_min = int(float(price_val) * 100)
-            except (ValueError, TypeError):
-                pass
-    elif isinstance(offers, list):
-        prices = []
-        for offer in offers:
-            p = offer.get("price")
-            if p is not None:
-                try:
-                    prices.append(int(float(p) * 100))
-                except (ValueError, TypeError):
-                    pass
-        if prices:
-            price_min = min(prices)
-            price_max = max(prices) if len(prices) > 1 else None
-
-    if price_min is not None and price_min == 0:
-        is_free = True
-
-    # Category
-    category_slug = default_category
-    if not category_slug:
-        all_text = f"{title} {description or ''}".lower()
-        if any(kw in all_text for kw in ["concert", "musique", "live"]):
-            category_slug = "concerts"
-        elif any(kw in all_text for kw in ["humour", "stand-up", "one man", "sketch"]):
-            category_slug = "spectacles"
-        elif any(kw in all_text for kw in ["danse", "ballet"]):
-            category_slug = "danse"
-        elif any(kw in all_text for kw in ["exposition", "expo"]):
-            category_slug = "expos"
-        else:
-            category_slug = "theatre"
-
-    # Arrondissement from zip
-    arrondissement = None
-    if venue_zip and venue_zip.startswith("750"):
-        try:
-            arrondissement = str(int(venue_zip[3:]))
-        except ValueError:
-            pass
-
-    slug = generate_slug(title, start_date)
-    quality = compute_quality_score(
-        title=title, description=description, image_url=image_url,
-        start_date=start_date, price_raw=str(price_min) if price_min else None,
-        booking_url=url,
-    )
-
-    return {
-        "title": title,
-        "slug": slug,
-        "description": description,
-        "short_desc": truncate(description),
-        "image_url": image_url,
-        "start_date": start_date,
-        "end_date": end_date,
-        "price_min": price_min,
-        "price_max": price_max,
-        "is_free": is_free,
-        "booking_url": url,
-        "source": "billetreduc",
-        "source_url": url,
-        "source_id": slug,
-        "venue_name": venue_name,
-        "venue_address": venue_address,
-        "venue_city": "Paris",
-        "venue_zip": venue_zip,
-        "venue_arrondissement": arrondissement,
-        "venue_lat": None,
-        "venue_lng": None,
-        "raw_category": default_category or category_slug,
-        "category_slug": category_slug,
-        "tags": [],
-        "quality_score": quality,
-    }
+        for el in obj.get("itemListElement") or []:
+            if isinstance(el, dict):
+                item = el.get("item")
+                u = el.get("url") or (item.get("url") if isinstance(item, dict) else item)
+                u = absolute_url(base_url, u) if isinstance(u, str) else None
+                if u and show_id(u) and u not in urls:
+                    urls.append(u)
+    if urls:
+        return urls
+    for href in re.findall(r'href="([^"]*/spectacle/[^"?#]+)"', html or ""):
+        u = absolute_url(base_url, href)
+        if u and show_id(u) and u not in urls:
+            urls.append(u)
+    return urls
 
 
-def parse_detail_html(soup: BeautifulSoup, url: str, default_category: Optional[str]) -> Optional[dict]:
-    """Fallback: parse the detail page HTML when no JSON-LD is present."""
-    title_el = soup.find("h1")
-    if not title_el:
-        return None
-    title = clean_text(title_el.get_text())
-    if not title or len(title) < 3:
-        return None
+def parse_detail(html: str, url: str, category_slug: Optional[str] = None) -> List[dict]:
+    """Show page → event dicts (one per schema.org Event; usually one)."""
+    out = []
+    sid = show_id(url)
+    for ev in events_from_html(html, source=SOURCE, base_url=url, category_slug=category_slug):
+        if sid:
+            # Stable id per show: startDate is "next performance" and moves every run.
+            ev["source_id"] = f"billetreduc-{sid}"
+        out.append(ev)
+    return out
 
-    # Description
-    desc_el = soup.select_one(".description, .synopsis, [class*='description'], [class*='synopsis']")
-    description = clean_text(desc_el.get_text()) if desc_el else None
 
-    # Image
-    og_img = soup.find("meta", property="og:image")
-    image_url = og_img["content"] if og_img and og_img.get("content") else None
-
-    # Venue
-    venue_el = soup.select_one("[class*='lieu'], [class*='theatre'], [class*='venue']")
-    venue_name = clean_text(venue_el.get_text()) if venue_el else None
-
-    slug = generate_slug(title, None)
-    quality = compute_quality_score(
-        title=title, description=description, image_url=image_url,
-        start_date=None, price_raw=None, booking_url=url,
-    )
-
-    return {
-        "title": title, "slug": slug, "description": description,
-        "short_desc": truncate(description), "image_url": image_url,
-        "start_date": None, "end_date": None,
-        "price_min": None, "price_max": None, "is_free": False,
-        "booking_url": url, "source": "billetreduc",
-        "source_url": url, "source_id": slug,
-        "venue_name": venue_name, "venue_address": None,
-        "venue_city": "Paris", "venue_zip": None,
-        "venue_arrondissement": None,
-        "venue_lat": None, "venue_lng": None,
-        "raw_category": default_category or "theatre",
-        "category_slug": default_category or "theatre",
-        "tags": [], "quality_score": quality,
-    }
+def fetch_events(max_pages_per_cat: int = 3, max_shows: int = 300) -> Generator[dict, None, None]:
+    """Listing pages → show pages (JSON-LD). ~20 shows per listing page."""
+    seen: set = set()
+    errors = 0
+    with PoliteClient() as client:
+        for path, category in LISTINGS:
+            for page in range(1, max_pages_per_cat + 1):
+                url = f"{BASE_URL}{path}" + (f"?page={page}" if page > 1 else "")
+                html = client.get_text(url)
+                if html is None:
+                    if page == 1 and path == LISTINGS[0][0]:
+                        print(f"  [{SOURCE}] blocked: listing {url} unreachable — stopping")
+                        return
+                    break
+                show_urls = [u for u in parse_listing(html) if u not in seen]
+                if not show_urls:
+                    break
+                count = 0
+                for show_url in show_urls:
+                    if len(seen) >= max_shows:
+                        print(f"  [{SOURCE}] max_shows={max_shows} reached")
+                        return
+                    seen.add(show_url)
+                    try:
+                        detail = client.get_text(show_url)
+                        if detail is None:
+                            errors += 1
+                            continue
+                        for ev in parse_detail(detail, show_url, category):
+                            count += 1
+                            yield ev
+                    except BudgetExceeded:
+                        raise
+                    except Exception as e:  # one bad page never kills the run
+                        errors += 1
+                        print(f"  [{SOURCE}] error on {show_url}: {e}")
+                print(f"  [{SOURCE}] {path} page {page}: {count} events from {len(show_urls)} shows")
+    if errors:
+        print(f"  [{SOURCE}] {errors} show pages failed")

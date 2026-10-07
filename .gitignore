@@ -38,3 +38,7 @@ scrapers/*.egg-info/
 *.log
 coverage/
 .vercel
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/

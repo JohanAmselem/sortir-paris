@@ -4,6 +4,7 @@ import {
   text,
   boolean,
   integer,
+  jsonb,
   smallint,
   timestamp,
   index,
@@ -27,6 +28,12 @@ export const events = pgTable(
     priceMin: integer('price_min').default(0).notNull(),
     priceMax: integer('price_max').default(0).notNull(),
     isFree: boolean('is_free').default(false).notNull(),
+    // 'free' | 'paid' | 'unknown' — price_min/max = 0 is ambiguous without it
+    priceStatus: text('price_status', { enum: ['free', 'paid', 'unknown'] })
+      .default('unknown')
+      .notNull(),
+    // false when the source only gave a date (stored at 12:00 Paris)
+    timeKnown: boolean('time_known').default(true).notNull(),
     bookingUrl: text('booking_url'),
     categoryId: uuid('category_id').references(() => categories.id),
     venueId: uuid('venue_id').references(() => venues.id),
@@ -40,10 +47,14 @@ export const events = pgTable(
     sourceId: text('source_id'),
 
     // Quality & moderation
-    status: text('status', { enum: ['draft', 'active', 'expired', 'rejected'] })
+    status: text('status', { enum: ['draft', 'active', 'expired', 'rejected', 'cancelled'] })
       .default('active')
       .notNull(),
     qualityScore: smallint('quality_score').default(0).notNull(),
+    qualityReasons: jsonb('quality_reasons').$type<string[]>().default([]).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    // Set on cross-source duplicates: points to the event that is displayed
+    canonicalEventId: uuid('canonical_event_id'),
 
     // Denormalized counters
     saveCount: integer('save_count').default(0).notNull(),
@@ -53,11 +64,10 @@ export const events = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
+  // Indexes are managed in packages/db/sql/0004_data_quality_schema.sql
   (table) => [
-    index('idx_events_start_date').on(table.startDate).where(sql`status = 'active'`),
-    index('idx_events_category').on(table.categoryId).where(sql`status = 'active'`),
-    index('idx_events_venue').on(table.venueId),
-    index('idx_events_slug').on(table.slug),
+    index('idx_events_live_start').on(table.startDate).where(sql`status = 'active'`),
+    index('idx_events_venue_id').on(table.venueId),
     uniqueIndex('idx_events_source_dedup').on(table.source, table.sourceId),
   ]
 )

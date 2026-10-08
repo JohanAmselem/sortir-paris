@@ -15,7 +15,9 @@ def _by_id(evs, sid):
 
 def test_listing_cards():
     evs = parse_listing(load_fixture("theatreonline_listing.html"), today=TODAY)
-    assert len(evs) == 30
+    # 30 cards; the Montigny-le-Bretonneux (78) one is outside Paris + petite couronne
+    assert len(evs) == 29
+    assert not any(e["venue_city"] == "Montigny-le-Bretonneux" for e in evs)
     for ev in evs:
         assert_valid_event(ev)
         assert ev["source"] == "theatreonline"
@@ -56,4 +58,40 @@ def test_parse_location():
     assert parse_location("Théâtre du Palais Royal, Paris 1e") == ("Théâtre du Palais Royal", "Paris", "75001")
     assert parse_location("Avant-Seine, Colombes (92)") == ("Avant-Seine", "Colombes", None)
     assert parse_location("Théâtre des Halles, Avignon (84)") is None
+    assert parse_location("Théâtre de Saint-Quentin-en-Yvelines, Montigny-le-Bretonneux (78)") is None
+    assert parse_location("Théâtre Jean Vilar, Suresnes (92)") == ("Théâtre Jean Vilar", "Suresnes", None)
+    assert parse_location("MC93, Bobigny (93)")[1] == "Bobigny"
     assert parse_location(None) is None
+
+
+def test_fetch_paginates_until_no_new_cards(monkeypatch):
+    """All listing pages are read (no artificial page cap); past the last page the
+    site redirects to page 1, so the loop stops on the first page without new shows."""
+    import spiders.theatreonline as mod
+
+    page_html = load_fixture("theatreonline_listing.html")
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get_text(self, url):
+            calls.append(url)
+            n = int(url.rsplit("=", 1)[1])
+            if n == 1:
+                return page_html
+            if n == 2:  # a page with other shows
+                return page_html.replace("/97022", "/1197022")
+            return page_html  # past the last page: redirected to page 1 → nothing new
+
+    monkeypatch.setattr(mod, "PoliteClient", FakeClient)
+    evs = list(mod.fetch_events())
+    assert len(calls) == 3
+    assert len(evs) == 30  # 29 + the renamed show of page 2

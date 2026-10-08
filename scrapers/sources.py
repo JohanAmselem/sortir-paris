@@ -46,7 +46,8 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("ticketmaster", "ticketing", "spiders.ticketmaster", env=["TICKETMASTER_API_KEY"]),
     SourceSpec("fnacspectacles", "ticketing", "spiders.fnacspectacles", enabled=False,
                notes="blocked: all requests (incl. robots.txt) time out for the bot UA"),
-    SourceSpec("billetreduc", "ticketing", "spiders.billetreduc"),
+    SourceSpec("billetreduc", "theatre", "spiders.billetreduc", budget=25 * 60,
+               notes="Paris + 92/93/94 listings; detail pages for real date/time/price"),
     SourceSpec("mapado", "ticketing", "spiders.mapado", enabled=False,
                notes="no public feed: /paris 404, mapado.com is now B2B ticketing"),
     SourceSpec("eventbrite", "ticketing", "spiders.eventbrite_paris", enabled=False,
@@ -59,7 +60,7 @@ SOURCES: List[SourceSpec] = [
                notes="blocked: site 403 Cloudflare; official API artist-based (needs BANDSINTOWN_APP_ID + BANDSINTOWN_ARTISTS)"),
     # ── media / listings ──
     SourceSpec("sortiraparis", "media", "spiders.sortir_a_paris"),
-    SourceSpec("timeout", "media", "spiders.timeout_paris"),
+    SourceSpec("timeout", "media", "spiders.timeout_paris", budget=5 * 60),
     SourceSpec("offi", "media", "spiders.offi"),
     SourceSpec("infoconcert", "media", "spiders.infoconcert", enabled=False,
                notes="blocked: Cloudflare 403 challenge to bot UA (parser ready)"),
@@ -72,6 +73,12 @@ SOURCES: List[SourceSpec] = [
     SourceSpec("newmorning", "venues", "spiders.newmorning", kwargs={"max_details": 80}),
     SourceSpec("parisjazzclub", "venues", "spiders.parisjazzclub",
                kwargs={"max_pages": 45, "days_ahead": 7}),
+    # ── culture (programme parsers of single institutions) ──
+    SourceSpec("cinematheque", "culture", "spiders.cinematheque", budget=10 * 60,
+               kwargs={"months": 3, "days_ahead": 60, "max_details": 450}),
+    SourceSpec("forumdesimages", "culture", "spiders.forumdesimages", budget=5 * 60),
+    SourceSpec("residentadvisor", "media", "spiders.residentadvisor", enabled=False,
+               notes="not implemented: event pages behind a DataDome captcha (not bypassed)"),
     # ── cinema ──
     SourceSpec("allocine", "cinema", "spiders.allocine", budget=35 * 60,
                kwargs={"max_cinemas": 82, "days_ahead": 3}),

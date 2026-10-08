@@ -31,3 +31,55 @@ def test_detail_jsonld_event():
     assert ev["venue_zip"] == "75018" and ev["venue_arrondissement"] == "18e"
     assert ev["category_slug"] == "theatre"
     assert ev["booking_url"] == SHOW
+
+
+def test_pagination_last_page():
+    from spiders.billetreduc import last_page
+
+    html = load_fixture("billetreduc_listing_theatre_pagination.html")
+    assert last_page(html) == 57
+    assert len(parse_listing(html)) == 20
+    assert last_page(load_fixture("billetreduc_listing_theatre.html")) == 1
+
+
+def test_zone_filter_drops_shows_outside_petite_couronne():
+    html = load_fixture("billetreduc_detail.html")
+    assert parse_detail(html.replace("75018", "69002"), SHOW, "theatre") == []
+    assert len(parse_detail(html.replace("75018", "93100"), SHOW, "theatre")) == 1
+
+
+def test_fetch_reads_listings_proportionally_and_stops_on_budget(monkeypatch):
+    """Page 1 of every listing first, then the listing with the smallest share read;
+    show pages are opened until the time budget is nearly spent."""
+    import spiders.billetreduc as mod
+
+    listing = load_fixture("billetreduc_listing_theatre_pagination.html")  # 20 shows, 57 pages
+    detail = load_fixture("billetreduc_detail.html")
+    fetched = []
+    budget = {"left": 10_000.0}
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get_text(self, url):
+            fetched.append(url)
+            budget["left"] -= 1.0
+            return detail if "/spectacle/" in url else listing
+
+    monkeypatch.setattr(mod, "PoliteClient", FakeClient)
+    monkeypatch.setattr(mod, "_budget_left", lambda: budget["left"])
+    monkeypatch.setattr(mod, "LISTINGS", [("/theatre", "theatre"), ("/humour", "spectacles")])
+    budget["left"] = mod.BUDGET_MARGIN + 30  # room for ~30 requests
+    evs = list(mod.fetch_events())
+    listings = [u for u in fetched if "/spectacle/" not in u]
+    assert listings[:2] == ["https://www.billetreduc.com/theatre", "https://www.billetreduc.com/humour"]
+    # every listing page carries the same 20 shows here: they are opened once
+    assert len(evs) == len([u for u in fetched if "/spectacle/" in u]) <= 20
+    assert budget["left"] >= mod.BUDGET_MARGIN - 1

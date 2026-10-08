@@ -47,3 +47,56 @@ def test_detail_expo_price_from_tarifs_text():
     # "Tarifs : 14€, tarif réduit 12€."
     assert (ev["price_min"], ev["price_max"], ev["is_free"]) == (1200, 1400, False)
     assert ev["category_slug"] == "expos"
+
+
+def test_concert_cards_use_first_non_empty_start_date_with_time():
+    """Concert cards (trimmed /concerts/programme.html?npage=2, 2026-10-09) have an
+    empty startDate meta first and the real one with the time at the bottom: before the
+    fix every concert card was dropped."""
+    evs = parse_listing(load_fixture("offi_listing_concerts.html"), "concerts")
+    assert len(evs) == 15
+    for ev in evs:
+        assert_valid_event(ev)
+        assert ev["venue_zip"][:2] in {"75", "92", "93", "94"}
+        assert ev["category_slug"] == "concerts"
+    trio = next(e for e in evs if e["source_id"] == "3316207")
+    assert trio["title"] == "Rémy Decormeille trio"
+    assert trio["start_date"] == "2026-10-09T17:45:00+00:00"  # "2026-10-09 19:45:00" Paris
+    assert trio["time_known"] is True
+    assert trio["price_status"] == "unknown"
+    helios = next(e for e in evs if e["source_id"] == "3174107")
+    assert (helios["price_min"], helios["price_max"], helios["price_status"]) == (2250, 6600, "paid")
+
+
+def test_stage_cards_price_tag_and_category_from_tags():
+    evs = parse_listing(load_fixture("offi_listing_theatre.html"), "theatre")
+    assert len(evs) == 15
+    by_id = {e["source_id"]: e for e in evs}
+    assert (by_id["86966"]["price_min"], by_id["86966"]["price_max"]) == (4800, 8200)  # "48-82 €"
+    assert by_id["86966"]["category_slug"] == "danse"  # Le Lac des cygnes: "Ballet"
+    assert by_id["106631"]["category_slug"] == "theatre"
+    assert by_id["33928"]["category_slug"] == "spectacles"  # Le Roi Lion: "Comédie musicale"
+    assert by_id["106877"]["category_slug"] == "spectacles"  # "Cirque contemporain"
+    # discount badges ("-31%") and price tags are not tags
+    assert all("%" not in t and "€" not in t for e in evs for t in e["tags_raw"])
+
+
+def test_pagination_last_page_and_zone():
+    from spiders.offi import _zip_ok, last_page
+
+    assert last_page(load_fixture("offi_listing_theatre.html")) == 137
+    assert last_page(load_fixture("offi_listing_concerts.html")) == 189
+    assert _zip_ok("75011") and _zip_ok("92100") and _zip_ok("93200") and _zip_ok("94300")
+    assert not _zip_ok("78000") and not _zip_ok("77420") and not _zip_ok(None)
+
+
+def test_merge_detail_keeps_listing_time_and_adds_price_geo():
+    from spiders.offi import merge_detail
+
+    listing = parse_listing(load_fixture("offi_listing_concerts.html"), "concerts")[0]
+    detail = parse_detail(load_fixture("offi_detail_theatre.html"), THEATRE_URL)[0]
+    ev = merge_detail(listing, detail)
+    assert ev["start_date"] == listing["start_date"] and ev["time_known"] is True
+    assert ev["title"] == listing["title"]
+    assert (ev["price_min"], ev["price_max"]) == (1650, 4950)
+    assert ev["venue_lat"] == detail["venue_lat"]

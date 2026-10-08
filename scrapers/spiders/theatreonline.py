@@ -2,7 +2,8 @@
 TheatreOnline spider.
 Source: https://www.theatreonline.com (ticketing platform; HTML scraping of schema.org microdata).
 
-The listing /Spectacles/Liste?page=N (30 shows/page) has one schema.org/Event
+The listing /Spectacles/Liste?page=N (30 shows/page, ~95 pages / ~2,800 shows across
+France on 2026-10-09; every page is read until the first empty one) has one schema.org/Event
 microdata card per show with: name, url, image, location text ("Théâtre Edouard VII,
 Paris 9e" / "Avant-Seine, Colombes (92)"), ISO startDate/endDate metas, a visible
 date line ("du 16 sept. 2026 au 10 janv. 2027"), tags (genre, price "18 - 46,5 €").
@@ -10,7 +11,9 @@ date line ("du 16 sept. 2026 au 10 janv. 2027"), tags (genre, price "18 - 46,5 �
 Dates: the ISO metas are used (no month-order / year-rollover ambiguity); the
 visible line is only a fallback, parsed with parse_date_fr (durations such as
 "1h40" are never read as times). Show times are not on the listing → time unknown.
-No JSON-LD on listing or detail pages (checked 2026-10-07).
+No JSON-LD on listing or detail pages (checked 2026-10-07). No robots.txt (404).
+Zone: Paris + petite couronne only — suburban venues are kept for departments
+92, 93 and 94 (the card gives "(92)", not the postcode).
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from bs4 import BeautifulSoup
 from utils.dates import parse_date_fr
 from utils.event import make_event
 from utils.http import PoliteClient
-from utils.normalize import IDF_DEPARTMENTS, absolute_url, clean_text, parse_price_fr
+from utils.normalize import SERVICE_DEPARTMENTS, absolute_url, clean_text, parse_price_fr
 
 SOURCE = "theatreonline"
 BASE_URL = "https://www.theatreonline.com"
@@ -33,11 +36,13 @@ LISTING_URL = f"{BASE_URL}/Spectacles/Liste"
 _ID_RE = re.compile(r"/Spectacle/[^/]+/(\d+)")
 _PARIS_RE = re.compile(r"^paris\s*(\d{1,2})\s*(?:e|er|eme)?$", re.I)
 _DEPT_RE = re.compile(r"^(.*?)\s*\((\d{2,3})\)$")
+_CARD_RE = re.compile(r'<div[^>]+class="spectacle-item[^"]*"[^>]*itemscope')
 
 
 def parse_location(text: Optional[str]) -> Optional[Tuple[str, str, Optional[str]]]:
     """'Théâtre Edouard VII, Paris 9e' → (venue, 'Paris', '75009');
-    'Avant-Seine, Colombes (92)' → (venue, 'Colombes', None). None if outside IDF."""
+    'Avant-Seine, Colombes (92)' → (venue, 'Colombes', None).
+    None outside Paris + petite couronne (75, 92, 93, 94)."""
     text = clean_text(text)
     if not text or "," not in text:
         return None
@@ -51,7 +56,7 @@ def parse_location(text: Optional[str]) -> Optional[Tuple[str, str, Optional[str
     if (place or "").lower() == "paris":
         return venue, "Paris", None
     m = _DEPT_RE.match(place or "")
-    if m and m.group(2) in IDF_DEPARTMENTS:
+    if m and m.group(2) in SERVICE_DEPARTMENTS:
         return venue, m.group(1), None
     return None
 
@@ -143,24 +148,33 @@ def _parse_card(card, today=None) -> Optional[dict]:
     )
 
 
-def fetch_events(max_pages: int = 10) -> Generator[dict, None, None]:
+def fetch_events(max_pages: int = 150) -> Generator[dict, None, None]:
+    """Every listing page (stops at the first page without new cards — past the last
+    page the site redirects to page 1 — or after `max_pages`)."""
     seen = set()
-    count = 0
+    raw_seen: set = set()
+    count = pages = 0
     with PoliteClient() as client:
         for page in range(1, max_pages + 1):
             html = client.get_text(f"{LISTING_URL}?page={page}")
             if html is None:
                 if page == 1:
-                    print(f"  [{SOURCE}] listing unavailable — nothing to do")
+                    print(f"  [{SOURCE}] blocked or unavailable: listing page 1 — nothing to do")
                 break
-            events = [e for e in parse_listing(html) if e["source_id"] not in seen]
-            if not events:
-                break
-            for ev in events:
+            if not _CARD_RE.search(html):
+                break  # past the last page (the page still mentions the CSS class, not a card)
+            raw_ids = set(_ID_RE.findall(html))
+            if raw_ids <= raw_seen:
+                break  # past the last page the site redirects to page 1: nothing new
+            raw_seen |= raw_ids
+            pages += 1
+            for ev in parse_listing(html):
+                if ev["source_id"] in seen:
+                    continue
                 seen.add(ev["source_id"])
                 count += 1
                 yield ev
-    print(f"  [{SOURCE}] {count} shows")
+    print(f"  [{SOURCE}] {count} shows in Paris + petite couronne from {pages} listing pages")
 
 
 if __name__ == "__main__":

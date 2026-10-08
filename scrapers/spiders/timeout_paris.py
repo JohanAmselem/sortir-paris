@@ -3,7 +3,13 @@ Time Out Paris spider.
 Source: https://www.timeout.fr/paris (editorial guide; public structured data JSON-LD).
 
 Strategy:
-  1. A few section / "best of" pages → candidate detail URLs (/paris/<section>/<slug>).
+  1. Candidate detail URLs (/paris/<section>/<slug>) come from
+     - section and "best of" list pages (expositions du moment, meilleurs concerts,
+       sélection du week-end, calendrier du mois…), and
+     - the public XML sitemap (robots.txt lists /paris/sitemap.xml.gz): the two most
+       recent sub-sitemaps, URLs in event sections modified in the last
+       `sitemap_days` days. Time Out Paris publishes few event reviews (~10–20 a
+       month in 2026), so the volume stays modest whatever the crawl depth.
   2. Each detail page: the JSON-LD is a schema.org Review whose `itemReviewed` is the
      event (TheaterEvent/MusicEvent/... with startDate, endDate, Place). Pages that are
      plain articles/lists (no event in JSON-LD) are skipped.
@@ -23,20 +29,31 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 from utils.event import make_event
-from utils.http import BudgetExceeded, PoliteClient
+from utils.http import BudgetExceeded, PoliteClient, current_budget
 from utils.jsonld import EVENT_TYPES, _types, extract_jsonld, image_from, location_from
-from utils.normalize import IDF_DEPARTMENTS, absolute_url, clean_text, in_idf, parse_price_fr
+from utils.normalize import SERVICE_DEPARTMENTS, absolute_url, clean_text, in_service_zone
 
 SOURCE = "timeout"
 BASE_URL = "https://www.timeout.fr"
 
 LISTING_PAGES = [
     "/paris/art/les-expositions-du-moment",
+    "/paris/art/les-expositions-a-voir-en-ce-moment-a-paris-toutes-les-critiques-de-time-out-paris",
     "/paris/art",
     "/paris/musique",
+    "/paris/musique/meilleurs-concerts-paris",
+    "/paris/musique/festivals-musique-paris",
     "/paris/theatre",
     "/paris/que-faire-a-paris",
+    "/paris/que-faire-a-paris/selection-week-end",
+    "/paris/que-faire-a-paris/les-meilleurs-plans-de-la-semaine",
+    "/paris/que-faire-a-paris/calendrier-mois",
 ]
+SITEMAPS = [
+    "/paris/sitemap_0.xml.gz",
+    "/paris/sitemap_1.xml.gz",
+]
+BUDGET_MARGIN = 30
 
 SECTION_CATEGORY = {
     "art": "expos",
@@ -50,6 +67,9 @@ SECTION_CATEGORY = {
 }
 
 _DETAIL_RE = re.compile(r"^/paris/([a-z-]+)/([a-z0-9-]+)/?$")
+_SITEMAP_URL_RE = re.compile(
+    r"<loc>\s*(https://www\.timeout\.fr/paris/[^<\s]+)\s*</loc>\s*(?:<lastmod>\s*([0-9-]{10})[^<]*</lastmod>)?"
+)
 
 
 # ─────────────────────────── pure parsers ───────────────────────────
@@ -71,6 +91,22 @@ def parse_listing(html: str) -> List[str]:
         url = f"{BASE_URL}{p.path.rstrip('/')}"
         if url not in out:
             out.append(url)
+    return out
+
+
+def parse_sitemap(xml: str, since=None) -> List[str]:
+    """Event-section detail URLs of a sitemap (lastmod ≥ `since` when given)."""
+    out: List[str] = []
+    for url, lastmod in _SITEMAP_URL_RE.findall(xml or ""):
+        p = urlparse(url)
+        m = _DETAIL_RE.match(p.path)
+        if not m or m.group(1) not in SECTION_CATEGORY:
+            continue
+        if since is not None and lastmod and lastmod < since.isoformat():
+            continue
+        u = f"{BASE_URL}{p.path.rstrip('/')}"
+        if u not in out:
+            out.append(u)
     return out
 
 
@@ -109,10 +145,14 @@ def parse_detail(html: str, url: str, category_slug: Optional[str] = None) -> Li
     zip_code = loc.get("venue_zip")
     if not loc.get("venue_name"):
         return []
-    if loc.get("venue_lat") is not None and loc.get("venue_lng") is not None:
-        if not in_idf(loc["venue_lat"], loc["venue_lng"]):
+    # Paris + petite couronne (75, 92, 93, 94): postcode first, else coordinates.
+    if zip_code and re.fullmatch(r"\d{5}", str(zip_code)):
+        if str(zip_code)[:2] not in SERVICE_DEPARTMENTS:
             return []
-    elif not zip_code or zip_code[:2] not in IDF_DEPARTMENTS:
+    elif loc.get("venue_lat") is not None and loc.get("venue_lng") is not None:
+        if not in_service_zone(loc["venue_lat"], loc["venue_lng"]):
+            return []
+    else:
         return []
 
     if category_slug is None:
@@ -153,26 +193,63 @@ def parse_detail(html: str, url: str, category_slug: Optional[str] = None) -> Li
 
 # ─────────────────────────── network ───────────────────────────
 
-def fetch_events(max_pages: int = 3, max_details: int = 60) -> Generator[dict, None, None]:
-    """max_pages: number of LISTING_PAGES to read per 'page' unit (kept for run.py
-    compatibility: Time Out sections are not paginated; max_pages>=3 reads all of them).
-    max_details: cap on detail pages fetched."""
-    listings = LISTING_PAGES[: max(1, max_pages) * 2]
+def _sitemap_text(client, url: str) -> Optional[str]:
+    """Sitemap body; the .gz files are served either gzipped or already decoded."""
+    import gzip
+
+    try:
+        resp = client.get(url)
+    except BudgetExceeded:
+        raise
+    except Exception as e:
+        print(f"  [{SOURCE}] sitemap {url} failed: {e}")
+        return None
+    if resp.status_code != 200:
+        print(f"  [{SOURCE}] sitemap {url} → HTTP {resp.status_code}")
+        return None
+    body = resp.content
+    if body[:2] == b"\x1f\x8b":
+        try:
+            body = gzip.decompress(body)
+        except OSError:
+            return None
+    return body.decode("utf-8", "replace")
+
+
+def fetch_events(max_pages: int = 3, max_details: int = 400, sitemap_days: int = 240) -> Generator[dict, None, None]:
+    """max_pages: kept for run.py compatibility (sections are not paginated).
+    Candidates from list pages first, then from the sitemaps; detail pages are
+    opened while the time budget allows (max_details as a hard cap)."""
+    from datetime import timedelta
+
+    from utils.dates import now_paris
+
     urls: List[str] = []
-    skipped = errors = count = 0
+    skipped = errors = count = opened = 0
+    since = now_paris().date() - timedelta(days=sitemap_days) if sitemap_days else None
     with PoliteClient() as client:
-        for path in listings:
+        for path in LISTING_PAGES:
             html = client.get_text(BASE_URL + path)
             if html is None:
                 continue
             for u in parse_listing(html):
-                if u not in urls and u.rstrip("/") != (BASE_URL + path).rstrip("/"):
+                if u not in urls and u.rstrip("/") not in (BASE_URL + p for p in LISTING_PAGES):
+                    urls.append(u)
+        n_list = len(urls)
+        for sm in SITEMAPS:
+            xml = _sitemap_text(client, BASE_URL + sm)
+            for u in parse_sitemap(xml, since):
+                if u not in urls and u not in (BASE_URL + p for p in LISTING_PAGES):
                     urls.append(u)
         if not urls:
             print(f"  [{SOURCE}] no candidate URLs (site changed or blocked) — nothing to do")
             return
-        print(f"  [{SOURCE}] {len(urls)} candidate pages, fetching up to {max_details}")
+        print(f"  [{SOURCE}] {len(urls)} candidate pages ({n_list} from list pages), fetching up to {max_details}")
         for url in urls[:max_details]:
+            if current_budget().remaining() < BUDGET_MARGIN:
+                print(f"  [{SOURCE}] time budget nearly spent — stopping after {opened} pages")
+                break
+            opened += 1
             try:
                 html = client.get_text(url)
                 if html is None:
@@ -190,7 +267,7 @@ def fetch_events(max_pages: int = 3, max_details: int = 60) -> Generator[dict, N
             for ev in events:
                 count += 1
                 yield ev
-    print(f"  [{SOURCE}] {count} events, {skipped} non-event pages skipped, {errors} errors")
+    print(f"  [{SOURCE}] {count} events, {skipped} non-event / out-of-zone pages skipped, {errors} errors")
 
 
 if __name__ == "__main__":

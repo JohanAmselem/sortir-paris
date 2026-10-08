@@ -1,0 +1,244 @@
+{
+ "rest_url": "https://www.exploradome.fr/wp-json/tribe/events/v1/events/?page=1&per_page=50&start_date=2026-10-08 00:00:00&end_date=2028-10-08 23:59:59&status=publish",
+ "total": 31,
+ "total_pages": 1,
+ "events": [
+  {
+   "id": 14529,
+   "global_id": "www.exploradome.fr?id=14529",
+   "global_id_lineage": [
+    "www.exploradome.fr?id=14529"
+   ],
+   "author": "18",
+   "status": "publish",
+   "date": "2026-09-30 10:07:09",
+   "date_utc": "2026-09-30 08:07:09",
+   "modified": "2026-09-30 10:15:25",
+   "modified_utc": "2026-09-30 08:15:25",
+   "url": "https://www.exploradome.fr/evenement/visite-dune-heure-10-oct-2026-10h30/",
+   "rest_url": "https://www.exploradome.fr/wp-json/tribe/events/v1/events/14529",
+   "title": "Visite d&rsquo;une heure &#8211; 10 oct. 2026-10h30",
+   "description": "<p>Seulement le 10 octobre 2026, de 10h30 à 18h00, nous ouvrons les portes du musée et vous offrons une visite d&rsquo;une heure à notre espace permanent pour profiter de près de 50 manipulations et à notre exposition temporaire « Fabriq&rsquo;Expo ». Nous vous souhaitons une très bonne visite. Profitez également de nos ateliers pour 5 euros par personne réservables sur notre site internet.</p>\n<div class=\"CampaignPresentation Card\" data-testid=\"campaign-presentation\">\n<div class=\"GeneratedContentWrapper\">\n<div class=\"'GeneratedContent\">\n<h4><strong>Informations pratiques  </strong></h4>\n<ul>\n<li><strong>Âge :  </strong>à partir de 6 ans</li>\n<li><strong>Durée : </strong>1 heure</li>\n<li><strong>Inscription en ligne</strong></li>\n</ul>\n<p>&nbsp;</p>\n</div>\n</div>\n</div>\n<p><iframe id=\"haWidget\" style=\"width: 100%; height: 750px; border: none;\" src=\"https://www.helloasso.com/associations/savoir-apprendre/evenements/visite-d-une-heure-10-oct-2026/widget\" scrolling=\"auto\"></iframe></p>",
+   "excerpt": "",
+   "slug": "visite-dune-heure-10-oct-2026-10h30",
+   "image": false,
+   "all_day": false,
+   "start_date": "2026-10-10 10:30:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "10",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-10 11:30:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "11",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-10 08:30:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "08",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-10 09:30:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "09",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "Gratuit",
+   "cost_details": {
+    "currency_symbol": "€",
+    "currency_code": "EUR",
+    "currency_position": "suffix",
+    "values": [
+     "0"
+    ]
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": [],
+   "custom_fields": []
+  },
+  {
+   "id": 14591,
+   "global_id": "www.exploradome.fr?id=14591",
+   "global_id_lineage": [
+    "www.exploradome.fr?id=14591"
+   ],
+   "author": "18",
+   "status": "publish",
+   "date": "2026-10-01 16:55:46",
+   "date_utc": "2026-10-01 14:55:46",
+   "modified": "2026-10-01 16:57:10",
+   "modified_utc": "2026-10-01 14:57:10",
+   "url": "https://www.exploradome.fr/evenement/la-science-du-petit-dejeuner-1030/",
+   "rest_url": "https://www.exploradome.fr/wp-json/tribe/events/v1/events/14591",
+   "title": "La science du petit déjeuner-10:30",
+   "description": "<p>La science du petit-déjeuner : à quoi nous sert-il ? Où vont les aliments par la suite ? Suivez le trajet de la digestion !</p>\n<div class=\"CampaignPresentation Card\" data-testid=\"campaign-presentation\">\n<div class=\"GeneratedContentWrapper\">\n<div class=\"'GeneratedContent\">\n<h4><strong>Informations pratiques  </strong></h4>\n<ul>\n<li><strong>Âge :  </strong>à partir de 6 ans</li>\n<li><strong>Durée : </strong>entre 15 à 25 mn</li>\n</ul>\n<ul>\n<li><strong>Inscription en ligne</strong></li>\n</ul>\n</div>\n</div>\n</div>\n<p><iframe id=\"haWidget\" style=\"width: 100%; height: 750px; border: none;\" src=\"https://www.helloasso.com/associations/savoir-apprendre/evenements/la-science-du-petit-dejeuner/widget\" scrolling=\"auto\"></iframe></p>",
+   "excerpt": "",
+   "slug": "la-science-du-petit-dejeuner-1030",
+   "image": false,
+   "all_day": false,
+   "start_date": "2026-10-10 10:30:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "10",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-10 10:55:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "10",
+    "minutes": "55",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-10 08:30:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "08",
+    "minutes": "30",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-10 08:55:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "08",
+    "minutes": "55",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "5€",
+   "cost_details": {
+    "currency_symbol": "€",
+    "currency_code": "EUR",
+    "currency_position": "suffix",
+    "values": [
+     "5"
+    ]
+   },
+   "website": "",
+   "show_map": false,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": [],
+   "custom_fields": []
+  },
+  {
+   "id": 14587,
+   "global_id": "www.exploradome.fr?id=14587",
+   "global_id_lineage": [
+    "www.exploradome.fr?id=14587"
+   ],
+   "author": "18",
+   "status": "publish",
+   "date": "2026-10-01 16:46:13",
+   "date_utc": "2026-10-01 14:46:13",
+   "modified": "2026-10-01 16:46:13",
+   "modified_utc": "2026-10-01 14:46:13",
+   "url": "https://www.exploradome.fr/evenement/epices-1115/",
+   "rest_url": "https://www.exploradome.fr/wp-json/tribe/events/v1/events/14587",
+   "title": "Epices &#8211; 11:15",
+   "description": "<p>Epices : elles sentent bons et donnent du goût au plat mais pas seulement : elles peuvent également servir de peinture. A vos pinceaux !</p>\n<div class=\"CampaignPresentation Card\" data-testid=\"campaign-presentation\">\n<div class=\"GeneratedContentWrapper\">\n<div class=\"'GeneratedContent\">\n<h4><strong>Informations pratiques  </strong></h4>\n<ul>\n<li><strong>Âge :  </strong>à partir de 6 ans</li>\n<li><strong>Durée : </strong>entre 15 à 25 mn</li>\n<li><strong>Inscription en ligne</strong></li>\n</ul>\n<p>&nbsp;</p>\n</div>\n</div>\n</div>\n<p><iframe id=\"haWidget\" allow=\"payment 'self' https://paymenthub.helloassopay.com https://helloasso.com\" allowtransparency=\"true\" scrolling=\"auto\" src=\"https://www.helloasso.com/associations/savoir-apprendre/evenements/epices/widget\" style=\"width: 100%; height: 750px; border: none;\" onload=\"window.addEventListener('message', function(e) { const dataHeight = e.data.height; const haWidgetElement = document.getElementById('haWidget'); \n  if (dataHeight > parseFloat(haWidgetElement.height || 0)) { haWidgetElement.height = dataHeight + &lsquo;px&rsquo;;}}) »></iframe></p>",
+   "excerpt": "",
+   "slug": "epices-1115",
+   "image": false,
+   "all_day": false,
+   "start_date": "2026-10-10 11:15:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "11",
+    "minutes": "15",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-10 11:40:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "11",
+    "minutes": "40",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-10 09:15:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "09",
+    "minutes": "15",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-10 09:40:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "09",
+    "minutes": "40",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "5€",
+   "cost_details": {
+    "currency_symbol": "€",
+    "currency_code": "EUR",
+    "currency_position": "suffix",
+    "values": [
+     "5"
+    ]
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": [],
+   "custom_fields": []
+  }
+ ]
+}

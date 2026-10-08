@@ -1,0 +1,605 @@
+{
+ "rest_url": "https://bizzartclub.com/wp-json/tribe/events/v1/events/?page=1&per_page=50&start_date=2026-10-08 00:00:00&end_date=2028-10-08 23:59:59&status=publish",
+ "total": 23,
+ "total_pages": 1,
+ "events": [
+  {
+   "id": 9103,
+   "global_id": "bizzartclub.com?id=9103",
+   "global_id_lineage": [
+    "bizzartclub.com?id=9103"
+   ],
+   "author": "1",
+   "status": "publish",
+   "date": "2026-09-30 08:20:20",
+   "date_utc": "2026-09-30 06:20:20",
+   "modified": "2026-09-30 08:20:20",
+   "modified_utc": "2026-09-30 06:20:20",
+   "url": "https://bizzartclub.com/event/live-and-soul-afterwork-feat-soulness-yannick-claire-mc-marina-dj-jp-mano-2/",
+   "rest_url": "https://bizzartclub.com/wp-json/tribe/events/v1/events/9103",
+   "title": "LIVE AND SOUL AFTERWORK Feat SOULNESS, YANNICK CLAIRE, MC MARINA, DJ JP MANO",
+   "description": "<p><strong> </strong></p>\n<p>C’est parti pour l’afterwork le plus fun de Panam ! Rejoins ce soir ton spot en bordure du Canal Saint Martin&#8230; Musique live Soul, Pop, RnB, DJs, blindtest… Au live le talent l’énergie et la fraîcheur de Yannick Claire pour vous ambiancer sur du RnB, de la Soul &amp; du Funk!! <strong>« </strong>DE-COM-PRE-SSEZ VOUS ALLEZ A-DO-RER !! »</p>\n<p>&nbsp;</p>\n<p>Entrée gratuite avant 21h – 12€ ensuite</p>\n<p>Restaurant bar tapas dès 19h – happy hours au bar jusque 21h30</p>",
+   "excerpt": "",
+   "slug": "live-and-soul-afterwork-feat-soulness-yannick-claire-mc-marina-dj-jp-mano-2",
+   "image": {
+    "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1.jpg",
+    "id": 9104,
+    "extension": "jpg",
+    "width": 1181,
+    "height": 1772,
+    "filesize": 1987245,
+    "sizes": {
+     "medium": {
+      "width": 200,
+      "height": 300,
+      "mime-type": "image/jpeg",
+      "filesize": 635424,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-200x300.jpg"
+     },
+     "large": {
+      "width": 682,
+      "height": 1024,
+      "mime-type": "image/jpeg",
+      "filesize": 780912,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-682x1024.jpg"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/jpeg",
+      "filesize": 623302,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-150x150.jpg"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 1152,
+      "mime-type": "image/jpeg",
+      "filesize": 816986,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-768x1152.jpg"
+     },
+     "etfrtb_logo": {
+      "width": 133,
+      "height": 200,
+      "mime-type": "image/jpeg",
+      "filesize": 624285,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-133x200.jpg"
+     },
+     "1536x1536": {
+      "width": 1024,
+      "height": 1536,
+      "mime-type": "image/jpeg",
+      "filesize": 933726,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-1024x1536.jpg"
+     },
+     "post-thumbnail": {
+      "width": 370,
+      "height": 555,
+      "mime-type": "image/jpeg",
+      "filesize": 676532,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-370x555.jpg"
+     },
+     "pubzinne-thumb-huge": {
+      "width": 1170,
+      "height": 658,
+      "mime-type": "image/jpeg",
+      "filesize": 755681,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-1170x658.jpg"
+     },
+     "pubzinne-thumb-big": {
+      "width": 800,
+      "height": 460,
+      "mime-type": "image/jpeg",
+      "filesize": 692092,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-800x460.jpg"
+     },
+     "pubzinne-thumb-med": {
+      "width": 370,
+      "height": 208,
+      "mime-type": "image/jpeg",
+      "filesize": 637230,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-370x208.jpg"
+     },
+     "pubzinne-thumb-tiny": {
+      "width": 90,
+      "height": 90,
+      "mime-type": "image/jpeg",
+      "filesize": 617633,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-90x90.jpg"
+     },
+     "pubzinne-thumb-masonry-big": {
+      "width": 760,
+      "height": 1140,
+      "mime-type": "image/jpeg",
+      "filesize": 812673,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-760x1140.jpg"
+     },
+     "pubzinne-thumb-masonry": {
+      "width": 370,
+      "height": 555,
+      "mime-type": "image/jpeg",
+      "filesize": 676532,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-370x555.jpg"
+     },
+     "pubzinne-thumb-team": {
+      "width": 470,
+      "height": 560,
+      "mime-type": "image/jpeg",
+      "filesize": 689163,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-470x560.jpg"
+     },
+     "trx_addons-thumb-small": {
+      "width": 270,
+      "height": 152,
+      "mime-type": "image/jpeg",
+      "filesize": 628134,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-270x152.jpg"
+     },
+     "trx_addons-thumb-portrait": {
+      "width": 370,
+      "height": 493,
+      "mime-type": "image/jpeg",
+      "filesize": 671034,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-370x493.jpg"
+     },
+     "trx_addons-thumb-avatar": {
+      "width": 370,
+      "height": 370,
+      "mime-type": "image/jpeg",
+      "filesize": 657875,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/LIVE-AND-SOUL-tous-les-jeudis-CMJN1-370x370.jpg"
+     }
+    }
+   },
+   "all_day": false,
+   "start_date": "2026-10-08 19:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "19",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-09 02:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "02",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-08 17:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "17",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-09 00:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "00",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "suffix",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": []
+  },
+  {
+   "id": 9106,
+   "global_id": "bizzartclub.com?id=9106",
+   "global_id_lineage": [
+    "bizzartclub.com?id=9106"
+   ],
+   "author": "1",
+   "status": "publish",
+   "date": "2026-09-30 08:22:51",
+   "date_utc": "2026-09-30 06:22:51",
+   "modified": "2026-09-30 08:22:51",
+   "modified_utc": "2026-09-30 06:22:51",
+   "url": "https://bizzartclub.com/event/steve-ray-ladson-us-gladys-soulness/",
+   "rest_url": "https://bizzartclub.com/wp-json/tribe/events/v1/events/9106",
+   "title": "STEVE RAY LADSON (US) * GLADYS * SOULNESS",
+   "description": "<p><strong>STEVE RAY LADSON (US)* GLADYS * SOULNESS</strong></p>\n<p>Steve Ray Ladson est un musicien et auteur-compositeur polyvalent originaire de Caroline du Sud, aux États-Unis. Il s’impose aujourd’hui comme l’une des voix les plus captivantes des scènes blues, roots et country. Véritable virtuose, ses talents s’étendent à de nombreux instruments : le banjo, la guitare, le piano, l’orgue Hammond, la basse, l’accordéon, les cuillères et l’harmonica. Il a joué un rôle déterminant dans le succès des The Blind Boys of Alabama (lauréats de six Grammy Awards), et a également collaboré avec Robert Randolph and the Family Band (4 nominations  Grammy ).</p>\n<p>Aujourd’hui, il trace son propre chemin musical en mettant en lumière son propre genre : le « Blackgrass Brothercana ». Sa mission ? Préserver l’essence du blues, du funk et du rock n’roll.<br />\nFort de son passage remarqué en finale de <em>America’s Got Talent</em>, qui l’a propulsé au sommet des classements iTunes avec deux compositions originales numéro 1.</p>\n<p>Steve Ray est de retour en Europe et ce soir il viendra interpréter quelques compositions originales ainsi que quelques reprises Soul Pop… Le tout accompagné par notre combo de rêve Soulness ! Au chant également l’irrésistible Gladys pour des covers Soul Rnb !</p>\n<p>Petite précision ce soir c’est l’anniversaire de Steve Ray, venez lui souhaiter avec nous!!!</p>\n<p>&nbsp;</p>\n<p>Entrée gratuite avant 21h – 12€ ensuite – concert suivi d’une soirée</p>\n<p>Restaurant bar tapas dès 20h – happy hours au bar jusque 21h30</p>\n<p>&nbsp;</p>",
+   "excerpt": "",
+   "slug": "steve-ray-ladson-us-gladys-soulness",
+   "image": {
+    "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780.jpeg",
+    "id": 9107,
+    "extension": "jpeg",
+    "width": 800,
+    "height": 1200,
+    "filesize": 63471,
+    "sizes": {
+     "medium": {
+      "width": 200,
+      "height": 300,
+      "mime-type": "image/jpeg",
+      "filesize": 8981,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-200x300.jpeg"
+     },
+     "large": {
+      "width": 683,
+      "height": 1024,
+      "mime-type": "image/jpeg",
+      "filesize": 31491,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-683x1024.jpeg"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/jpeg",
+      "filesize": 7087,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-150x150.jpeg"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 1152,
+      "mime-type": "image/jpeg",
+      "filesize": 37861,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-768x1152.jpeg"
+     },
+     "etfrtb_logo": {
+      "width": 133,
+      "height": 200,
+      "mime-type": "image/jpeg",
+      "filesize": 7386,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-133x200.jpeg"
+     },
+     "post-thumbnail": {
+      "width": 370,
+      "height": 555,
+      "mime-type": "image/jpeg",
+      "filesize": 14615,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-370x555.jpeg"
+     },
+     "pubzinne-thumb-huge": {
+      "width": 800,
+      "height": 658,
+      "mime-type": "image/jpeg",
+      "filesize": 28410,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-800x658.jpeg"
+     },
+     "pubzinne-thumb-big": {
+      "width": 800,
+      "height": 460,
+      "mime-type": "image/jpeg",
+      "filesize": 21593,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-800x460.jpeg"
+     },
+     "pubzinne-thumb-med": {
+      "width": 370,
+      "height": 208,
+      "mime-type": "image/jpeg",
+      "filesize": 9452,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-370x208.jpeg"
+     },
+     "pubzinne-thumb-tiny": {
+      "width": 90,
+      "height": 90,
+      "mime-type": "image/jpeg",
+      "filesize": 6303,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-90x90.jpeg"
+     },
+     "pubzinne-thumb-masonry-big": {
+      "width": 760,
+      "height": 1140,
+      "mime-type": "image/jpeg",
+      "filesize": 37503,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-760x1140.jpeg"
+     },
+     "pubzinne-thumb-masonry": {
+      "width": 370,
+      "height": 555,
+      "mime-type": "image/jpeg",
+      "filesize": 14615,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-370x555.jpeg"
+     },
+     "pubzinne-thumb-team": {
+      "width": 470,
+      "height": 560,
+      "mime-type": "image/jpeg",
+      "filesize": 16825,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-470x560.jpeg"
+     },
+     "trx_addons-thumb-small": {
+      "width": 270,
+      "height": 152,
+      "mime-type": "image/jpeg",
+      "filesize": 7945,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-270x152.jpeg"
+     },
+     "trx_addons-thumb-portrait": {
+      "width": 370,
+      "height": 493,
+      "mime-type": "image/jpeg",
+      "filesize": 14050,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-370x493.jpeg"
+     },
+     "trx_addons-thumb-avatar": {
+      "width": 370,
+      "height": 370,
+      "mime-type": "image/jpeg",
+      "filesize": 12067,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/IMG_5780-370x370.jpeg"
+     }
+    }
+   },
+   "all_day": false,
+   "start_date": "2026-10-09 21:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-09 23:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "23",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-09 19:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "19",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-09 21:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "suffix",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": []
+  },
+  {
+   "id": 9109,
+   "global_id": "bizzartclub.com?id=9109",
+   "global_id_lineage": [
+    "bizzartclub.com?id=9109"
+   ],
+   "author": "1",
+   "status": "publish",
+   "date": "2026-09-30 08:25:27",
+   "date_utc": "2026-09-30 06:25:27",
+   "modified": "2026-09-30 08:25:27",
+   "modified_utc": "2026-09-30 06:25:27",
+   "url": "https://bizzartclub.com/event/the-getdown-feat-hafid-renart-8/",
+   "rest_url": "https://bizzartclub.com/wp-json/tribe/events/v1/events/9109",
+   "title": "THE GETDOWN feat HAFID RENART",
+   "description": "<p>&nbsp;</p>\n<p>RDV dans votre club façon loft New Yorkais en bordure du Canal Saint Martin!  Ce soir la nuit sera groovy avec THE GETDOWN feat HAFID RENART: HipHop, RnB, Funk, Soul, Disco, Afro remix… Et tout ça en mode « bangers only» les sons que vous connaissez sur les bouts des doigts et qui vous font vibrer de la tête aux pieds! Le feu !!</p>",
+   "excerpt": "",
+   "slug": "the-getdown-feat-hafid-renart-8",
+   "image": {
+    "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10.png",
+    "id": 9110,
+    "extension": "png",
+    "width": 1254,
+    "height": 1254,
+    "filesize": 2301820,
+    "sizes": {
+     "medium": {
+      "width": 300,
+      "height": 300,
+      "mime-type": "image/png",
+      "filesize": 148948,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-300x300.png"
+     },
+     "large": {
+      "width": 1024,
+      "height": 1024,
+      "mime-type": "image/png",
+      "filesize": 1347740,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-1024x1024.png"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/png",
+      "filesize": 43636,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-150x150.png"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 768,
+      "mime-type": "image/png",
+      "filesize": 796621,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-768x768.png"
+     },
+     "etfrtb_logo": {
+      "width": 200,
+      "height": 200,
+      "mime-type": "image/png",
+      "filesize": 72672,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-200x200.png"
+     },
+     "post-thumbnail": {
+      "width": 370,
+      "height": 370,
+      "mime-type": "image/png",
+      "filesize": 215817,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-370x370.png"
+     },
+     "pubzinne-thumb-huge": {
+      "width": 1170,
+      "height": 658,
+      "mime-type": "image/png",
+      "filesize": 1031976,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-1170x658.png"
+     },
+     "pubzinne-thumb-big": {
+      "width": 800,
+      "height": 460,
+      "mime-type": "image/png",
+      "filesize": 526359,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-800x460.png"
+     },
+     "pubzinne-thumb-med": {
+      "width": 370,
+      "height": 208,
+      "mime-type": "image/png",
+      "filesize": 127529,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-370x208.png"
+     },
+     "pubzinne-thumb-tiny": {
+      "width": 90,
+      "height": 90,
+      "mime-type": "image/png",
+      "filesize": 17256,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-90x90.png"
+     },
+     "pubzinne-thumb-masonry-big": {
+      "width": 760,
+      "height": 760,
+      "mime-type": "image/png",
+      "filesize": 781687,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-760x760.png"
+     },
+     "pubzinne-thumb-masonry": {
+      "width": 370,
+      "height": 370,
+      "mime-type": "image/png",
+      "filesize": 215817,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-370x370.png"
+     },
+     "pubzinne-thumb-team": {
+      "width": 470,
+      "height": 560,
+      "mime-type": "image/png",
+      "filesize": 397195,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-470x560.png"
+     },
+     "trx_addons-thumb-small": {
+      "width": 270,
+      "height": 152,
+      "mime-type": "image/png",
+      "filesize": 72408,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-270x152.png"
+     },
+     "trx_addons-thumb-portrait": {
+      "width": 370,
+      "height": 493,
+      "mime-type": "image/png",
+      "filesize": 287709,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-370x493.png"
+     },
+     "trx_addons-thumb-avatar": {
+      "width": 370,
+      "height": 370,
+      "mime-type": "image/png",
+      "filesize": 215817,
+      "url": "https://bizzartclub.com/wp-content/uploads/2026/09/getdown-09.10-370x370.png"
+     }
+    }
+   },
+   "all_day": false,
+   "start_date": "2026-10-09 23:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "23",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-10 05:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "05",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-09 21:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-10 03:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "10",
+    "hour": "03",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "Europe/Paris",
+   "timezone_abbr": "CEST",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "suffix",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": [],
+   "organizer": []
+  }
+ ]
+}

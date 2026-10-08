@@ -1,0 +1,784 @@
+{
+ "rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/?page=1&per_page=50&start_date=2026-10-08 00:00:00&end_date=2028-10-08 23:59:59&status=publish",
+ "next_rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/?per_page=50&start_date=2026-10-08+00%3A00%3A00&end_date=2028-10-08+23%3A59%3A59&status=publish&page=2",
+ "total": 188,
+ "total_pages": 4,
+ "events": [
+  {
+   "id": 10010563,
+   "global_id": "lanouvelleseine.com?id=10010563",
+   "global_id_lineage": [
+    "lanouvelleseine.com?id=10010563"
+   ],
+   "author": "10",
+   "status": "publish",
+   "date": "2026-03-31 15:33:42",
+   "date_utc": "2026-03-31 14:33:42",
+   "modified": "2026-09-30 19:11:49",
+   "modified_utc": "2026-09-30 18:11:49",
+   "url": "https://lanouvelleseine.com/events/lisa-perrio-dans-cest-complique-je-texpliquerai/2026-10-08/",
+   "rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/10010563",
+   "title": "Lisa PERRIO dans C&rsquo;est compliqué, je t&rsquo;expliquerai.",
+   "description": "<p>Dans ce seule-en-scène co-écrit avec Florian Nardone, Lisa donne vie aux personnages qu’elle croise au fil de sa journée : Joe la directrice artistique, misogyne et misandre, Marc le gynécologue frustré de ne pas vivre sa passion du théâtre, Candice la coach sportive qui n’existe qu’au travers du regard des hommes… À travers eux, Lisa s’amuse de nos absurdités, de nos contradictions et de nos maladresses.</p>\n<p>Porté par une énergie communicative, le spectacle enchaîne les situations aussi gênantes que reconnaissables. Le regard de Lisa observe nos travers avec mordant et tendresse, toujours accompagné d’un sourire désarmant qui invite à la complicité.</p>\n<p>Touche par touche, à la manière d’une impressionniste, à travers cette galerie de personnages, se dessine aussi une histoire plus intime : celle de l’attente d’un père absent.</p>\n<p>C’est compliqué, je t’expliquerai est un spectacle brillamment écrit, peuplé de personnages attachants, qui révèle une artiste singulière, capable de bousculer le quotidien pour mieux en faire jaillir le rire.<br />\nEcrit et Mise en Scène par Lisa Perrio et Florian Nardone</p>\n<p>Organisateur : Little Bros // Site de l’organisateur : <a href=\"https://www.littlebros.fr/\">https://www.littlebros.fr/</a></p>\n<p>&nbsp;</p>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>",
+   "excerpt": "",
+   "slug": "lisa-perrio-dans-cest-complique-je-texpliquerai",
+   "image": {
+    "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2.jpeg",
+    "id": 13883,
+    "extension": "jpeg",
+    "width": 1365,
+    "height": 2048,
+    "filesize": 1839633,
+    "sizes": {
+     "medium": {
+      "width": 200,
+      "height": 300,
+      "mime-type": "image/jpeg",
+      "filesize": 20111,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-200x300.jpeg"
+     },
+     "large": {
+      "width": 683,
+      "height": 1024,
+      "mime-type": "image/jpeg",
+      "filesize": 125160,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-683x1024.jpeg"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/jpeg",
+      "filesize": 11178,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-150x150.jpeg"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 1152,
+      "mime-type": "image/jpeg",
+      "filesize": 152517,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-768x1152.jpeg"
+     },
+     "1536x1536": {
+      "width": 1024,
+      "height": 1536,
+      "mime-type": "image/jpeg",
+      "filesize": 253738,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-1024x1536.jpeg"
+     },
+     "large-size": {
+      "width": 1200,
+      "height": 1800,
+      "mime-type": "image/jpeg",
+      "filesize": 338461,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-1200x1800.jpeg"
+     },
+     "medium-size": {
+      "width": 900,
+      "height": 1350,
+      "mime-type": "image/jpeg",
+      "filesize": 203184,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-900x1350.jpeg"
+     },
+     "small-size": {
+      "width": 400,
+      "height": 600,
+      "mime-type": "image/jpeg",
+      "filesize": 53013,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-400x600.jpeg"
+     }
+    }
+   },
+   "all_day": false,
+   "start_date": "2026-10-08 19:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "19",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-08 20:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "20",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-08 17:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "17",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-08 18:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "18",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "UTC+1",
+   "timezone_abbr": "UTC+1",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [
+    {
+     "name": "One (Wo)Man Show",
+     "slug": "one-woman-show",
+     "term_group": 0,
+     "term_taxonomy_id": 24,
+     "taxonomy": "tribe_events_cat",
+     "description": "",
+     "parent": 0,
+     "count": 572,
+     "filter": "raw",
+     "id": 24,
+     "urls": {
+      "self": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories/24",
+      "collection": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories"
+     }
+    }
+   ],
+   "tags": [],
+   "venue": {
+    "id": 757,
+    "author": "1",
+    "status": "publish",
+    "date": "2015-06-14 18:29:27",
+    "date_utc": "2015-06-14 18:29:27",
+    "modified": "2015-06-15 12:35:05",
+    "modified_utc": "2015-06-15 12:35:05",
+    "url": "https://lanouvelleseine.com/lieu/la-nouvelle-seine/",
+    "venue": "Théâtre La Nouvelle Seine",
+    "slug": "la-nouvelle-seine",
+    "address": "3 Quai de Montebello",
+    "city": "Paris",
+    "country": "France",
+    "province": "Ile-de-France",
+    "zip": "75005",
+    "phone": "+33 1 43 54 08 08",
+    "website": "www.lanouvelleseine.com",
+    "stateprovince": "Ile-de-France",
+    "geo_lat": 48.851482,
+    "geo_lng": 2.3499824,
+    "show_map": true,
+    "show_map_link": true,
+    "global_id": "lanouvelleseine.com?id=757",
+    "global_id_lineage": [
+     "lanouvelleseine.com?id=757"
+    ]
+   },
+   "organizer": [
+    {
+     "id": 760,
+     "author": "1",
+     "status": "publish",
+     "date": "2015-06-14 18:34:27",
+     "date_utc": "2015-06-14 18:34:27",
+     "modified": "2015-06-15 14:17:23",
+     "modified_utc": "2015-06-15 14:17:23",
+     "url": "https://lanouvelleseine.com/organisateur/organisateur-1/",
+     "organizer": "La Nouvelle Seine",
+     "slug": "organisateur-1",
+     "phone": "01 43 54 08 08",
+     "website": "www.lanouvelleseine.com",
+     "email": "info@lanouvelleseine.com",
+     "global_id": "lanouvelleseine.com?id=760",
+     "global_id_lineage": [
+      "lanouvelleseine.com?id=760"
+     ]
+    }
+   ],
+   "ticketed": false,
+   "is_virtual": false,
+   "virtual_url": null,
+   "virtual_video_source": ""
+  },
+  {
+   "id": 10010451,
+   "global_id": "lanouvelleseine.com?id=10010451",
+   "global_id_lineage": [
+    "lanouvelleseine.com?id=10010451"
+   ],
+   "author": "10",
+   "status": "publish",
+   "date": "2024-11-22 15:54:22",
+   "date_utc": "2024-11-22 13:54:22",
+   "modified": "2026-06-15 20:14:37",
+   "modified_utc": "2026-06-15 19:14:37",
+   "url": "https://lanouvelleseine.com/events/le-roi-borgne-dans-la-vie-ou-la-mort-4/2026-10-08/",
+   "rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/10010451",
+   "title": "Le Roi Borgne dans La Vie ou la Mort",
+   "description": "<div>Pourquoi devrions-nous préserver la vie ?<br />\nUne bonne question à se poser un lundi matin. Ou un mardi.</div>\n<div>\n<p>Pour y répondre, le Roi Borgne invoque différents personnages, certains diront “décalés”, d’autres “complètement idiots”. Mais on lui a dit une fois qu’idiot voulait dire unique, alors, croyez-le, c’est un spectacle très unique.On parlera de l’essentiel, oui, rien de moins ; avec légèreté, audace et absurdité. En chantant même, parfois. Dans un rêve fiévreux jailliront des thèmes comme la révolution industrielle ! Le bien-être ! L’argent ! Les slips ! Peut-être pas les slips&#8230; mais pourquoi pas le Général de Gaulle ?</p>\n</div>\n<div>Tout cela fera sens, vous verrez.</div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>",
+   "excerpt": "",
+   "slug": "le-roi-borgne-dans-la-vie-ou-la-mort-4",
+   "image": {
+    "url": "https://lanouvelleseine.com/wp-content/uploads/2024/11/whatsapp-image-2025-08-29-a-17.30.37_64939141.jpg",
+    "id": 13049,
+    "extension": "jpg",
+    "width": 1131,
+    "height": 1600,
+    "filesize": 214218
+   },
+   "all_day": false,
+   "start_date": "2026-10-08 21:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-08 21:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-08 18:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "18",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-08 18:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "08",
+    "hour": "18",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "UTC+2",
+   "timezone_abbr": "UTC+2",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "€",
+    "currency_code": "",
+    "currency_position": "suffix",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [
+    {
+     "name": "Seul(e) en scène",
+     "slug": "seule-en-scene",
+     "term_group": 0,
+     "term_taxonomy_id": 20,
+     "taxonomy": "tribe_events_cat",
+     "description": "",
+     "parent": 0,
+     "count": 376,
+     "filter": "raw",
+     "id": 20,
+     "urls": {
+      "self": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories/20",
+      "collection": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories"
+     }
+    }
+   ],
+   "tags": [],
+   "venue": {
+    "id": 757,
+    "author": "1",
+    "status": "publish",
+    "date": "2015-06-14 18:29:27",
+    "date_utc": "2015-06-14 18:29:27",
+    "modified": "2015-06-15 12:35:05",
+    "modified_utc": "2015-06-15 12:35:05",
+    "url": "https://lanouvelleseine.com/lieu/la-nouvelle-seine/",
+    "venue": "Théâtre La Nouvelle Seine",
+    "slug": "la-nouvelle-seine",
+    "address": "3 Quai de Montebello",
+    "city": "Paris",
+    "country": "France",
+    "province": "Ile-de-France",
+    "zip": "75005",
+    "phone": "+33 1 43 54 08 08",
+    "website": "www.lanouvelleseine.com",
+    "stateprovince": "Ile-de-France",
+    "geo_lat": 48.851482,
+    "geo_lng": 2.3499824,
+    "show_map": true,
+    "show_map_link": true,
+    "global_id": "lanouvelleseine.com?id=757",
+    "global_id_lineage": [
+     "lanouvelleseine.com?id=757"
+    ]
+   },
+   "organizer": [
+    {
+     "id": 760,
+     "author": "1",
+     "status": "publish",
+     "date": "2015-06-14 18:34:27",
+     "date_utc": "2015-06-14 18:34:27",
+     "modified": "2015-06-15 14:17:23",
+     "modified_utc": "2015-06-15 14:17:23",
+     "url": "https://lanouvelleseine.com/organisateur/organisateur-1/",
+     "organizer": "La Nouvelle Seine",
+     "slug": "organisateur-1",
+     "phone": "01 43 54 08 08",
+     "website": "www.lanouvelleseine.com",
+     "email": "info@lanouvelleseine.com",
+     "global_id": "lanouvelleseine.com?id=760",
+     "global_id_lineage": [
+      "lanouvelleseine.com?id=760"
+     ]
+    }
+   ],
+   "ticketed": false,
+   "is_virtual": false,
+   "virtual_url": null,
+   "virtual_video_source": ""
+  },
+  {
+   "id": 10010564,
+   "global_id": "lanouvelleseine.com?id=10010564",
+   "global_id_lineage": [
+    "lanouvelleseine.com?id=10010564"
+   ],
+   "author": "10",
+   "status": "publish",
+   "date": "2026-03-31 15:33:42",
+   "date_utc": "2026-03-31 14:33:42",
+   "modified": "2026-09-30 19:11:49",
+   "modified_utc": "2026-09-30 18:11:49",
+   "url": "https://lanouvelleseine.com/events/lisa-perrio-dans-cest-complique-je-texpliquerai/2026-10-09/",
+   "rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/10010564",
+   "title": "Lisa PERRIO dans C&rsquo;est compliqué, je t&rsquo;expliquerai.",
+   "description": "<p>Dans ce seule-en-scène co-écrit avec Florian Nardone, Lisa donne vie aux personnages qu’elle croise au fil de sa journée : Joe la directrice artistique, misogyne et misandre, Marc le gynécologue frustré de ne pas vivre sa passion du théâtre, Candice la coach sportive qui n’existe qu’au travers du regard des hommes… À travers eux, Lisa s’amuse de nos absurdités, de nos contradictions et de nos maladresses.</p>\n<p>Porté par une énergie communicative, le spectacle enchaîne les situations aussi gênantes que reconnaissables. Le regard de Lisa observe nos travers avec mordant et tendresse, toujours accompagné d’un sourire désarmant qui invite à la complicité.</p>\n<p>Touche par touche, à la manière d’une impressionniste, à travers cette galerie de personnages, se dessine aussi une histoire plus intime : celle de l’attente d’un père absent.</p>\n<p>C’est compliqué, je t’expliquerai est un spectacle brillamment écrit, peuplé de personnages attachants, qui révèle une artiste singulière, capable de bousculer le quotidien pour mieux en faire jaillir le rire.<br />\nEcrit et Mise en Scène par Lisa Perrio et Florian Nardone</p>\n<p>Organisateur : Little Bros // Site de l’organisateur : <a href=\"https://www.littlebros.fr/\">https://www.littlebros.fr/</a></p>\n<p>&nbsp;</p>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>\n<div id=\"aircall-extension-app\"></div>",
+   "excerpt": "",
+   "slug": "lisa-perrio-dans-cest-complique-je-texpliquerai",
+   "image": {
+    "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2.jpeg",
+    "id": 13883,
+    "extension": "jpeg",
+    "width": 1365,
+    "height": 2048,
+    "filesize": 1839633,
+    "sizes": {
+     "medium": {
+      "width": 200,
+      "height": 300,
+      "mime-type": "image/jpeg",
+      "filesize": 20111,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-200x300.jpeg"
+     },
+     "large": {
+      "width": 683,
+      "height": 1024,
+      "mime-type": "image/jpeg",
+      "filesize": 125160,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-683x1024.jpeg"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/jpeg",
+      "filesize": 11178,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-150x150.jpeg"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 1152,
+      "mime-type": "image/jpeg",
+      "filesize": 152517,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-768x1152.jpeg"
+     },
+     "1536x1536": {
+      "width": 1024,
+      "height": 1536,
+      "mime-type": "image/jpeg",
+      "filesize": 253738,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-1024x1536.jpeg"
+     },
+     "large-size": {
+      "width": 1200,
+      "height": 1800,
+      "mime-type": "image/jpeg",
+      "filesize": 338461,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-1200x1800.jpeg"
+     },
+     "medium-size": {
+      "width": 900,
+      "height": 1350,
+      "mime-type": "image/jpeg",
+      "filesize": 203184,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-900x1350.jpeg"
+     },
+     "small-size": {
+      "width": 400,
+      "height": 600,
+      "mime-type": "image/jpeg",
+      "filesize": 53013,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/03/affiche-lisa-perrio-40x60.jpg-2-400x600.jpeg"
+     }
+    }
+   },
+   "all_day": false,
+   "start_date": "2026-10-09 19:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "19",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-09 20:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "20",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-09 17:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "17",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-09 18:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "18",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "UTC+1",
+   "timezone_abbr": "UTC+1",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [
+    {
+     "name": "One (Wo)Man Show",
+     "slug": "one-woman-show",
+     "term_group": 0,
+     "term_taxonomy_id": 24,
+     "taxonomy": "tribe_events_cat",
+     "description": "",
+     "parent": 0,
+     "count": 572,
+     "filter": "raw",
+     "id": 24,
+     "urls": {
+      "self": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories/24",
+      "collection": "https://lanouvelleseine.com/wp-json/tribe/events/v1/categories"
+     }
+    }
+   ],
+   "tags": [],
+   "venue": {
+    "id": 757,
+    "author": "1",
+    "status": "publish",
+    "date": "2015-06-14 18:29:27",
+    "date_utc": "2015-06-14 18:29:27",
+    "modified": "2015-06-15 12:35:05",
+    "modified_utc": "2015-06-15 12:35:05",
+    "url": "https://lanouvelleseine.com/lieu/la-nouvelle-seine/",
+    "venue": "Théâtre La Nouvelle Seine",
+    "slug": "la-nouvelle-seine",
+    "address": "3 Quai de Montebello",
+    "city": "Paris",
+    "country": "France",
+    "province": "Ile-de-France",
+    "zip": "75005",
+    "phone": "+33 1 43 54 08 08",
+    "website": "www.lanouvelleseine.com",
+    "stateprovince": "Ile-de-France",
+    "geo_lat": 48.851482,
+    "geo_lng": 2.3499824,
+    "show_map": true,
+    "show_map_link": true,
+    "global_id": "lanouvelleseine.com?id=757",
+    "global_id_lineage": [
+     "lanouvelleseine.com?id=757"
+    ]
+   },
+   "organizer": [
+    {
+     "id": 760,
+     "author": "1",
+     "status": "publish",
+     "date": "2015-06-14 18:34:27",
+     "date_utc": "2015-06-14 18:34:27",
+     "modified": "2015-06-15 14:17:23",
+     "modified_utc": "2015-06-15 14:17:23",
+     "url": "https://lanouvelleseine.com/organisateur/organisateur-1/",
+     "organizer": "La Nouvelle Seine",
+     "slug": "organisateur-1",
+     "phone": "01 43 54 08 08",
+     "website": "www.lanouvelleseine.com",
+     "email": "info@lanouvelleseine.com",
+     "global_id": "lanouvelleseine.com?id=760",
+     "global_id_lineage": [
+      "lanouvelleseine.com?id=760"
+     ]
+    }
+   ],
+   "ticketed": false,
+   "is_virtual": false,
+   "virtual_url": null,
+   "virtual_video_source": ""
+  },
+  {
+   "id": 10010328,
+   "global_id": "lanouvelleseine.com?id=10010328",
+   "global_id_lineage": [
+    "lanouvelleseine.com?id=10010328"
+   ],
+   "author": "10",
+   "status": "publish",
+   "date": "2026-05-06 20:03:42",
+   "date_utc": "2026-05-06 19:03:42",
+   "modified": "2026-06-18 19:02:46",
+   "modified_utc": "2026-06-18 18:02:46",
+   "url": "https://lanouvelleseine.com/events/tania-dutel-dans-brouillage/2026-10-09/",
+   "rest_url": "https://lanouvelleseine.com/wp-json/tribe/events/v1/events/10010328",
+   "title": "TANIA DUTEL dans Brouillage",
+   "description": "<p>Les Productions Adonis et Bernuda Prod présentent</p>\n<p>TANIA DUTEL dans Brouillage</p>\n<div>Des centaines de scènes.</div>\n<div>Et toujours aucune intention de se calmer.</div>\n<div>Tania Dutel revient avec un quatrième spectacle inédit.</div>\n<div>Tu la connais ? Alors tu sais jusqu&rsquo;où elle peut aller.</div>\n<div>Bonne nouvelle : elle a gardé sa patte.</div>\n<div>\n<p>Mauvaise nouvelle : elle va encore aller loin.</p>\n<p>De et avec Tania Dutel</p>\n</div>\n<div id=\"aircall-extension-app\"></div>",
+   "excerpt": "",
+   "slug": "tania-dutel-dans-brouillage",
+   "image": {
+    "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-scaled.jpg",
+    "id": 13845,
+    "extension": "jpg",
+    "width": 1707,
+    "height": 2560,
+    "filesize": 749827,
+    "sizes": {
+     "medium": {
+      "width": 200,
+      "height": 300,
+      "mime-type": "image/jpeg",
+      "filesize": 14331,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-200x300.jpg"
+     },
+     "large": {
+      "width": 683,
+      "height": 1024,
+      "mime-type": "image/jpeg",
+      "filesize": 121987,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-683x1024.jpg"
+     },
+     "thumbnail": {
+      "width": 150,
+      "height": 150,
+      "mime-type": "image/jpeg",
+      "filesize": 7580,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-150x150.jpg"
+     },
+     "medium_large": {
+      "width": 768,
+      "height": 1152,
+      "mime-type": "image/jpeg",
+      "filesize": 152180,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-768x1152.jpg"
+     },
+     "1536x1536": {
+      "width": 1024,
+      "height": 1536,
+      "mime-type": "image/jpeg",
+      "filesize": 264209,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-1024x1536.jpg"
+     },
+     "2048x2048": {
+      "width": 1365,
+      "height": 2048,
+      "mime-type": "image/jpeg",
+      "filesize": 471665,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-1365x2048.jpg"
+     },
+     "full-size": {
+      "width": 2048,
+      "height": 3072,
+      "mime-type": "image/jpeg",
+      "filesize": 1094197,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-2048x3072.jpg"
+     },
+     "large-size": {
+      "width": 1200,
+      "height": 1800,
+      "mime-type": "image/jpeg",
+      "filesize": 363050,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-1200x1800.jpg"
+     },
+     "medium-size": {
+      "width": 900,
+      "height": 1350,
+      "mime-type": "image/jpeg",
+      "filesize": 205477,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-900x1350.jpg"
+     },
+     "small-size": {
+      "width": 400,
+      "height": 600,
+      "mime-type": "image/jpeg",
+      "filesize": 45811,
+      "url": "https://lanouvelleseine.com/wp-content/uploads/2026/05/taniadutel_brouillage_lanouvelleseine_affiche_web_hd-400x600.jpg"
+     }
+    },
+    "original_image": "taniadutel_brouillage_lanouvelleseine_affiche_web_hd.jpg"
+   },
+   "all_day": false,
+   "start_date": "2026-10-09 21:00:00",
+   "start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "21",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "end_date": "2026-10-09 22:00:00",
+   "end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "22",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_start_date": "2026-10-09 19:00:00",
+   "utc_start_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "19",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "utc_end_date": "2026-10-09 20:00:00",
+   "utc_end_date_details": {
+    "year": "2026",
+    "month": "10",
+    "day": "09",
+    "hour": "20",
+    "minutes": "00",
+    "seconds": "00"
+   },
+   "timezone": "UTC+1",
+   "timezone_abbr": "UTC+1",
+   "cost": "",
+   "cost_details": {
+    "currency_symbol": "",
+    "currency_code": "",
+    "currency_position": "",
+    "values": []
+   },
+   "website": "",
+   "show_map": true,
+   "show_map_link": true,
+   "hide_from_listings": false,
+   "sticky": false,
+   "featured": false,
+   "categories": [],
+   "tags": [],
+   "venue": {
+    "id": 757,
+    "author": "1",
+    "status": "publish",
+    "date": "2015-06-14 18:29:27",
+    "date_utc": "2015-06-14 18:29:27",
+    "modified": "2015-06-15 12:35:05",
+    "modified_utc": "2015-06-15 12:35:05",
+    "url": "https://lanouvelleseine.com/lieu/la-nouvelle-seine/",
+    "venue": "Théâtre La Nouvelle Seine",
+    "slug": "la-nouvelle-seine",
+    "address": "3 Quai de Montebello",
+    "city": "Paris",
+    "country": "France",
+    "province": "Ile-de-France",
+    "zip": "75005",
+    "phone": "+33 1 43 54 08 08",
+    "website": "www.lanouvelleseine.com",
+    "stateprovince": "Ile-de-France",
+    "geo_lat": 48.851482,
+    "geo_lng": 2.3499824,
+    "show_map": true,
+    "show_map_link": true,
+    "global_id": "lanouvelleseine.com?id=757",
+    "global_id_lineage": [
+     "lanouvelleseine.com?id=757"
+    ]
+   },
+   "organizer": [
+    {
+     "id": 760,
+     "author": "1",
+     "status": "publish",
+     "date": "2015-06-14 18:34:27",
+     "date_utc": "2015-06-14 18:34:27",
+     "modified": "2015-06-15 14:17:23",
+     "modified_utc": "2015-06-15 14:17:23",
+     "url": "https://lanouvelleseine.com/organisateur/organisateur-1/",
+     "organizer": "La Nouvelle Seine",
+     "slug": "organisateur-1",
+     "phone": "01 43 54 08 08",
+     "website": "www.lanouvelleseine.com",
+     "email": "info@lanouvelleseine.com",
+     "global_id": "lanouvelleseine.com?id=760",
+     "global_id_lineage": [
+      "lanouvelleseine.com?id=760"
+     ]
+    }
+   ],
+   "ticketed": false,
+   "is_virtual": false,
+   "virtual_url": null,
+   "virtual_video_source": ""
+  }
+ ]
+}

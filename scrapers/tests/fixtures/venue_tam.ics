@@ -1,0 +1,238 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//wp-events-plugin.com//7.4.3//EN
+TZID:Europe/Paris
+X-WR-TIMEZONE:Europe/Paris
+BEGIN:VEVENT
+UID:5144@tam.fr
+DTSTART;TZID=Europe/Paris:20261009T201500
+DTEND;TZID=Europe/Paris:20261009T201500
+DTSTAMP:20260622T134233Z
+URL:https://www.tam.fr/spectacle/pierre-christophe-et-hugo-lippi/
+SUMMARY:Pierre Christophe et Hugo Lippi
+DESCRIPTION:Pierre Christophe et Hugo Lippi\, références incontournables 
+ du jazz français (tous deux lauréats du Prix Django Reinhardt) se retrou
+ vent pour l’enregistrement de Flowing. Le répertoire s’évade du chem
+ in bien balisé des standards pour faire la part belle aux compositions in
+ spirées de Pierre\nChristophe. On y décèle la marque de Duke Ellington\
+ , Carlos Jobim\, Maurice Ravel…\n\nLe tout est porté par des harmonies 
+ délicates et d’entrelacs subtils des lignes mélodiques dessinées par 
+ le piano et la guitare. Un climat poétique aux couleurs diaphanes où pr
+ édomine un sentiment de nostalgie. Une rencontre entre deux virtuoses ma
+ îtres de leur art\, complices et respectueux du discours de l’autre.
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/si
+ te-internet-photos-saison-2627-1.jpg
+CATEGORIES:Musique,Salle Cabaret,Spectacle
+LOCATION:Cabaret Ariel Centre-Ville\, 99 Avenue Paul Doumer\, Rueil-Malmais
+ on\, 92500\, France
+GEO:48.879700;2.181000
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=99 Avenue Paul Doumer\, Rue
+ il-Malmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Cabaret Ariel Cen
+ tre-Ville:geo:48.879700,2.181000
+END:VEVENT
+BEGIN:VEVENT
+UID:5145@tam.fr
+DTSTART;TZID=Europe/Paris:20261127T201500
+DTEND;TZID=Europe/Paris:20261127T201500
+DTSTAMP:20260625T105501Z
+URL:https://www.tam.fr/spectacle/3-for-swing/
+SUMMARY:3 for swing
+DESCRIPTION:Trio authentique\, 3 For Swing est le fruit de près de vingt a
+ ns de route\, de concerts\, d’amitié et de complicité. Bien connu des 
+ amateurs de jazz\, le groupe réunit trois fortes personnalités musicales
+ \, dont un chanteur à la voix d’or\, au service d’un swing à la fois
+  subtil et expressif.\n\nInspiré par le trio de Nat King Cole\, 3 For Swi
+ ng rend hommage à l’âge d’or du jazz classique avec fraîcheur\, él
+ égance et sobriété\, tout en conservant\nune énergie exceptionnelle. L
+ eur quatrième album\, Action !\, puise dans le Great American Songbook de
+ s années 1920 à 1950\, et vient de sortir.
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/gu
+ illaume-ferrari.jpg
+CATEGORIES:Musique,Salle Cabaret,Spectacle
+LOCATION:Cabaret Ariel Centre-Ville\, 99 Avenue Paul Doumer\, Rueil-Malmais
+ on\, 92500\, France
+GEO:48.879700;2.181000
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=99 Avenue Paul Doumer\, Rue
+ il-Malmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Cabaret Ariel Cen
+ tre-Ville:geo:48.879700,2.181000
+END:VEVENT
+BEGIN:VEVENT
+UID:5130@tam.fr
+DTSTART;TZID=Europe/Paris:20261205T203000
+DTEND;TZID=Europe/Paris:20261205T203000
+DTSTAMP:20260623T094947Z
+URL:https://www.tam.fr/spectacle/camille-the-sound-of-milk-tour/
+SUMMARY:Camille
+DESCRIPTION:Neuf ans après « Ouï »\, Camille sort son nouvel album « T
+ he Sound of Milk » !\n\n« Seule la joie me console\, et c’est mon rôl
+ e d’humaine\, de femme et de mère de la nourrir\, de la rêver\, et de 
+ réparer le monde par le chant en le faisant vibrer à nouveau ! » Camill
+ e\n\nDans une époque sombre et mouvementée\, Camille fait le choix de pa
+ rler de la joie puissante et vulnérable à la fois\, du féminin\, de la 
+ maternité\, de l’enfance et de la famille au sens large\, de la transmi
+ ssion de la musique et de valeurs immuables. Elle s’interroge : comment 
+ vivre au quotidien face aux enjeux actuels ? Comment prendre soin des enfa
+ nts et de l’enfant intérieur de chacun ? Que leur transmettre pour rée
+ nchanter le monde ?\n\nTendre\, lucide et engagé\, cet album nous met fac
+ e aux problématiques et aux défis de l’humanité. Il nous berce aussi 
+ pour nous éveiller à l’amour\, et rallumer les étoiles là où elles 
+ se sont éteintes.\n\n« The Sound of Milk » est une fresque musicale\, q
+ ui mûrit depuis plus de quinze ans (l’âge de son fils aîné)\, où Ca
+ mille explore la porosité des liens entre sa vie de mère de deux enfants
+ \, sa vie de famille et sa vie d’artiste \; tout en retraçant l’histo
+ ire de la musique.
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2025/06/si
+ te-internet-photos-saison-2627.jpg
+CATEGORIES:Chansons,Spectacle
+LOCATION:Théâtre André Malraux\, 9 Place des Arts\, Rueil-Malmaison\, 92
+ 500\, France
+GEO:48.880083;2.183949
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=9 Place des Arts\, Rueil-Ma
+ lmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Théâtre André Malra
+ ux:geo:48.880083,2.183949
+END:VEVENT
+BEGIN:VEVENT
+UID:5171@tam.fr
+DTSTART;TZID=Europe/Paris:20270106T203000
+DTEND;TZID=Europe/Paris:20270108T203000
+DTSTAMP:20260914T082322Z
+URL:https://www.tam.fr/spectacle/laurent-madiot-comme-par-hasard/
+SUMMARY:Laurent Madiot
+DESCRIPTION:Laurent Madiot est un faiseur de chansons\, avec un nez de clow
+ n et des larmes invisibles.\nSoutenu par sa guitare\, son tuba ou ses jamb
+ es\, il nous propose un exil en tendresse\, comme un joyeux pas de côté.
+  Les grands écarts l’amusent\, les doubles sens le régalent et la fleu
+ r de peau le fait frissonner.\nArtiste touche-à-tout\, poète au verbe si
+ ngulier\, Laurent est un homme descène (qu’il pratique depuis plus de 2
+ 0 ans avec notamment\, Les Fouteurs de Joie bien connus au TAM) à la vita
+ lité contagieuse.\nÀ son actif\, pas moins de 11 albums dont 4 en solo c
+ omme ce dernier. Ce concert de poche théâtral nous offre un “ photomat
+ on anthropologique ” de nos congénères qui prête à sourire largement
+ .\n\nCoup de cœur Festival Off d’Avignon 2025
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2025/06/si
+ te-internet-photos-saison-2627-1.jpg
+CATEGORIES:Chansons,Salle Cabaret,Spectacle
+LOCATION:Cabaret Ariel Centre-Ville\, 99 Avenue Paul Doumer\, Rueil-Malmais
+ on\, 92500\, France
+GEO:48.879700;2.181000
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=99 Avenue Paul Doumer\, Rue
+ il-Malmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Cabaret Ariel Cen
+ tre-Ville:geo:48.879700,2.181000
+END:VEVENT
+BEGIN:VEVENT
+UID:5146@tam.fr
+DTSTART;TZID=Europe/Paris:20270115T201500
+DTEND;TZID=Europe/Paris:20270115T201500
+DTSTAMP:20260623T124331Z
+URL:https://www.tam.fr/spectacle/valentin-martel/
+SUMMARY:Valentin Martel
+DESCRIPTION:Batteur\, chanteur et guitariste\, Valentin Martel propose en q
+ uartet un magnifique répertoire\, façonné au fil du temps et des rencon
+ tres. Il partage avec sincérité les histoires et anecdotes qui nourrisse
+ nt cette musique vivante.\n\nMulti-instrumentiste\, il commence la batteri
+ e en chantant tout ce qu’il joue. C’est donc tout naturellement qu’i
+ l choisit de donner une place grandissante au chant dans sa vie et sur sc
+ ène.\n\nLe quartet de Valentin Martel réunit avant tout des musiciens pa
+ ssionnés\, bercés depuis l’enfance par le jazz d’Oscar Peterson\, de
+  Monty Alexander ou encore d’Ella Fitzgerald. Ensemble\, ils proposent u
+ ne musique teintée d’une pointe de blues\, portée par le sourire et un
+ e énergie communicative.
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/c-
+ vincent-nageotte.jpg
+CATEGORIES:Musique,Salle Cabaret,Spectacle
+LOCATION:Cabaret Ariel Centre-Ville\, 99 Avenue Paul Doumer\, Rueil-Malmais
+ on\, 92500\, France
+GEO:48.879700;2.181000
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=99 Avenue Paul Doumer\, Rue
+ il-Malmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Cabaret Ariel Cen
+ tre-Ville:geo:48.879700,2.181000
+END:VEVENT
+BEGIN:VEVENT
+UID:5147@tam.fr
+DTSTART;TZID=Europe/Paris:20270226T201500
+DTEND;TZID=Europe/Paris:20270226T201500
+DTSTAMP:20260623T130644Z
+URL:https://www.tam.fr/spectacle/castillos-novelty-knives/
+SUMMARY:Castillo's Novelty Knives
+DESCRIPTION:Groupe de jazz international basé à Paris et dirigé par le c
+ ornettiste Pablo Castillo\, Castillo’s Novelty Knives ravive l’esprit 
+ inventif du jazz des années 1920\, en puisant son inspiration dans les or
+ chestres qui faisaient vibrer New York et Chicago à cette époque.\n\nL
+ ’improvisation collective\, les arrangements subtils et la présence du 
+ saxophone basse\, ici pilier de la section rythmique\, évoquent les ensem
+ bles de Bix Beiderbecke ou des California Ramblers... Le répertoire rend 
+ également hommage à des figures majeures du jazz telles que King Oliver\
+ , Jelly Roll Morton\, Clarence Williams ou encore Louis Armstrong.
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/c-
+ amanda-malavi.jpg
+CATEGORIES:Musique,Salle Cabaret,Spectacle
+LOCATION:Cabaret Ariel Centre-Ville\, 99 Avenue Paul Doumer\, Rueil-Malmais
+ on\, 92500\, France
+GEO:48.879700;2.181000
+X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-ADDRESS=99 Avenue Paul Doumer\, Rue
+ il-Malmaison\, 92500\, France;X-APPLE-RADIUS=100;X-TITLE=Cabaret Ariel Cen
+ tre-Ville:geo:48.879700,2.181000
+END:VEVENT
+BEGIN:VEVENT
+UID:5136@tam.fr
+DTSTART;TZID=Europe/Paris:20261009T203000
+DTEND;TZID=Europe/Paris:20261009T203000
+DTSTAMP:20260622T143634Z
+URL:https://www.tam.fr/spectacle/marius/
+SUMMARY:Marius
+DESCRIPTION:Coup de cœur Festival Off d’Avignon 2025\n\nMarius aide son 
+ père César\, bourru et bonhomme\, à tenir son café juste à côté de 
+ l’étal de coquillages de la petite Fanny\, sa complice de toujours. Mai
+ s l’envie de prendre la mer l’a toujours obsédé. Alors\, comment lut
+ ter contre l’appel du large\, lorsqu’un grand trois mâts fait une cou
+ rte escale au port ?\n\nLe metteur en scène Jean-Philippe Daguerre\, laur
+ éat de nombreux Molières\, fait vibrer sa troupe pour incarner les perso
+ nnages de la pièce de Pagnol comme personne. Sans clichés\, la gouaille 
+ qui sied aux couleurs méridionales de Marseille\, est sincère et touchan
+ te. Elle n’a d’égale que le cœur. Un cœur immense qui fait déborde
+ r le nôtre !
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/c-
+ gregoire-matzneff.jpg
+CATEGORIES:À voir en famille,Spectacle,Théâtre
+END:VEVENT
+BEGIN:VEVENT
+UID:5138@tam.fr
+DTSTART;TZID=Europe/Paris:20261010T203000
+DTEND;TZID=Europe/Paris:20261010T203000
+DTSTAMP:20260622T143727Z
+URL:https://www.tam.fr/spectacle/verino/
+SUMMARY:Vérino
+DESCRIPTION:Vérino explore avec délectation\, la complexité des tensions
+  qui nous habitent car avant de nous faire rire à tout prix\, il s’int
+ éresse à l’être humain !\nAncré dans le sol mais les pieds dans le v
+ ide\, il navigue avec agilité pour tenter de trouver un peu de stabilité
+  au milieu des turbulences de notre époque. Et ce n’est pas facile ! Ca
+ r oui\, on ne fait pas de balade paisible sur un cheval fougueux. On fait 
+ du rodéo !
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/xk
+ obayashi-photos.jpg
+CATEGORIES:Humour,Spectacle
+END:VEVENT
+BEGIN:VEVENT
+UID:5139@tam.fr
+DTSTART;TZID=Europe/Paris:20261013T203000
+DTEND;TZID=Europe/Paris:20261013T203000
+DTSTAMP:20260622T144238Z
+URL:https://www.tam.fr/spectacle/madeleine-bejart/
+SUMMARY:Madeleine Béjart
+DESCRIPTION:Coup de cœur Festival Off d’Avignon 2025\n\nMadeleine Béjar
+ t est résolument une femme moderne. Elle s’est aventurée sur des chemi
+ ns qu’aucune femme de son époque n’a empruntés.\nInterprète de gén
+ ie\, écrivant des vers\, elle invente la mise en scène. Elle fonde\, fin
+ ance et dirige la troupe qui deviendra\, en 1680\, le célèbre Théâtre 
+ Français.\nÀ l’aune de sa vie\, dans une confession intime énoncée p
+ ar la comédienne tout aussi talentueuse Isabelle Andréani\, Madeleine B
+ éjart nous touche en plein cœur.\nLa muse de Molière\, sa compagnonne d
+ e route\, le suivant comme son ombre en lui ayant consacré sa vie entièr
+ e\, n’aurait-elle pas mérité son nom gravé au côté de celui de Moli
+ ère à la Comédie Française ?
+ATTACH;FMTTYPE=image/jpeg:https://www.tam.fr/wp-content/uploads/2026/05/c-
+ ville-de-versailles---adele-kiffer.jpg
+CATEGORIES:À voir en famille,Spectacle,Théâtre
+END:VEVENT
+END:VCALENDAR

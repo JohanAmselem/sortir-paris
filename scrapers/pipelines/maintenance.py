@@ -51,3 +51,26 @@ def promote_geocoded(conn) -> int:
     conn.commit()
     print(f"[promote] {n} events re-scored after venue geocoding")
     return n
+
+
+# Ended events are kept 60 days (event pages answer "terminé" + suggestions,
+# reviews can still be written), then deleted. Events that members interacted
+# with are kept: deleting them would cascade to saves, reviews and outings.
+PURGE_SQL = """
+DELETE FROM events e
+WHERE e.status IN ('expired', 'rejected', 'cancelled')
+  AND coalesce(e.end_date, e.start_date) < now() - interval '60 days'
+  AND NOT EXISTS (SELECT 1 FROM user_saves s WHERE s.event_id = e.id)
+  AND NOT EXISTS (SELECT 1 FROM user_attendances a WHERE a.event_id = e.id)
+  AND NOT EXISTS (SELECT 1 FROM event_reviews r WHERE r.event_id = e.id)
+  AND NOT EXISTS (SELECT 1 FROM events c WHERE c.canonical_event_id = e.id AND c.status = 'active')
+"""
+
+
+def purge_old_events(conn) -> int:
+    with conn.cursor() as cur:
+        cur.execute(PURGE_SQL)
+        n = cur.rowcount
+    conn.commit()
+    print(f"[purge] {n} old ended events deleted")
+    return n

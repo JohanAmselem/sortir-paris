@@ -145,3 +145,36 @@ def test_run_pipeline_isolates_failures(monkeypatch):
     assert new["category_id"] == "cat-1" and new["venue_id"] == "venue-1"
     assert new["status"] in ("active", "draft")
     assert conn.updated[0]["id"] == "ev-existing"
+
+
+class StrictConn(FakeConn):
+    """Behaves like psycopg2: autocommit cannot change inside a transaction."""
+
+    def __init__(self):
+        super().__init__()
+        self._autocommit = False
+        self.in_tx = True  # e.g. a SELECT was just run by the caller
+
+    @property
+    def autocommit(self):
+        return self._autocommit
+
+    @autocommit.setter
+    def autocommit(self, value):
+        if getattr(self, "in_tx", False):
+            raise RuntimeError("set_session cannot be used inside a transaction")
+        self._autocommit = value
+
+    def rollback(self):
+        self.in_tx = False
+
+
+def test_run_pipeline_accepts_connection_with_open_transaction():
+    from datetime import timedelta
+
+    soon = (datetime.now(timezone.utc) + timedelta(days=10)).strftime("%Y-%m-%dT20:00:00")
+    ev = make_event(source="test", source_id="tx1", title="Concert sous transaction", start=soon,
+                    venue_name="Le Bal", venue_zip="75018", price_raw="10 €", category_slug="concerts")
+    conn = StrictConn()
+    stats = run_pipeline([ev], "test", conn=conn)  # used to raise / store 0 events
+    assert stats["errors"] == 0

@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
-from utils.normalize import IDF_DEPARTMENTS, VALID_CATEGORIES, in_idf
+from utils.normalize import SERVICE_DEPARTMENTS, VALID_CATEGORIES, in_service_zone
 
 PUBLISH_THRESHOLD = 50
 MAX_PRICE_CENTIMES = 50_000  # 500 €
@@ -156,11 +156,11 @@ def validate(
     if ev.is_free and (ev.price_min > 0 or ev.price_max > 0):
         hard.append("free_with_price")
 
-    # Geography: Île-de-France only
-    if ev.venue_lat is not None and ev.venue_lng is not None and not in_idf(ev.venue_lat, ev.venue_lng):
+    # Geography: Paris + petite couronne (75, 92, 93, 94)
+    if ev.venue_lat is not None and ev.venue_lng is not None and not in_service_zone(ev.venue_lat, ev.venue_lng):
         hard.append("out_of_zone")
     if ev.venue_zip:
-        if re.fullmatch(r"\d{5}", ev.venue_zip) and ev.venue_zip[:2] not in IDF_DEPARTMENTS:
+        if re.fullmatch(r"\d{5}", ev.venue_zip) and ev.venue_zip[:2] not in SERVICE_DEPARTMENTS:
             hard.append("out_of_zone")
     if ev.is_online:
         hard.append("online")

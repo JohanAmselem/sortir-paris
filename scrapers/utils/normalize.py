@@ -86,6 +86,11 @@ def absolute_url(base: str, href: Optional[str]) -> Optional[str]:
 IDF_BBOX = (48.12, 49.24, 1.44, 3.56)  # lat_min, lat_max, lng_min, lng_max
 IDF_DEPARTMENTS = {"75", "77", "78", "91", "92", "93", "94", "95"}
 
+# Service zone = Paris + petite couronne (reachable by metro / RER in < 45 min).
+SERVICE_DEPARTMENTS = {"75", "92", "93", "94"}
+# lat_min, lat_max, lng_min, lng_max — covers 92/93/94 with a small margin.
+SERVICE_BBOX = (48.70, 49.01, 2.14, 2.64)
+
 
 def arrondissement_from_zip(zip_code: Optional[str]) -> Optional[str]:
     """75001 → '1er', 75011 → '11e', 75116 → '16e'. None outside Paris."""
@@ -107,6 +112,14 @@ def extract_zip(text: Optional[str]) -> Optional[str]:
         return None
     m = re.search(r"\b(7[5789]\d{3}|9[1-5]\d{3})\b", text)
     return m.group(1) if m else None
+
+
+def in_service_zone(lat, lng) -> bool:
+    try:
+        lat, lng = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return False
+    return SERVICE_BBOX[0] <= lat <= SERVICE_BBOX[1] and SERVICE_BBOX[2] <= lng <= SERVICE_BBOX[3]
 
 
 def in_idf(lat, lng) -> bool:

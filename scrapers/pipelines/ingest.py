@@ -208,7 +208,10 @@ def run_pipeline(events: List[dict], source_name: str, conn=None) -> dict:
     own_conn = conn is None
     if own_conn:
         conn = get_db_connection()
-    conn.autocommit = False
+    # psycopg2 refuses to change autocommit while a transaction is open (the
+    # caller may just have run a SELECT): only switch when needed.
+    if conn.autocommit:
+        conn.autocommit = False
     cur = conn.cursor()
     venues = VenueResolver()
     categories = CategoryCache(cur)
@@ -296,4 +299,5 @@ def last_successful_found(conn, source: str) -> Optional[int]:
             (source,),
         )
         row = cur.fetchone()
+    conn.rollback()  # read-only: close the implicit transaction
     return row[0] if row else None

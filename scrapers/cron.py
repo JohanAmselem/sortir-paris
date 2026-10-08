@@ -144,11 +144,10 @@ def run_sources(specs, dry_run: bool = False) -> list:
 
 
 def run_post() -> list:
-    """Geocode → promote → dedup → expire → Meilisearch. Each step isolated; failures reported."""
+    """Geocode → promote → dedup → expire → purge (→ Meilisearch if MEILI_SYNC=1). Each step isolated; failures reported."""
     from pipelines.dedup import run_dedup
     from pipelines.ingest import get_db_connection
-    from pipelines.maintenance import expire_events, promote_geocoded
-    from pipelines.meili import sync
+    from pipelines.maintenance import expire_events, promote_geocoded, purge_old_events
     from utils.geocode import geocode_missing_venues
 
     problems = []
@@ -158,6 +157,7 @@ def run_post() -> list:
         ("promote", lambda: promote_geocoded(conn)),
         ("dedup", lambda: run_dedup(conn)),
         ("expire", lambda: expire_events(conn)),
+        ("purge", lambda: purge_old_events(conn)),
     ]
     for name, step in steps:
         set_budget(15 * 60)
@@ -172,11 +172,15 @@ def run_post() -> list:
                 pass
         finally:
             set_budget(None)
-    try:
-        sync(conn)
-    except Exception as e:
-        problems.append(f"post/meili: {type(e).__name__}: {e}")
-        traceback.print_exc()
+    # The website no longer reads Meilisearch (search is done in Postgres).
+    # The sync stays available for a future search backend: MEILI_SYNC=1.
+    if os.getenv("MEILI_SYNC") == "1":
+        from pipelines.meili import sync
+        try:
+            sync(conn)
+        except Exception as e:
+            problems.append(f"post/meili: {type(e).__name__}: {e}")
+            traceback.print_exc()
     conn.close()
     return problems
 

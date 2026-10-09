@@ -27,6 +27,7 @@ from utils.normalize import (
     detect_category,
     generate_slug,
     looks_online,
+    normalize_zip,
     parse_price_fr,
     truncate,
 )
@@ -99,7 +100,7 @@ def make_event(
     if not category_slug:
         category_slug = detect_category(category_raw, title_c, desc_c, source_map=category_map)
 
-    venue_zip = (str(venue_zip).strip() or None) if venue_zip else None
+    venue_zip = normalize_zip(venue_zip)
     venue_name_c = clean_text(venue_name)
     if is_online is None:
         is_online = looks_online(venue_name_c, venue_address) if venue_name_c or venue_address else False

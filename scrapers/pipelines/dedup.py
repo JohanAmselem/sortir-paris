@@ -1,11 +1,13 @@
 """
 Cross-source event deduplication (AUDIT D11).
 
-Two events are duplicates when ALL hold:
-  - different sources,
-  - same Paris-local day, or overlapping multi-day ranges,
-  - same canonical venue, or venues < 150 m apart,
-  - trigram similarity of their normalized dedup titles > 0.55.
+Two events are duplicates when they come from different sources, on the same Paris-local
+day (or overlapping multi-day ranges), and either:
+  - same canonical venue, or venues < 150 m apart, and trigram similarity of their
+    normalized dedup titles (dates, COMPLET, editorial tails stripped) > 0.55; or
+  - venue rows not linked yet but with compatible names (containment / trigram, postcode
+    equal or unknown), same day and time slot (±45 min when both times are known), and
+    title similarity ≥ 0.8.
 
 The weaker row gets canonical_event_id = stronger row (see choose_canonical), and the
 canonical row's missing fields are filled from the duplicate. Rows are never deleted.
@@ -20,10 +22,22 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from utils.dates import paris_day
 from pipelines.ingest import _exec_many
-from utils.matching import _trigrams, dedup_title, haversine_m, trigram_similarity
+from utils.matching import (
+    _trigrams,
+    dedup_title,
+    haversine_m,
+    trigram_similarity,
+    venue_names_compatible,
+    venue_tokens,
+)
+from utils.normalize import normalize_zip
 
 TITLE_THRESHOLD = 0.55
 NEAR_METERS = 150
+# Different venue rows whose names designate the same place (no shared geocode yet):
+STRONG_TITLE_THRESHOLD = 0.8
+SLOT_MINUTES = 45
+FAR_METERS = 1500
 
 # Higher = more trusted. Official venue/open-data feeds beat aggregators.
 SOURCE_PRIORITY: Dict[str, int] = {
@@ -104,23 +118,63 @@ def venues_match(a: dict, b: dict) -> bool:
     return False
 
 
-def is_duplicate(a: dict, b: dict) -> bool:
-    if a.get("source") == b.get("source"):
+def venue_names_match(a: dict, b: dict) -> bool:
+    """Two venue rows that are probably the same place: compatible names, postcodes equal
+    or one unknown, and not geocoded far apart."""
+    za, zb = normalize_zip(a.get("zip_code")), normalize_zip(b.get("zip_code"))
+    if za and zb and za != zb:
         return False
-    if not dates_match(a, b) or not venues_match(a, b):
+    if None not in (a.get("lat"), a.get("lng"), b.get("lat"), b.get("lng")):
+        if haversine_m(a["lat"], a["lng"], b["lat"], b["lng"]) > FAR_METERS:
+            return False
+    return venue_names_compatible(a.get("venue_name"), b.get("venue_name"))
+
+
+def same_slot(a: dict, b: dict) -> bool:
+    """Same Paris day, and starts within SLOT_MINUTES when both times are known."""
+    sa, sb = _days(a)[0], _days(b)[0]
+    if not sa or sa != sb:
         return False
+    if a.get("time_known") and b.get("time_known"):
+        da, db = a.get("start_date"), b.get("start_date")
+        if isinstance(da, datetime) and isinstance(db, datetime):
+            return abs((da - db).total_seconds()) <= SLOT_MINUTES * 60
+    return True
+
+
+def _title_sim(a: dict, b: dict) -> float:
     ga, gb = a.get("_tg"), b.get("_tg")
     if ga is None or gb is None:
         ta = a.get("_dt") or dedup_title(a.get("title"))
         tb = b.get("_dt") or dedup_title(b.get("title"))
-        return trigram_similarity(ta, tb) > TITLE_THRESHOLD
+        return trigram_similarity(ta, tb)
     if not ga or not gb:
+        return 0.0
+    return len(ga & gb) / len(ga | gb)
+
+
+def is_duplicate(a: dict, b: dict) -> bool:
+    if a.get("source") == b.get("source"):
         return False
-    return len(ga & gb) / len(ga | gb) > TITLE_THRESHOLD
+    if not dates_match(a, b):
+        return False
+    if venues_match(a, b):
+        return _title_sim(a, b) > TITLE_THRESHOLD
+    # venue rows not linked/geocoded yet ("Seine Musicale" / "La Seine Musicale"):
+    # stricter title and same time slot
+    return (same_slot(a, b) and _title_sim(a, b) >= STRONG_TITLE_THRESHOLD
+            and venue_names_match(a, b))
 
 
 def _cells(row: dict) -> List[tuple]:
     keys = []
+    start_day, end_day = _days(row)
+    if start_day and start_day == end_day and row.get("venue_name"):
+        # same day + a distinctive venue word: candidates for venue_names_match
+        toks = row.setdefault("_vt", venue_tokens(row.get("venue_name")))
+        for tok in toks + ["".join(sorted(toks))]:  # "38Riv" and "38 RIV" share the compact key
+            if tok:
+                keys.append(("n", start_day, tok))
     if row.get("canonical_venue"):
         keys.append(("v", row["canonical_venue"]))
     if row.get("lat") is not None and row.get("lng") is not None:
@@ -151,6 +205,8 @@ def find_duplicates(rows: Iterable[dict]) -> Dict[str, str]:
 
     seen_pairs = set()
     for key, members in buckets.items():
+        if key[0] == "n" and len(members) > 300:
+            continue  # a venue word shared by hundreds of events that day is not distinctive
         candidates = list(members)
         if key[0] == "g":  # add neighbouring geo cells
             for di in (-1, 0, 1):
@@ -178,7 +234,16 @@ def find_duplicates(rows: Iterable[dict]) -> Dict[str, str]:
     for members in groups.values():
         if len(members) < 2:
             continue
-        best = max((rows[i] for i in members), key=canonical_rank)
+        pool = members
+        per_source = defaultdict(int)
+        for i in members:
+            per_source[rows[i].get("source")] += 1
+        if any(n > 1 for n in per_source.values()):
+            # several sessions of one source joined through a run/series row of another:
+            # the run is what is displayed, never one session hiding the others
+            ranged = [i for i in members if _days(rows[i])[0] != _days(rows[i])[1]]
+            pool = ranged or members
+        best = max((rows[i] for i in pool), key=canonical_rank)
         for i in members:
             if rows[i]["id"] != best["id"]:
                 out[str(rows[i]["id"])] = str(best["id"])
@@ -224,9 +289,13 @@ def run_dedup(conn) -> int:
         """
         SELECT e.id, e.source, e.title, e.start_date, e.end_date, e.status,
                e.quality_score, e.created_at,
-               COALESCE(v.canonical_venue_id, v.id) AS canonical_venue, v.lat, v.lng
+               COALESCE(v.canonical_venue_id, v.id) AS canonical_venue,
+               COALESCE(c.lat, v.lat) AS lat, COALESCE(c.lng, v.lng) AS lng,
+               COALESCE(c.name, v.name) AS venue_name, COALESCE(c.zip_code, v.zip_code) AS zip_code,
+               e.time_known
         FROM events e
         JOIN venues v ON v.id = e.venue_id
+        LEFT JOIN venues c ON c.id = v.canonical_venue_id
         WHERE e.status IN ('active', 'draft')
           AND e.canonical_event_id IS NULL
           AND coalesce(e.end_date, e.start_date) >= now() - interval '6 hours'

@@ -25,8 +25,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Generator, List, Optional, Tuple
 
-from utils.event import make_event, stable_id
-from utils.matching import dedup_title
+from utils.event import make_event
+from utils.series import collapse_series as shared_collapse_series
 from utils.http import BudgetExceeded, PoliteClient
 import re
 from collections import Counter
@@ -64,6 +64,50 @@ ARTS_GENRES = {
 }
 
 
+# Genre names that mean "a concert" whatever the segment (segment "Undefined" happens).
+MUSIC_GENRES = {
+    "rock", "pop", "pop/rock", "hip-hop/rap", "hip hop", "rap", "r&b", "jazz", "blues", "classical",
+    "classique", "metal", "hard rock", "electronic", "dance/electronic", "electro", "world",
+    "musiques du monde", "chanson française", "chanson francaise", "variété", "variete",
+    "variété française", "folk", "reggae", "soul", "funk", "alternative", "country", "latin",
+    "gospel", "musique classique", "opéra", "opera", "punk", "indie", "new age",
+}
+
+# Last resort when neither the classification nor the title says anything: the kind of
+# venue ("Église de la Madeleine" sells concerts, "Le Point Virgule" sells stand-up).
+VENUE_CATEGORY_HINTS = [
+    (re.compile(r"\b([eé]glise|cath[eé]drale|basilique|chapelle|temple|philharmonie|salle pleyel|"
+                r"salle gaveau|olympia|bataclan|z[eé]nith|cigale|trianon|[eé]lys[eé]e montmartre|"
+                r"accor arena|seine musicale|maroquinerie|new morning|cabaret sauvage|boule noire|"
+                r"fl[eè]che d.or|alhambra|casino de paris|folies berg[eè]re|d[eé]fense arena)\b", re.I),
+     "concerts"),
+    (re.compile(r"\b(point virgule|comedy|com[eé]die club|caf[eé][ -]th[eé][aâ]tre|caf[eé] de la gare|"
+                r"palais des glaces|spotlight|th[eé][aâ]tre de dix heures|apollo|barbizon)\b", re.I),
+     "spectacles"),
+    (re.compile(r"\b(th[eé][aâ]tre|theater|theatre|com[eé]die|bouffes|op[eé]ra comique|"
+                r"la scala|sc[eè]ne)\b", re.I), "theatre"),
+]
+
+
+def venue_category_hint(venue_name: Optional[str]) -> Optional[str]:
+    for rx, slug in VENUE_CATEGORY_HINTS:
+        if venue_name and rx.search(venue_name):
+            return slug
+    return None
+
+
+def display_title(name: str, attractions: List[str], venue_name: Optional[str]) -> str:
+    """A 1-3 character name ("ELI") says nothing: use the attraction's longer name, or
+    append the venue ("ELI · La Cigale")."""
+    t = (name or "").strip()
+    if len(t) > 3:
+        return t
+    for a in attractions:
+        if a and len(a.strip()) > 3 and a.strip().lower() != t.lower():
+            return a.strip()
+    return f"{t} · {venue_name}" if venue_name else t
+
+
 def tm_datetime(dt: datetime) -> str:
     """Discovery API format: YYYY-MM-DDTHH:mm:ssZ (UTC)."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -82,6 +126,8 @@ def category_for(classifications) -> Tuple[Optional[str], bool]:
     if segment in ("sports", "sport"):
         return None, True
     if segment in ("music", "musique"):
+        return "concerts", False  # genre "Undefined" included
+    if genre in MUSIC_GENRES:
         return "concerts", False
     if segment in ("film", "cinéma", "cinema"):
         return "cinema", False
@@ -187,10 +233,10 @@ def event_from_tm(e: dict) -> Optional[dict]:
             if n and n.lower() != "undefined" and n not in genre_tags:
                 genre_tags.append(n)
     attractions = [a.get("name") for a in (e.get("_embedded") or {}).get("attractions") or [] if a.get("name")]
-    return make_event(
+    ev = make_event(
         source=SOURCE,
         source_id=f"tm-{e['id']}",
-        title=e["name"],
+        title=display_title(e["name"], attractions, v.get("name")),
         start=start,
         end=_when(dates.get("end")),
         description=e.get("info") or e.get("description") or e.get("pleaseNote"),
@@ -210,6 +256,9 @@ def event_from_tm(e: dict) -> Optional[dict]:
         event_status="cancelled" if status == "cancelled" else "scheduled",
         is_online=False,
     )
+    if not ev["category_slug"]:
+        ev["category_slug"] = venue_category_hint(v.get("name"))
+    return ev
 
 
 def parse_api(data) -> Tuple[List[dict], dict]:
@@ -235,25 +284,9 @@ SERIES_MIN = 4  # sessions of the same show at the same venue → one event with
 
 def collapse_series(events: List[dict]) -> List[dict]:
     """Ticketmaster lists every session (museum time slot, each night of a run) as its own
-    event. Same title + same venue with SERIES_MIN+ sessions → one event spanning them."""
-    groups: Dict[Tuple[str, str], List[dict]] = {}
-    for ev in events:
-        key = (dedup_title(ev.get("title")), (ev.get("venue_name") or "").strip().lower())
-        groups.setdefault(key, []).append(ev)
-    out: List[dict] = []
-    for (tkey, vkey), evs in groups.items():
-        live = [e for e in evs if e.get("event_status") != "cancelled"]
-        if len(live) < SERIES_MIN:
-            out.extend(evs)
-            continue
-        live.sort(key=lambda e: e["start_date"])
-        first = dict(live[0])
-        last_end = max((e.get("end_date") or e["start_date"]) for e in live)
-        first["end_date"] = last_end
-        first["time_known"] = len({e["start_date"][11:16] for e in live}) == 1 and live[0]["time_known"]
-        first["source_id"] = f"tm-series-{stable_id(tkey, vkey)[:16]}"
-        out.append(first)
-    return out
+    event. Same title + same venue with SERIES_MIN+ sessions → one event spanning them
+    (shared rule: utils/series.py; "tm-series-…" ids kept for stability)."""
+    return shared_collapse_series(events, SOURCE, id_prefix="tm", min_sessions=SERIES_MIN)
 
 
 def build_params(api_key: str, start: datetime, end: datetime, page: int) -> dict:

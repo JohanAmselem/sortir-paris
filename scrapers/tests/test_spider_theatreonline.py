@@ -92,6 +92,38 @@ def test_fetch_paginates_until_no_new_cards(monkeypatch):
             return page_html  # past the last page: redirected to page 1 → nothing new
 
     monkeypatch.setattr(mod, "PoliteClient", FakeClient)
-    evs = list(mod.fetch_events())
+    evs = list(mod.fetch_events(max_venues=0))
     assert len(calls) == 3
     assert len(evs) == 30  # 29 + the renamed show of page 2
+
+
+def test_venue_page_address_and_lookup(monkeypatch):
+    """Show page → /Theatre/ page → Place microdata (street, postcode, geo)."""
+    import spiders.theatreonline as mod
+
+    assert mod.parse_theatre_link(load_fixture("theatreonline_detail.html")) == \
+        "https://www.theatreonline.com/Theatre/Theatre-Saint-Georges/209"
+    info = mod.parse_venue_page(load_fixture("theatreonline_theatre.html"))
+    assert info == {"venue_address": "51, rue Saint-Georges", "venue_zip": "75009", "venue_city": "Paris",
+                    "venue_lat": 48.8782005, "venue_lng": 2.33744}
+    assert mod.parse_venue_page("<html></html>") is None
+
+    evs = parse_listing(load_fixture("theatreonline_listing.html"), today=TODAY)
+    pages = {"https://www.theatreonline.com/Spectacle/": load_fixture("theatreonline_detail.html"),
+             "https://www.theatreonline.com/Theatre/": load_fixture("theatreonline_theatre.html")}
+    calls = []
+
+    class FakeClient:
+        def get_text(self, url):
+            calls.append(url)
+            return next(v for k, v in pages.items() if url.startswith(k))
+
+    # every venue resolves to the same fixture page here; check one venue only
+    n = mod.enrich_venues(evs, FakeClient(), max_venues=1)
+    assert n == 1 and len(calls) == 2
+    # venues without postcode are looked up first (suburbs "(92)" / bare "Paris")
+    changed = [e for e in evs if e.get("venue_address") == "51, rue Saint-Georges"]
+    assert changed and all(e["venue_zip"] == "75009" and e["venue_lat"] == 48.8782005 for e in changed)
+    assert {e["venue_name"] for e in changed} and all(
+        not any(o.get("venue_zip") for o in parse_listing(load_fixture("theatreonline_listing.html"), today=TODAY)
+                if o["venue_name"] == e["venue_name"]) for e in changed)

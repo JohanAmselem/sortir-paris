@@ -5,7 +5,7 @@ Usage:
     python cron.py --group official            # one matrix group
     python cron.py --source paris_opendata     # one (or several, comma-separated) sources
     python cron.py --all                       # every enabled source
-    python cron.py --post                      # geocode + promote + dedup + expiry + Meilisearch sync
+    python cron.py --post                      # geocode, venue links, promote, series, dedup, categories, expiry
     python cron.py --source dice --dry-run     # fetch + validate only, no database
     python cron.py --list
 
@@ -34,6 +34,7 @@ load_dotenv()
 
 from sources import GROUPS, SOURCES, select  # noqa: E402
 from utils.http import BudgetExceeded, set_budget  # noqa: E402
+from utils.series import collapse_series  # noqa: E402
 
 DROP_THRESHOLD = 0.6
 DROP_MIN_PREVIOUS = 20
@@ -100,6 +101,14 @@ def run_sources(specs, dry_run: bool = False) -> list:
             by_source[ev.get("source") or spec.name].append(ev)
         if not by_source:
             by_source[spec.name] = []
+        # One event per series (≥ 4 sessions, same title + venue) — not for cinema séances.
+        # Health checks keep counting sessions (comparable with previous runs).
+        sessions = {name: len(evs) for name, evs in by_source.items()}
+        for name in list(by_source):
+            before = len(by_source[name])
+            by_source[name] = collapse_series(by_source[name], name)
+            if len(by_source[name]) != before:
+                print(f"  [{name}] series: {before} sessions → {len(by_source[name])} events")
 
         if dry_run:
             for name, evs in by_source.items():
@@ -115,10 +124,11 @@ def run_sources(specs, dry_run: bool = False) -> list:
         for name, evs in by_source.items():
             log_id = log_start(conn, name, started_at)
             previous = last_successful_found(conn, name)
-            stats = {"found": len(evs), "new": 0, "updated": 0, "duplicate": 0, "errors": 0, "error_list": []}
+            stats = {"found": sessions.get(name, len(evs)), "new": 0, "updated": 0, "duplicate": 0, "errors": 0, "error_list": []}
             try:
                 if evs:
                     stats = run_pipeline(evs, name, conn=conn)
+                    stats["found"] = sessions.get(name, stats.get("found", 0))
             except Exception as e:
                 crashed = True
                 errors.append(f"ingest {type(e).__name__}: {e}")
@@ -144,18 +154,29 @@ def run_sources(specs, dry_run: bool = False) -> list:
 
 
 def run_post() -> list:
-    """Geocode → promote → dedup → expire → purge (→ Meilisearch if MEILI_SYNC=1). Each step isolated; failures reported."""
+    """Geocode → link venues → promote → series → dedup → categories → expire → purge
+    (→ Meilisearch if MEILI_SYNC=1). Each step isolated; failures reported."""
     from pipelines.dedup import run_dedup
     from pipelines.ingest import get_db_connection
-    from pipelines.maintenance import expire_events, promote_geocoded, purge_old_events
+    from pipelines.maintenance import (
+        expire_events,
+        promote_geocoded,
+        purge_old_events,
+        reclassify_categories,
+        reject_collapsed_series,
+    )
+    from pipelines.venue_links import link_venues
     from utils.geocode import geocode_missing_venues
 
     problems = []
     conn = get_db_connection()
     steps = [
         ("geocode", lambda: geocode_missing_venues(conn)),
+        ("link_venues", lambda: link_venues(conn)),
         ("promote", lambda: promote_geocoded(conn)),
+        ("series", lambda: reject_collapsed_series(conn)),
         ("dedup", lambda: run_dedup(conn)),
+        ("categories", lambda: reclassify_categories(conn)),
         ("expire", lambda: expire_events(conn)),
         ("purge", lambda: purge_old_events(conn)),
     ]

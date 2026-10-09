@@ -196,3 +196,35 @@ def test_past_events_are_dropped():
 
 def test_ics_rejects_non_calendar_body():
     assert parse_ics_feed("<html>nope</html>", VENUES_BY_KEY["comedyclub"], now=NOW) == []
+
+
+def test_room_named_location_is_the_venue_itself():
+    """Châtelet events located in "Grande Salle" (no address) belong to the Théâtre du
+    Châtelet (75001), never to a shared address-less "Grande Salle" venue."""
+    from spiders.venues_structured import is_room_name, parse_jsonld_page
+
+    v = VENUES_BY_KEY["chatelet"]
+    html = load_fixture("venue_chatelet_detail.html").replace(
+        '"name":"Théâtre du Châtelet"', '"name":"Grande Salle"')
+    evs = parse_jsonld_page(html, v.urls[0], v, now=NOW)
+    assert evs and all(e["venue_name"] == "Théâtre du Châtelet" and e["venue_zip"] == "75001" for e in evs)
+    for name in ("Grande Salle", "La Petite Salle", "Studio 2", "Foyer", "Grand Foyer", "Salle B"):
+        assert is_room_name(name), name
+    for name in ("Salle Gaveau", "Salle Pleyel", "Studio Hébertot", "La Seine Musicale"):
+        assert not is_room_name(name), name
+
+
+def test_38riv_times_are_right_and_utc_title_suffix_is_dropped():
+    """Audit 9 Oct: "Jeanne Lee par Äulne – 09/10/2026 - 17:30" displayed at 19:30.
+    The JSON-LD says 19:30+02:00 (Paris Jazz Club agrees: 19:30 and 21:30); the time in
+    the site's event NAME is UTC. Times are kept; the misleading suffix is removed."""
+    from spiders.venues_config import ALL_VENUES_BY_KEY
+    from spiders.venues_structured import parse_jsonld_page
+    from utils.dates import paris_local
+    from validation import validate
+
+    v = ALL_VENUES_BY_KEY["38riv"]
+    evs = parse_jsonld_page(load_fixture("venue_38riv_detail.html"),
+                            "https://38riv.com/concerts/jeanne-lee-par-aulne", v, now=NOW)
+    assert sorted(paris_local(e["start_date"]).strftime("%H:%M") for e in evs) == ["19:30", "21:30"]
+    assert {validate(e, now=NOW)[0].title for e in evs} == {"Jeanne Lee par Äulne"}

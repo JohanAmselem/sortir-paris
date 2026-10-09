@@ -157,7 +157,8 @@ RETURNING id
 # Hard reasons that mean "not worth a new row" (existing rows are still updated).
 # Out-of-zone / online / junk rows are not stored at all (they used to be inserted as
 # "rejected", which bloated the table with thousands of useless rows).
-SKIP_INSERT = {"no_title", "no_start_date", "ended", "too_far_ahead", "out_of_zone", "online", "junk_title"}
+SKIP_INSERT = {"no_title", "no_start_date", "ended", "too_far_ahead", "out_of_zone", "online", "junk_title",
+               "placeholder_venue"}
 UNSTORABLE = {"no_title", "no_start_date"}
 
 
@@ -176,7 +177,10 @@ def plan_event(cur, raw: dict, ctx: "IngestContext"):
     if not existing_id and set(hard) & SKIP_INSERT:
         return "skipped", None, None  # e.g. already ended: not worth a row (and no venue creation)
 
-    venue_id, geocoded = ctx.venues.resolve(cur, raw) if raw.get("venue_name") else (None, False)
+    # the venue is resolved from the validated fields (zip as 5 digits, "THEATRE X" → "Theatre X"
+    # for venues created from now on; existing venues are never renamed)
+    venue_raw = dict(raw, venue_name=ev.venue_name, venue_zip=ev.venue_zip) if ev.venue_name else raw
+    venue_id, geocoded = ctx.venues.resolve(cur, venue_raw) if ev.venue_name else (None, False)
     ev, hard, soft, score = validate(raw, venue_geocoded=geocoded)
     status = decide_status(hard, score)
     if hard and set(hard) <= {"ended"}:

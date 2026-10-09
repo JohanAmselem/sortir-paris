@@ -94,3 +94,53 @@ def test_table_has_unique_paris_codes():
     for code, (name, addr, zip_) in PARIS_CINEMAS.items():
         assert zip_.startswith("75"), code
     assert "Le Desperado" not in [v[0] for v in PARIS_CINEMAS.values()]
+
+
+def test_fetch_seven_days_day_by_day_and_skips_unpublished_days(monkeypatch):
+    """Day-major order; a cinema whose day N has no showtime (programme not published
+    yet) is not requested for later days."""
+    from datetime import datetime
+
+    import spiders.allocine as mod
+    from utils.dates import PARIS
+
+    codes = list(PARIS_CINEMAS)[:2]
+    published = {codes[0]: 2, codes[1]: 7}  # first cinema: only 2 days published
+    calls = []
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get(self, url):
+            code = url.split("theater-")[1].split("/")[0]
+            day = int(url.split("/d-")[1][8:10]) - 9
+            calls.append((day, code))
+            ok = day < published[code]
+            return Resp({"results": [1] if ok else [], "pagination": {"totalPages": 1 if ok else 0}})
+
+    monkeypatch.setattr(mod, "PoliteClient", FakeClient)
+    monkeypatch.setattr(mod, "now_paris", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=PARIS))
+    monkeypatch.setattr(mod, "_enricher", lambda: None)
+    monkeypatch.setattr(mod, "parse_showtimes",
+                        lambda data, code, day, venue, enrich=None: [{"source_id": f"{code}-{day}"}])
+    evs = list(mod.fetch_events(max_cinemas=2, days_ahead=7))
+    assert len(evs) == 2 + 7
+    assert calls[:2] == [(0, codes[0]), (0, codes[1])]  # day by day
+    assert [d for d, c in calls if c == codes[0]] == [0, 1, 2]  # day 2 empty → stop

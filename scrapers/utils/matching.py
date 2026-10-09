@@ -32,6 +32,99 @@ def normalize_venue_name(name: Optional[str]) -> str:
     return out or folded
 
 
+# Words that describe the kind of place rather than which place it is: stripped before
+# comparing two venue names ("38 RIV - Jazz Club & Bar" ≈ "38Riv", "Théâtre 71" ≈
+# "Malakoff scène nationale – Théâtre 71").
+VENUE_GENERIC_WORDS = {
+    "theatre", "theatres", "salle", "salles", "paris", "jazz", "club", "bar", "bars", "studio",
+    "scene", "scenes", "nationale", "national", "restaurant", "cabaret", "live", "music",
+    "musique", "concert", "concerts", "espace", "lieu", "the", "and", "et", "de", "du", "des", "la",
+    "le", "les", "l", "d", "a", "au", "aux", "en", "france", "idf", "ile", "spectacle", "spectacles",
+    "officiel", "official", "venue", "arena",
+}
+# Keys too generic to merge on the name alone (needs the same spot).
+VENUE_GENERIC_KEYS = {
+    "mairie", "mediatheque", "bibliotheque", "eglise", "gymnase", "parc", "square", "jardin",
+    "fetes", "centreculturel", "centre", "culturel", "auditorium", "conservatoire", "cinema",
+    "maisonquartier", "maison", "galerie", "musee", "chapelle", "temple", "stade", "piscine",
+    "kiosque", "place", "cour", "foyer", "atelier", "ateliers", "librairie", "grandesalle",
+    "petitesalle", "salledesfetes", "hall", "jardins", "theatre", "salle",
+}
+_VENUE_SEPARATORS = re.compile(r"\s+[-–—|:/]\s+|\s*[|/]\s*|\s+[–—]\s*|\s*[–—]\s+|\(")
+
+
+def venue_tokens(name: Optional[str]) -> list:
+    """Distinctive tokens of a venue name, in order, each once (generic words, postcodes,
+    arrondissements and a trailing "à <town>" removed)."""
+    folded = _fold(name)
+    words = folded.split()
+    if " a " in f" {folded} ":  # "La Seine Musicale à Boulogne-Billancourt"
+        head = folded.rsplit(" a ", 1)[0].split()
+        if len([w for w in head if w not in VENUE_GENERIC_WORDS]) >= 2:
+            words = head
+    out = []
+    for w in words:
+        if w in VENUE_GENERIC_WORDS or re.fullmatch(r"75\d{3}|9[234]\d{3}|\d{1,2}(e|er|eme)", w):
+            continue
+        if w not in out:
+            out.append(w)
+    return out
+
+
+def venue_key(name: Optional[str]) -> str:
+    """Compact comparison key: '38 RIV - Jazz Club & Bar' → '38riv', '38Riv' → '38riv',
+    'THEATRE MARIGNY - STUDIO MARIGNY' → 'marigny' (tokens sorted: word order is ignored)."""
+    return "".join(sorted(venue_tokens(name)))
+
+
+# Outdoor spots / transport named after a nearby building: never the building itself
+# ("Place du Châtelet" is not "Théâtre du Châtelet").
+_PLACE_TYPE_WORDS = {"place", "square", "parvis", "rue", "quai", "quais", "berges", "metro", "station",
+                     "gare", "jardin", "jardins", "parc", "pont", "esplanade", "avenue", "boulevard",
+                     "rampe", "port", "bassin", "canal"}
+
+
+def venue_name_parts(name: Optional[str]) -> list:
+    """'La Seine Musicale - Grande Seine' → ['La Seine Musicale', 'Grande Seine']."""
+    return [p.strip(" )") for p in _VENUE_SEPARATORS.split(name or "") if p and p.strip(" )")]
+
+
+def venue_names_compatible(a: Optional[str], b: Optional[str], min_sim: float = 0.5) -> bool:
+    """Do two names designate the same place (given they are at the same spot)?
+
+    True when the distinctive tokens of one are contained in the other's (or their compact
+    keys contain each other), or their trigram similarity ≥ min_sim — unless one is a
+    hall of a complex: a ' - <hall>' suffix whose distinctive words the other name lacks
+    ('La Seine Musicale - Grande Seine' ≠ 'La Seine Musicale - Auditorium' ≠ 'La Seine
+    Musicale')."""
+    ka, kb = venue_key(a), venue_key(b)
+    if not ka or not kb:
+        return False
+    if ka == kb:
+        return True
+    ta, tb = set(venue_tokens(a)), set(venue_tokens(b))
+    if bool(ta & _PLACE_TYPE_WORDS) != bool(tb & _PLACE_TYPE_WORDS):
+        return False
+    na, nb = {w for w in ta if w.isdigit()}, {w for w in tb if w.isdigit()}
+    if na and nb and na != nb:
+        return False  # "17 rue X" ≠ "19 rue X", "Atelier 77" ≠ "Atelier 78"
+    if ka in VENUE_GENERIC_KEYS or kb in VENUE_GENERIC_KEYS:
+        return False  # a bare "Galerie" / "Mairie" is not "Galerie Sato"
+    for name, other in ((a, tb), (b, ta)):
+        parts = venue_name_parts(name)
+        prefix = set(venue_tokens(parts[0])) if parts else set()
+        for suffix in parts[1:]:
+            st = set(venue_tokens(suffix))
+            if st and not st <= other and prefix & other:
+                return False  # "<complex> - <hall>" and the other name lacks that hall
+    if ta <= tb or tb <= ta:
+        return True
+    short, long_ = sorted((ka, kb), key=len)
+    if len(short) >= 4 and short in long_:
+        return True
+    return trigram_similarity(" ".join(venue_tokens(a)), " ".join(venue_tokens(b))) >= min_sim
+
+
 _ADDR_ABBREV = {
     "bd": "boulevard", "boul": "boulevard", "blvd": "boulevard",
     "av": "avenue", "ave": "avenue",
@@ -62,8 +155,11 @@ _TITLE_NOISE = {
 
 
 def dedup_title(title: Optional[str]) -> str:
-    """Normalized title for cross-source comparison."""
-    t = unidecode(title or "").lower()
+    """Normalized title for cross-source comparison (dates, COMPLET/ANNULÉ markers and
+    editorial tails such as "… en concert à Paris au Bataclan le 9 octobre" removed)."""
+    from utils.titles import strip_for_matching
+
+    t = unidecode(strip_for_matching(title)).lower()
     t = re.sub(r"\(.*?\)|\[.*?\]", " ", t)  # (complet), [VOST]
     t = re.sub(r"\b(19|20)\d{2}\b", " ", t)
     t = re.sub(r"[^a-z0-9]+", " ", t)

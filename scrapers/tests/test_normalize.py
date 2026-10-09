@@ -92,14 +92,20 @@ def test_clean_text_no_xss_survivors(raw):
     [
         ("Manifestation pour le climat", None, None, None),  # not "festival"
         ("Un exposé sur les abeilles", None, None, None),  # not "expo"
-        ("Parcours sportif au parc", None, None, None),  # not "visite"
+        ("Parcours sportif au parc", None, None, "sport"),  # not "visite"
         ("Duo gourmand : sablés", "Atelier art de la table", None, "ateliers"),
         ("Concert de jazz au Sunside", None, None, "concerts"),
         ("Festival du film court", None, None, "festivals"),
         ("Le Lac des cygnes", "Un ballet en quatre actes", None, "danse"),
         ("Soirée", None, "Concerts / Jazz", "concerts"),  # explicit label wins
         ("Visite guidée du Marais", "Concert final", None, "visites"),  # title beats description
-        ("Yoga au parc", None, "sport", "ateliers"),  # no 'sport' category
+        ("Yoga au parc", None, "sport", "sport"),
+        ("Blind test spécial années 80", None, "Concerts", "soirees"),
+        ("Karaoké géant", None, None, "soirees"),
+        ("Atelier gravure en famille", None, "Exposition", "ateliers"),
+        ("Conférence : Picasso, un influenceur avant l'heure ?", None, "Expositions", "conferences"),
+        ("Randonnée en forêt de Meudon", None, None, "sport"),
+        ("Paris sport proximité : gym douce", None, "Paris sport proximité", "sport"),
     ],
 )
 def test_detect_category(title, desc, raw, expected):

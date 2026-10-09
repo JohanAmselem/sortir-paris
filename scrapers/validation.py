@@ -15,7 +15,18 @@ from typing import List, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
-from utils.normalize import SERVICE_DEPARTMENTS, VALID_CATEGORIES, in_service_zone
+from utils.normalize import (
+    SERVICE_DEPARTMENTS,
+    VALID_CATEGORIES,
+    detect_category,
+    far_from_zone,
+    in_service_zone,
+    is_placeholder_venue,
+    normalize_zip,
+    smart_title_case_safe,
+    title_category_override,
+)
+from utils.titles import strip_date_affixes, title_flags
 
 PUBLISH_THRESHOLD = 50
 MAX_PRICE_CENTIMES = 50_000  # 500 €
@@ -30,7 +41,15 @@ SOFT_PENALTIES = {
     "venue_not_geocoded": 15,
     "no_category": 10,
     "no_venue": 15,
+    "sold_out": 0,  # information only ("COMPLET" removed from the title)
 }
+
+# Hard reasons (also listed in pipelines/maintenance.PROMOTE_SQL).
+HARD_REASONS = (
+    "no_title", "junk_title", "no_start_date", "ended", "too_far_ahead", "end_before_start",
+    "span_too_long", "price_outlier", "price_inconsistent", "free_with_price", "out_of_zone",
+    "online", "cancelled", "placeholder_venue",
+)
 
 _JUNK_TITLE_RE = re.compile(
     r"^(untitled|sans titre|test|tbd|tba|null|none|undefined|evenement|événement|event|"
@@ -95,15 +114,60 @@ class EventIn(BaseModel):
     @field_validator("venue_zip", mode="before")
     @classmethod
     def _zip(cls, v):
-        if v is None:
-            return None
-        v = str(v).strip()
-        return v or None
+        return normalize_zip(v)  # 5 digits or None ("à venir", "75 018" → "75018")
 
     @field_validator("tags_raw", mode="before")
     @classmethod
     def _tags(cls, v):
         return [str(x) for x in (v or []) if x]
+
+
+def _clean_title(ev: "EventIn") -> bool:
+    """Display title clean-up. Returns True when the title said "complet"/"sold out".
+
+    - "ANNULÉ - X" / "X (reporté)" → event_status cancelled, marker removed
+    - "COMPLET" / "sold out" → removed (soft reason sold_out + tag "complet")
+    - date prefixes/suffixes ("09.OCT | PARIS | X", "X – 09/10/2026 - 17:30") removed
+    - mostly upper-case titles → smart title case (acronyms kept)"""
+    title, cancelled, sold_out = title_flags(ev.title)
+    title = strip_date_affixes(title)
+    ev.title = smart_title_case_safe(title) or title
+    if cancelled:
+        ev.event_status = "cancelled"
+    return sold_out
+
+
+def _local_midnight_unknown(ev: "EventIn") -> None:
+    """A start at exactly 00:00 or 23:59 Paris time is a "no time given" default."""
+    if ev.start_date is None or not ev.time_known:
+        return
+    from utils.dates import PARIS
+
+    local = ev.start_date.astimezone(PARIS)
+    if (local.hour, local.minute) in ((0, 0), (23, 59)) and local.second == 0:
+        ev.time_known = False
+
+
+def _single_day_timed(ev: "EventIn") -> bool:
+    if ev.start_date is None or not ev.time_known:
+        return False
+    end = ev.end_date or ev.start_date
+    return timedelta(0) <= end - ev.start_date <= timedelta(hours=5)
+
+
+def _fix_category(ev: "EventIn") -> None:
+    """Title-driven corrections of the source category (see utils.normalize):
+    "Atelier …" listed as an exhibition → ateliers, "Blind test" listed as a concert →
+    soirees; a 2-hour evening slot listed as an exhibition is a talk/workshop/visit when
+    its title or description says so."""
+    over = title_category_override(ev.title, ev.category_slug)
+    if over:
+        ev.category_slug = over
+        return
+    if ev.category_slug == "expos" and _single_day_timed(ev):
+        alt = detect_category(None, ev.title, ev.description)
+        if alt in ("conferences", "ateliers", "visites", "soirees", "sport"):
+            ev.category_slug = alt
 
 
 def _score(soft: List[str]) -> int:
@@ -128,6 +192,11 @@ def validate(
         ev = EventIn.model_validate({k: v for k, v in event.items() if k in EventIn.model_fields})
     except Exception as e:  # malformed dict: reject, never crash the pipeline
         return None, [f"invalid:{type(e).__name__}"], [], 0
+
+    sold_out = _clean_title(ev)
+    _local_midnight_unknown(ev)
+    if ev.venue_name:
+        ev.venue_name = smart_title_case_safe(ev.venue_name)
 
     title = (ev.title or "").strip()
     if not title:
@@ -159,14 +228,18 @@ def validate(
     # Geography: Paris + petite couronne (75, 92, 93, 94)
     if ev.venue_lat is not None and ev.venue_lng is not None and not in_service_zone(ev.venue_lat, ev.venue_lng):
         hard.append("out_of_zone")
-    if ev.venue_zip:
-        if re.fullmatch(r"\d{5}", ev.venue_zip) and ev.venue_zip[:2] not in SERVICE_DEPARTMENTS:
-            hard.append("out_of_zone")
+    if ev.venue_zip and ev.venue_zip[:2] not in SERVICE_DEPARTMENTS:
+        hard.append("out_of_zone")
+    if ev.venue_name and far_from_zone(ev.venue_name, ev.venue_address, ev.venue_city):
+        hard.append("out_of_zone")  # "Auditorium de la Grotte Cosquer, Marseille"
+    if ev.venue_name and is_placeholder_venue(ev.venue_name, ev.venue_address):
+        hard.append("placeholder_venue")  # "Adresse communiquée à l'inscription"
     if ev.is_online:
         hard.append("online")
     if ev.event_status == "cancelled":
         hard.append("cancelled")
 
+    _fix_category(ev)
     if ev.category_slug is not None and ev.category_slug not in VALID_CATEGORIES:
         ev.category_slug = None
     hard = list(dict.fromkeys(hard))
@@ -189,6 +262,10 @@ def validate(
         soft.append("venue_not_geocoded")
     if ev.category_slug is None:
         soft.append("no_category")
+    if sold_out:
+        soft.append("sold_out")
+        if "complet" not in ev.tags_raw:
+            ev.tags_raw.append("complet")
 
     return ev, hard, soft, _score(soft)
 

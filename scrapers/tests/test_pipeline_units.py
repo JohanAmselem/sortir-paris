@@ -64,6 +64,66 @@ def test_pick_feature_rejects_municipality_and_low_score():
     assert res["city"] == "Courbevoie" and res["arrondissement"] is None
 
 
+def test_pick_feature_by_venue_name_needs_the_street_in_the_name():
+    def feat(name, t="street", score=0.55, lat=48.8173, lng=2.3047, pc="92240"):
+        return {"geometry": {"coordinates": [lng, lat]},
+                "properties": {"type": t, "score": score, "postcode": pc, "city": "X", "name": name}}
+
+    # "Théâtre 71" must not land on "Passage du Théâtre"
+    assert pick_feature({"features": [feat("Passage du Théâtre")]}, venue_name="Théâtre 71") is None
+    res = pick_feature({"features": [feat("Place du Châtelet", lat=48.8576, lng=2.347, pc="75001")]},
+                       venue_name="Place du Châtelet")
+    assert res and res["postcode"] == "75001" and res["arrondissement"] == "1er"
+    # outside the service zone (Essonne) → rejected for name queries
+    assert pick_feature({"features": [feat("Place du Marché", lat=48.6, lng=2.3, pc="91470")]},
+                        venue_name="Place du Marché") is None
+
+
+def test_pick_poi_nominatim():
+    from utils.geocode import pick_poi
+
+    def r(name, cls="amenity", typ="theatre", lat="48.8211081", lon="2.3013158", pc="92240"):
+        return {"name": name, "category": cls, "type": typ, "lat": lat, "lon": lon,
+                "address": {"postcode": pc, "town": "Malakoff"}}
+
+    res = pick_poi([r("Théâtre 71")], "Malakoff scène nationale – Théâtre 71")
+    assert res["postcode"] == "92240" and res["city"] == "Malakoff" and res["source"] == "osm"
+    assert pick_poi([r("Théâtre 71")], "Théâtre 71", zip_code="92240")
+    assert pick_poi([r("Théâtre 71")], "Théâtre 71", zip_code="75011") is None  # postcode conflict
+    assert pick_poi([r("Parking du Théâtre", typ="parking")], "Théâtre 71") is None
+    assert pick_poi([r("Théâtre Gérard Philipe")], "Théâtre 71") is None  # another venue
+    assert pick_poi([r("Théâtre 71", lat="49.44", lon="1.09", pc="76000")], "Théâtre 71") is None
+    assert pick_poi([r("Malakoff", cls="boundary", typ="administrative")], "Malakoff") is None
+
+
+def test_geocode_venue_strategies_in_order():
+    from utils.geocode import geocode_venue
+
+    calls = []
+
+    class Client:
+        def __init__(self, name, answers):
+            self.name, self.answers = name, list(answers)
+
+        def get_json(self, url, params=None):
+            calls.append((self.name, params["q"]))
+            return self.answers.pop(0) if self.answers else None
+
+    ban = Client("ban", [{"features": []}, {"features": []}])
+    osm = Client("osm", [[{"name": "Sunset Sunside", "category": "club", "type": "music",
+                           "lat": "48.8598645", "lon": "2.3477284", "address": {"postcode": "75001", "city": "Paris"}}]])
+    budget = [1]
+    res = geocode_venue({"name": "Sunside", "address": "60 rue des Lombards", "zip_code": "75001",
+                         "city": "Paris"}, ban, osm, budget)
+    assert [c[0] for c in calls] == ["ban", "ban", "osm"] and budget == [0]
+    assert res["postcode"] == "75001" and res["arrondissement"] == "1er"
+    # no OSM budget left → no request
+    calls.clear()
+    assert geocode_venue({"name": "Sunside", "address": None, "zip_code": None, "city": None},
+                         Client("ban", []), osm, budget) is None
+    assert [c[0] for c in calls] == ["ban"]
+
+
 # ── fake DB: exercises run_pipeline's SAVEPOINT flow without Postgres ──
 
 class FakeCursor:

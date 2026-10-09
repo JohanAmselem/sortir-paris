@@ -7,8 +7,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        // Search and filtered variants are noindex anyway; keep crawlers (and the LLM) off free-text queries.
-        disallow: ['/api/', '/compte', '/login', '/onboarding', '/partage', '/*?*q=', '/surprise?'],
+        // Filtered / paginated variants are noindex with a canonical to the bare page: crawling
+        // them only costs uncached database queries (each combination is a new cache entry).
+        disallow: ['/api/', '/compte', '/login', '/onboarding', '/partage', '/*?'],
       },
     ],
     sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/sitemap-events.xml`],

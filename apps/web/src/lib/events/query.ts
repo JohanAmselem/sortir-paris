@@ -398,7 +398,8 @@ export function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'query'):
 
 // Keyed by the query only: entries are refreshed in the background every 5 min and
 // the previous result keeps being served while (or if) the refresh fails.
-const cachedQuery = unstable_cache(runQuery, ['events-query-v3'], { revalidate: 300, tags: ['events'] })
+// 15 min: the catalogue changes twice a day (scrapes); each refresh is a database query.
+const cachedQuery = unstable_cache(runQuery, ['events-query-v3'], { revalidate: 900, tags: ['events'] })
 
 /** Cached, time-bucketed event query. Geolocated queries are rounded to ~100 m for cache hits. */
 export function queryEvents(query: EventQuery): Promise<EventPage> {

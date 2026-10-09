@@ -104,7 +104,7 @@ async function load(slug: string): Promise<EventDetail | null> {
   }
 }
 
-const cached = unstable_cache(load, ['event-detail-v1'], { revalidate: 600, tags: ['events'] })
+const cached = unstable_cache(load, ['event-detail-v1'], { revalidate: 1800, tags: ['events'] })
 
 /**
  * Exhibitions published as one row per opening day (9h–19h): the end of the run

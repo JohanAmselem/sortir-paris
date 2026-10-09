@@ -8,7 +8,7 @@ import { unstable_cache } from 'next/cache'
 import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { DEFAULT_DURATION_MS, LONG_RUN_MS, resolveWindow, type TimeWindow } from '@/lib/paris-time'
-import { INSTITUTIONAL_TERMS, INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULES } from './taxonomy'
+import { INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULES } from './taxonomy'
 import { ACCENTS_FROM, ACCENTS_TO, filmSlug, foldText } from './fold'
 
 export { foldText }
@@ -110,10 +110,7 @@ function distanceSql(lat: number, lng: number): SQL {
  */
 export const filmKeySql = sql`trim(both '-' from regexp_replace(${foldSql(sql`${events.title}`)}, '[^a-z0-9]+', '-', 'g'))`
 
-const INSTITUTIONAL_LIKE = sql.raw(`array[${INSTITUTIONAL_TERMS.map((t) => `'%${t.replace(/'/g, "''")}%'`).join(', ')}]`)
 
-/** Cancelled but still "active" at the source: "ANNULÉ – …" (see looksCancelled in lib/format). */
-const cancelledTextSql = sql`(${foldSql(sql`${events.title}`)} like '%annule%' or ${foldSql(sql`coalesce(${events.shortDesc}, '')`)} like 'annule%')`
 
 /** Venue in Paris proper (arrondissement known or 75xxx zip). */
 const inParisSql = sql`(${venues.arrondissement} is not null or ${venues.zipCode} like '75%')`
@@ -127,7 +124,6 @@ function relevanceSql(now: Date): SQL {
   return sql`(
     ${events.qualityScore}
     + case when ${venues.id} is null then -4 when ${inParisSql} then 0 else -10 end
-    + case when ${foldSql(sql`${events.title}`)} like any (${INSTITUTIONAL_LIKE}) then -22 else 0 end
     + case when ${categories.slug} in ${OUTING_CATEGORIES} then 4 when ${categories.slug} is null then -4 else 0 end
     + least(${events.saveCount} * 3 + ${events.viewCount} / 25, 25)
     + case when ${events.imageUrl} is null then -25 else 0 end
@@ -224,7 +220,9 @@ function toIsoList(v: unknown): string[] {
 }
 
 export function buildConditions(query: EventQuery, now: Date): { where: SQL; window: TimeWindow | null } {
-  const conds: SQL[] = [liveCondition(now), sql`not ${cancelledTextSql}`]
+  // Cancellations and administrative topics are scored at ingestion (scrapers/validation):
+  // computing them here on every row made each listing ~10x heavier (outage of 9 Oct, 14:00).
+  const conds: SQL[] = [liveCondition(now)]
   const window = resolveWindow(query.when, now)
   if (window) conds.push(windowCondition(window, now))
 

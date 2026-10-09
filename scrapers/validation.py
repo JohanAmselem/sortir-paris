@@ -42,7 +42,19 @@ SOFT_PENALTIES = {
     "no_category": 10,
     "no_venue": 15,
     "sold_out": 0,  # information only ("COMPLET" removed from the title)
+    # Administrative / professional sessions (mairie, permanence, job dating…): ranked
+    # lower, never hidden on their own. Scored here once instead of in every web query.
+    "institutional": 15,
 }
+
+# Same list as the web used to match at query time (apps/web lib/events/taxonomy.ts).
+_INSTITUTIONAL_RE = re.compile(
+    r"\b(mairie|forum (?:des )?seniors?|permanence|m[ée]tiers de la ville|conversation (?:en |anglaise|espagnol)|"
+    r"caf[ée] (?:linguistique|des langues)|r[ée]union (?:publique|d'information)|job ?dating|recrutement|"
+    r"conseil (?:de quartier|municipal|d'arrondissement)|atelier num[ée]rique|aide aux devoirs|soutien scolaire|"
+    r"d[ée]marches|assembl[ée]e g[ée]n[ée]rale|webinaire|networking|salon de l'emploi)\b",
+    re.I,
+)
 
 # Hard reasons (also listed in pipelines/maintenance.PROMOTE_SQL).
 HARD_REASONS = (
@@ -262,6 +274,8 @@ def validate(
         soft.append("venue_not_geocoded")
     if ev.category_slug is None:
         soft.append("no_category")
+    if _INSTITUTIONAL_RE.search(ev.title or ""):
+        soft.append("institutional")
     if sold_out:
         soft.append("sold_out")
         if "complet" not in ev.tags_raw:

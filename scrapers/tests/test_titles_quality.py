@@ -220,3 +220,12 @@ def test_evening_expo_slot_with_talk_description_is_a_conference():
     raw = ev(title="Monet", category_slug="expos", start="2026-10-01", end="2027-01-10",
              description="Une conférence inaugurale aura lieu le premier jour de l'exposition.")
     assert validate(raw, now=NOW)[0].category_slug == "expos"
+
+
+def test_institutional_titles_are_ranked_lower_not_hidden():
+    from validation import _INSTITUTIONAL_RE, SOFT_PENALTIES, PUBLISH_THRESHOLD
+    assert _INSTITUTIONAL_RE.search("Forum Seniors du 15e")
+    assert _INSTITUTIONAL_RE.search("Comment fonctionne la Mairie de Paris Centre ?")
+    assert _INSTITUTIONAL_RE.search("Conversation en espagnol")
+    assert not _INSTITUTIONAL_RE.search("Concert de jazz au Sunside")
+    assert 100 - SOFT_PENALTIES["institutional"] >= PUBLISH_THRESHOLD

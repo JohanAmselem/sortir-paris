@@ -42,7 +42,7 @@ export function formatPriceShort(p: PriceInfo): string {
 /**
  * Some sources keep a cancelled event published and only say it in the text
  * ("ANNULÉ – …", "Annulé en raison des intempéries"). Same rule as the SQL
- * filter in lib/events/query.ts (cancelledTextSql).
+ * filter at ingestion (scrapers/utils/titles.py).
  */
 export function looksCancelled(title: string, shortDesc?: string | null): boolean {
   const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')

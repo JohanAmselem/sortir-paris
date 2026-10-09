@@ -19,7 +19,8 @@ from datetime import date, datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from utils.dates import paris_day
-from utils.matching import dedup_title, haversine_m, trigram_similarity
+from pipelines.ingest import _exec_many
+from utils.matching import _trigrams, dedup_title, haversine_m, trigram_similarity
 
 TITLE_THRESHOLD = 0.55
 NEAR_METERS = 150
@@ -108,9 +109,14 @@ def is_duplicate(a: dict, b: dict) -> bool:
         return False
     if not dates_match(a, b) or not venues_match(a, b):
         return False
-    ta = a.get("_dt") or dedup_title(a.get("title"))
-    tb = b.get("_dt") or dedup_title(b.get("title"))
-    return trigram_similarity(ta, tb) > TITLE_THRESHOLD
+    ga, gb = a.get("_tg"), b.get("_tg")
+    if ga is None or gb is None:
+        ta = a.get("_dt") or dedup_title(a.get("title"))
+        tb = b.get("_dt") or dedup_title(b.get("title"))
+        return trigram_similarity(ta, tb) > TITLE_THRESHOLD
+    if not ga or not gb:
+        return False
+    return len(ga & gb) / len(ga | gb) > TITLE_THRESHOLD
 
 
 def _cells(row: dict) -> List[tuple]:
@@ -129,6 +135,7 @@ def find_duplicates(rows: Iterable[dict]) -> Dict[str, str]:
     rows = [r for r in rows if r.get("start_date")]
     for r in rows:
         r["_dt"] = dedup_title(r.get("title"))
+        r["_tg"] = frozenset(_trigrams(r["_dt"]))  # computed once, not per pair
     buckets: Dict[tuple, List[int]] = defaultdict(list)
     for idx, r in enumerate(rows):
         for k in _cells(r):
@@ -152,8 +159,8 @@ def find_duplicates(rows: Iterable[dict]) -> Dict[str, str]:
                         candidates += buckets.get(("g", key[1] + di, key[2] + dj), [])
         for x in members:
             for y in candidates:
-                if x == y:
-                    continue
+                if x == y or rows[x].get("source") == rows[y].get("source"):
+                    continue  # same-source rows are never duplicates: skip before bookkeeping
                 pair = (min(x, y), max(x, y))
                 if pair in seen_pairs:
                     continue
@@ -205,6 +212,11 @@ WHERE c.id = %(canonical)s AND d.id = %(dup)s
 """
 
 
+MARK_SQL = "UPDATE events SET canonical_event_id = %(canonical)s, updated_at = now() WHERE id = %(dup)s AND id <> %(canonical)s"
+# rows that pointed at the (now) duplicate follow it to the canonical
+FOLLOW_SQL = "UPDATE events SET canonical_event_id = %(canonical)s WHERE canonical_event_id = %(dup)s"
+
+
 def run_dedup(conn) -> int:
     """Find and mark cross-source duplicates among live events. Returns #rows marked."""
     cur = conn.cursor()
@@ -223,25 +235,31 @@ def run_dedup(conn) -> int:
     cols = [d[0] for d in cur.description]
     rows = [dict(zip(cols, r)) for r in cur.fetchall()]
     mapping = find_duplicates(rows)
+    # Batched: a few round trips per 200 duplicates instead of 5 per duplicate.
+    items = [{"canonical": c, "dup": d} for d, c in mapping.items()]
     marked = 0
-    for dup_id, canonical_id in mapping.items():
+    for i in range(0, len(items), 200):
+        chunk = items[i:i + 200]
         cur.execute("SAVEPOINT dedup")
         try:
-            cur.execute(FILL_SQL, {"canonical": canonical_id, "dup": dup_id})
-            cur.execute(
-                "UPDATE events SET canonical_event_id = %s, updated_at = now() WHERE id = %s AND id <> %s",
-                (canonical_id, dup_id, canonical_id),
-            )
-            # rows that pointed at the (now) duplicate follow it to the canonical
-            cur.execute(
-                "UPDATE events SET canonical_event_id = %s WHERE canonical_event_id = %s",
-                (canonical_id, dup_id),
-            )
+            _exec_many(cur, FILL_SQL, chunk)
+            _exec_many(cur, MARK_SQL, chunk)
+            _exec_many(cur, FOLLOW_SQL, chunk)
             cur.execute("RELEASE SAVEPOINT dedup")
-            marked += 1
-        except Exception as e:
+            marked += len(chunk)
+            continue
+        except Exception:
             cur.execute("ROLLBACK TO SAVEPOINT dedup")
-            print(f"  [dedup] {dup_id} → {canonical_id} failed: {e}")
+        for p in chunk:  # replay one by one so a bad pair does not block the batch
+            cur.execute("SAVEPOINT dedup")
+            try:
+                for sql in (FILL_SQL, MARK_SQL, FOLLOW_SQL):
+                    cur.execute(sql, p)
+                cur.execute("RELEASE SAVEPOINT dedup")
+                marked += 1
+            except Exception as e:
+                cur.execute("ROLLBACK TO SAVEPOINT dedup")
+                print(f"  [dedup] {p['dup']} → {p['canonical']} failed: {e}")
     conn.commit()
     cur.close()
     print(f"[dedup] {len(rows)} live events scanned, {marked} marked as duplicates")

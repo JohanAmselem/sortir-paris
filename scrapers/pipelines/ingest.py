@@ -302,14 +302,13 @@ def run_pipeline(events: List[dict], source_name: str, conn=None) -> dict:
 
     pending: List[tuple] = []
     for i, raw in enumerate(events):
-        cur.execute("SAVEPOINT ev")
+        # No per-event savepoint (2 round trips each): planning is in memory and the
+        # rare venue writes guard themselves (pipelines.venues._guarded).
         try:
             action, kind, params = plan_event(cur, raw, ctx)
-            cur.execute("RELEASE SAVEPOINT ev")
             ctx.venues.saved()
         except Exception as e:
-            cur.execute("ROLLBACK TO SAVEPOINT ev")
-            ctx.venues.forget_unsaved()
+            ctx.venues.saved()  # a venue created before the failure is committed with the batch
             stats["errors"] += 1
             if len(stats["error_list"]) < MAX_LOGGED_ERRORS:
                 stats["error_list"].append(f"{(raw.get('title') or '?')[:80]}: {str(e)[:200]}")

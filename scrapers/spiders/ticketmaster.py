@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
-from utils.event import make_event
+from utils.event import make_event, stable_id
+from utils.matching import dedup_title
 from utils.http import BudgetExceeded, PoliteClient
 import re
 from collections import Counter
@@ -229,6 +230,32 @@ def parse_api(data) -> Tuple[List[dict], dict]:
     return out, data.get("page") or {}
 
 
+SERIES_MIN = 4  # sessions of the same show at the same venue → one event with a date range
+
+
+def collapse_series(events: List[dict]) -> List[dict]:
+    """Ticketmaster lists every session (museum time slot, each night of a run) as its own
+    event. Same title + same venue with SERIES_MIN+ sessions → one event spanning them."""
+    groups: Dict[Tuple[str, str], List[dict]] = {}
+    for ev in events:
+        key = (dedup_title(ev.get("title")), (ev.get("venue_name") or "").strip().lower())
+        groups.setdefault(key, []).append(ev)
+    out: List[dict] = []
+    for (tkey, vkey), evs in groups.items():
+        live = [e for e in evs if e.get("event_status") != "cancelled"]
+        if len(live) < SERIES_MIN:
+            out.extend(evs)
+            continue
+        live.sort(key=lambda e: e["start_date"])
+        first = dict(live[0])
+        last_end = max((e.get("end_date") or e["start_date"]) for e in live)
+        first["end_date"] = last_end
+        first["time_known"] = len({e["start_date"][11:16] for e in live}) == 1 and live[0]["time_known"]
+        first["source_id"] = f"tm-series-{stable_id(tkey, vkey)[:16]}"
+        out.append(first)
+    return out
+
+
 def build_params(api_key: str, start: datetime, end: datetime, page: int) -> dict:
     """Query params (passed via httpx params= so the key never appears in our logs)."""
     params = dict(BASE_PARAMS)
@@ -255,6 +282,7 @@ def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int =
         t += timedelta(days=window_days)
 
     seen: set = set()
+    collected: List[dict] = []
     requests = 0
     max_pages = DEEP_PAGING_LIMIT // PAGE_SIZE  # pages 0..4 → size*page < 1000
     with PoliteClient(delay=0.3) as client:
@@ -264,12 +292,15 @@ def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int =
             while page < max_pages:
                 if requests >= max_requests:
                     print(f"  [{SOURCE}] max_requests={max_requests} reached")
-                    return
+                    windows = []
+                    break
                 requests += 1
                 try:
                     data = client.get_json(API_URL, params=build_params(api_key, w_start, w_end, page))
                 except BudgetExceeded:
-                    raise
+                    print(f"  [{SOURCE}] budget reached — keeping what was fetched")
+                    windows = []
+                    break
                 if data is None:
                     if requests == 1:
                         print(f"  [{SOURCE}] API unreachable or key refused — stopping")
@@ -284,11 +315,13 @@ def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int =
                 for ev in events:
                     if ev["source_id"] not in seen:
                         seen.add(ev["source_id"])
-                        yield ev
+                        collected.append(ev)
                 if page + 1 >= int(info.get("totalPages") or 0):
                     break
                 page += 1
-    print(f"  [{SOURCE}] {len(seen)} events from {requests} requests")
+    series = collapse_series(collected)
+    print(f"  [{SOURCE}] {len(seen)} sessions from {requests} requests → {len(series)} events")
+    yield from series
     skipped = {k: v for k, v in STATS.items() if k.startswith("skip:")}
     types = [(k[5:], v) for k, v in STATS.most_common() if k.startswith("type:")][:12]
     venues = [(k[6:], v) for k, v in STATS.most_common() if k.startswith("venue:")][:12]

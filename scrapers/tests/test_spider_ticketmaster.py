@@ -57,3 +57,21 @@ def test_params_and_skip(monkeypatch, capsys):
     monkeypatch.delenv("TICKETMASTER_API_KEY", raising=False)
     assert list(tm.fetch_events()) == []
     assert "TICKETMASTER_API_KEY not set, skipping" in capsys.readouterr().out
+
+
+def test_collapse_series():
+    def ev(i, day, hour="10:00", title="Expo Monet", venue="Musée du Luxembourg"):
+        return {"source_id": f"tm-{i}", "title": title, "venue_name": venue, "event_status": "scheduled",
+                "start_date": f"2026-10-{day:02d}T{hour}:00Z", "end_date": None, "time_known": True}
+
+    slots = [ev(i, 10 + i % 5, hour=f"{9 + i % 3:02d}:00") for i in range(12)]
+    single = [ev(100, 12, title="Concert unique", venue="Olympia")]
+    run3 = [ev(200 + i, 20 + i, title="Pièce courte", venue="Lucernaire") for i in range(3)]
+    out = tm.collapse_series(slots + single + run3)
+    assert len(out) == 1 + 1 + 3
+    series = [e for e in out if e["source_id"].startswith("tm-series-")]
+    assert len(series) == 1
+    s = series[0]
+    assert s["start_date"] == "2026-10-10T09:00:00Z" and s["end_date"] == "2026-10-14T10:00:00Z"
+    assert s["time_known"] is False
+    assert tm.collapse_series(slots)[0]["source_id"] == s["source_id"]  # stable across runs

@@ -23,6 +23,20 @@ NAME_SIM_SAME_ADDRESS = 0.3
 NEAR_METERS = 100
 
 
+def _guarded(cur, sql: str, params: dict, fetch: bool = False):
+    """Run one venue write in its own savepoint: a failure never aborts the caller's
+    transaction (the event loop itself takes no per-event savepoint, to save round trips)."""
+    cur.execute("SAVEPOINT venue")
+    try:
+        cur.execute(sql, params)
+        row = cur.fetchone() if fetch else None
+    except Exception:
+        cur.execute("ROLLBACK TO SAVEPOINT venue")
+        raise
+    cur.execute("RELEASE SAVEPOINT venue")
+    return row
+
+
 class VenueResolver:
     """Resolves venues against an in-memory index loaded once (one query), so a source
     with thousands of events does not pay several round trips per event."""
@@ -166,8 +180,7 @@ class VenueResolver:
                 v["website"] = event.get("venue_website")
             if fills["geo"]:
                 v["lat"], v["lng"] = lat, lng
-        cur.execute(
-            """
+        _guarded(cur, """
             UPDATE venues SET
                 normalized_name = COALESCE(normalized_name, %(nn)s),
                 address = COALESCE(NULLIF(address, ''), %(address)s),
@@ -179,8 +192,7 @@ class VenueResolver:
                 lng = CASE WHEN lat IS NULL AND %(lat)s::float8 IS NOT NULL THEN %(lng)s ELSE lng END,
                 lat = CASE WHEN lat IS NULL AND %(lat)s::float8 IS NOT NULL THEN %(lat)s ELSE lat END
             WHERE id = %(id)s
-            """,
-            {
+            """, {
                 "nn": nn,
                 "address": event.get("venue_address"),
                 "zip": zip_code,
@@ -189,8 +201,7 @@ class VenueResolver:
                 "lat": lat,
                 "lng": lng,
                 "id": venue_id,
-            },
-        )
+            })
 
     def _create(self, cur, event, name, nn, lat, lng) -> str:
         zip_code = event.get("venue_zip")
@@ -212,18 +223,14 @@ class VenueResolver:
             if not slug:
                 continue
             params["slug"] = slug
-            cur.execute(
-                """
+            row = _guarded(cur, """
                 INSERT INTO venues (name, slug, address, city, zip_code, arrondissement,
                                     lat, lng, website, normalized_name, geocode_status)
                 VALUES (%(name)s, %(slug)s, %(address)s, COALESCE(%(city)s, 'Paris'), %(zip)s, %(arr)s,
                         %(lat)s, %(lng)s, %(website)s, %(nn)s, %(geo_status)s)
                 ON CONFLICT (slug) DO NOTHING
                 RETURNING id
-                """,
-                params,
-            )
-            row = cur.fetchone()
+                """, params, fetch=True)
             if row:
                 return row[0]
         raise RuntimeError(f"could not create venue '{name}' (slug conflicts)")

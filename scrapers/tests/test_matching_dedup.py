@@ -104,3 +104,54 @@ def test_find_duplicates_groups_to_single_canonical():
         row("d", "infoconcert", "Autre concert", S),
     ]
     assert find_duplicates(rows) == {"b": "a", "c": "a"}
+
+
+# ── Lot 1: venue rows not linked/geocoded yet, date suffixes, series ──
+
+def vrow(id, source, title, start, venue_id, venue_name, zip_code=None, time_known=True, **kw):
+    r = row(id, source, title, start, venue=venue_id, lat=None, lng=None, **kw)
+    r.update(venue_name=venue_name, zip_code=zip_code, time_known=time_known)
+    return r
+
+
+def test_dedup_title_strips_dates_and_editorial_tails():
+    assert dedup_title("Jeanne Lee par Äulne – 09/10/2026 - 17:30") == dedup_title("Jeanne Lee par Äulne")
+    assert dedup_title("09.OCT | PARIS | Fakear") == "fakear"
+    assert dedup_title("Fakear en concert à Paris au Bataclan le 9 octobre 2026") == "fakear"
+
+
+def test_duplicate_through_compatible_venue_names():
+    a = vrow("a", "ticketmaster", "Fakear", S, "v1", "La Seine Musicale", "92100")
+    b = vrow("b", "sortiraparis", "FAKEAR", S, "v2", "Seine Musicale", None)
+    assert is_duplicate(a, b)
+    # 2 h apart: another session
+    late = vrow("c", "sortiraparis", "Fakear", datetime(2026, 10, 20, 21, 0, tzinfo=timezone.utc),
+                "v2", "Seine Musicale")
+    assert not is_duplicate(a, late)
+    # one time unknown: same day is enough
+    unknown = vrow("d", "sortiraparis", "Fakear", datetime(2026, 10, 20, 10, 0, tzinfo=timezone.utc),
+                   "v2", "Seine Musicale", time_known=False)
+    assert is_duplicate(a, unknown)
+    # postcodes differ → different places
+    assert not is_duplicate(a, vrow("e", "sortiraparis", "Fakear", S, "v3", "Seine Musicale", "75011"))
+    # names not compatible (another hall)
+    assert not is_duplicate(a, vrow("f", "sortiraparis", "Fakear", S, "v4", "La Seine Musicale - Auditorium"))
+    # weaker title similarity is not enough without a shared venue
+    assert not is_duplicate(a, vrow("g", "sortiraparis", "Fakear & friends : soirée spéciale", S, "v2",
+                                    "Seine Musicale"))
+
+
+def test_find_duplicates_uses_venue_name_buckets():
+    rows = [
+        vrow("a", "venue_38riv", "Jeanne Lee par Äulne – 09/10/2026 - 17:30", S, "v1", "38Riv", "75004"),
+        vrow("b", "parisjazzclub", "Jeanne Lee Par Äulne", S, "v2", "38 RIV - Jazz Club & Bar", None),
+    ]
+    assert find_duplicates(rows) == {"b": "a"}
+
+
+def test_series_row_is_canonical_over_single_sessions():
+    run = row("s", "venue_chatelet", "Les Misérables", datetime(2026, 10, 9, 18, 0, tzinfo=timezone.utc),
+              end=datetime(2027, 1, 10, 22, 0, tzinfo=timezone.utc), q=60)
+    d1 = row("t1", "ticketmaster", "Les Misérables", datetime(2026, 10, 12, 18, 0, tzinfo=timezone.utc), q=90)
+    d2 = row("t2", "ticketmaster", "Les Misérables", datetime(2026, 10, 13, 18, 0, tzinfo=timezone.utc), q=90)
+    assert find_duplicates([run, d1, d2]) == {"t1": "s", "t2": "s"}

@@ -25,8 +25,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Generator, List, Optional, Tuple
 
-from utils.event import make_event, stable_id
-from utils.matching import dedup_title
+from utils.event import make_event
+from utils.series import collapse_series as shared_collapse_series
 from utils.http import BudgetExceeded, PoliteClient
 import re
 from collections import Counter
@@ -235,25 +235,9 @@ SERIES_MIN = 4  # sessions of the same show at the same venue → one event with
 
 def collapse_series(events: List[dict]) -> List[dict]:
     """Ticketmaster lists every session (museum time slot, each night of a run) as its own
-    event. Same title + same venue with SERIES_MIN+ sessions → one event spanning them."""
-    groups: Dict[Tuple[str, str], List[dict]] = {}
-    for ev in events:
-        key = (dedup_title(ev.get("title")), (ev.get("venue_name") or "").strip().lower())
-        groups.setdefault(key, []).append(ev)
-    out: List[dict] = []
-    for (tkey, vkey), evs in groups.items():
-        live = [e for e in evs if e.get("event_status") != "cancelled"]
-        if len(live) < SERIES_MIN:
-            out.extend(evs)
-            continue
-        live.sort(key=lambda e: e["start_date"])
-        first = dict(live[0])
-        last_end = max((e.get("end_date") or e["start_date"]) for e in live)
-        first["end_date"] = last_end
-        first["time_known"] = len({e["start_date"][11:16] for e in live}) == 1 and live[0]["time_known"]
-        first["source_id"] = f"tm-series-{stable_id(tkey, vkey)[:16]}"
-        out.append(first)
-    return out
+    event. Same title + same venue with SERIES_MIN+ sessions → one event spanning them
+    (shared rule: utils/series.py; "tm-series-…" ids kept for stability)."""
+    return shared_collapse_series(events, SOURCE, id_prefix="tm", min_sessions=SERIES_MIN)
 
 
 def build_params(api_key: str, start: datetime, end: datetime, page: int) -> dict:

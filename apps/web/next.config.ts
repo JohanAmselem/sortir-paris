@@ -25,6 +25,8 @@ const securityHeaders = [
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self' https://*.supabase.co",
+      // Violations are logged (Vercel logs) before the policy is enforced.
+      'report-uri /api/csp-report',
     ].join('; '),
   },
 ]

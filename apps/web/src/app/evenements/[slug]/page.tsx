@@ -117,6 +117,7 @@ function eventJsonLd(e: EventDetail, past: boolean) {
             '@type': 'Offer',
             price: price.tone === 'free' ? '0' : (Math.min(e.priceMin || e.priceMax, e.priceMax || e.priceMin) / 100).toFixed(2),
             priceCurrency: 'EUR',
+            availability: e.status === 'cancelled' ? 'https://schema.org/Discontinued' : 'https://schema.org/InStock',
             ...(href ? { url: href } : {}),
           },
         }

@@ -155,7 +155,9 @@ def reject_collapsed_series(conn) -> int:
 # ─────────────────────────── categories ───────────────────────────
 
 CATEGORY_ROWS_SQL = """
-SELECT e.id, e.title, e.description, c.slug
+SELECT e.id, e.title,
+       CASE WHEN e.category_id IS NULL THEN left(e.description, 2000) END AS description,  -- only used then
+       c.slug
 FROM events e
 LEFT JOIN categories c ON c.id = e.category_id
 WHERE e.status IN ('active', 'draft')

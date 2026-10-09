@@ -29,7 +29,7 @@ The registry is `sources.py`; run `python cron.py --list` to see it. To enable o
 | `venues` → `venue_<key>` | venues | generic JSON-LD / iCal spider (`spiders/venues_config.py`) | public structured data | ✅ verified live | ~150 in total | Enabled venues: Bataclan, Olympia, Théâtre du Châtelet, La Cigale, Maison de la Radio et de la Musique, Musée de l'Orangerie, Le Comedy Club (ics), Sunset-Sunside (ics). Adding a venue takes one config line. |
 | `newmorning` | venues | JSON-LD listing + detail pages for the real times | public structured data | ✅ verified live | ~70 | The JSON-LD shows 00:00 start times and "0.00" prices, both of which are wrong, so they are treated as unknown. |
 | `parisjazzclub` | venues | schema.org microdata cards | public structured data | ✅ verified live | ~500 (45 pages, 7 days) | Each event uses the real club as its venue. The 22:00 hardcoded time is gone. |
-| `allocine` | cinema | public JSON behind the theater pages (`/_/showtimes/theater-…`) | public structured data | ✅ verified live | ~1,500–2,500 film-days | Only real showtimes are kept. There is one event per film × cinema × day, with all showtimes in the description. The cinema table was rebuilt: most old codes pointed to the wrong cinema. |
+| `allocine` | cinema | public JSON behind the theater pages (`/_/showtimes/theater-…`) | public structured data | ✅ verified live | ~3,000–5,000 film-days | Only real showtimes are kept, 7 days ahead (Allociné publishes the Wednesday→Tuesday programme on Monday/Tuesday; unpublished days are skipped). There is one event per film × cinema × day, with all showtimes in the description. The cinema table was rebuilt: most old codes pointed to the wrong cinema. |
 
 ## Disabled (kept in the code, `enabled=False`)
 
@@ -60,7 +60,8 @@ Each of these is listed in `spiders/venues_config.py` with `enabled=False` and a
 
 ## Operations
 
-- **Schedule.** `.github/workflows/daily-scrape.yml` runs at 05:30 and 15:30 UTC. The matrix has one job per group (official / ticketing / media / venues / cinema), each with a 45-minute limit, followed by `cron.py --post`, which runs geocoding, re-scoring, cross-source dedup, expiry and the Meilisearch index swap.
+- **Schedule.** `.github/workflows/daily-scrape.yml` runs at 05:30 and 15:30 UTC. The matrix has one job per group (official / ticketing / media / venues / cinema), each with a 45-minute limit, followed by `cron.py --post`, which runs geocoding (address, then venue name via BAN / OpenStreetMap), venue linking (`canonical_venue_id`), re-scoring, hiding per-date rows of collapsed series, cross-source dedup, category reclassification, expiry and purge.
+- **Series.** Before ingestion, `utils/series.py` turns ≥ 4 sessions of the same title at the same venue into one event spanning them (`<source>-series-<hash>`), for every source except cinema (allocine, cinematheque, forumdesimages).
 - **Logs.** Each source writes one row to `ingestion_logs`, with the real start time and a truncated list of errors.
 - **Failures.** A group job fails (exit 1) when a key source returns 0 events, when a source drops more than 60 % against its last successful run (if that run had ≥ 20 events), or when a source crashes.
 - **Running locally.** `python cron.py --source <name> --dry-run` fetches and validates without touching the database. `pytest` runs entirely offline on the fixtures in `tests/fixtures/`.

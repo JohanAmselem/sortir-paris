@@ -5,7 +5,9 @@ import { ExternalLink } from 'lucide-react'
 import { PageIntro } from '@/components/events/listing'
 import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
 import { LoadMore } from '@/components/events/load-more'
+import { SignatureBadge } from '@/components/events/signature-badge'
 import { getVenueBySlug } from '@/lib/venues'
+import { isSignatureVenue } from '@/lib/venues-signature'
 import { bucketNow, safeQueryEvents } from '@/lib/events/query'
 import { safeJsonLd } from '@/lib/json-ld'
 import { safeUrl } from '@/lib/format'
@@ -70,6 +72,7 @@ export default async function VenuePage({ params }: Props) {
     <div className="px-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(placeLd) }} />
       <PageIntro kicker={venue.arrondissement ? `Paris ${venue.arrondissement}` : venue.city} title={venue.name}>
+        {isSignatureVenue(venue.name) && <SignatureBadge className="mb-2" />}
         <p>{[venue.address, [venue.zipCode, venue.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</p>
         <div className="mt-2 flex flex-wrap gap-x-5">
           {hasGeo && (

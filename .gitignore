@@ -43,3 +43,6 @@ coverage/
 apps/web/test-results/
 apps/web/playwright-report/
 *.tsbuildinfo
+
+# Claude Code agent worktrees
+.claude/worktrees/

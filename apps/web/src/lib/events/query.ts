@@ -10,6 +10,8 @@ import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { DEFAULT_DURATION_MS, LONG_RUN_MS, resolveWindow, type TimeWindow } from '@/lib/paris-time'
 import { INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULES } from './taxonomy'
 import { ACCENTS_FROM, ACCENTS_TO, filmSlug, foldText } from './fold'
+import { workLikePattern } from './works-utils'
+import { SIGNATURE_VENUE_REGEX, isSignatureVenue } from '@/lib/venues-signature'
 
 export { foldText }
 import type { CardEvent, EventPage, EventQuery } from './types'
@@ -110,7 +112,48 @@ function distanceSql(lat: number, lng: number): SQL {
  */
 export const filmKeySql = sql`trim(both '-' from regexp_replace(${foldSql(sql`${events.title}`)}, '[^a-z0-9]+', '-', 'g'))`
 
+/**
+ * Rows of a work (same title key, see lib/events/works-utils.ts). The LIKE on
+ * the indexed event text narrows the candidates with idx_events_search_trgm;
+ * the exact key check runs on those few rows only.
+ */
+export function workMatchSql(slug: string): SQL {
+  return sql`(${eventSearchText} like ${workLikePattern(slug)} and ${filmKeySql} = ${slug})`
+}
 
+/**
+ * Ids of the "lieux phares" venues (lib/venues-signature.ts, matched on the
+ * folded name, aliases included). One regex pass over the venues table every
+ * 6 hours instead of one per listing query; the listings then use a plain
+ * `venue_id in (…)` list. Empty on error: no boost, no "grandes scènes".
+ */
+const loadSignatureVenueIds = unstable_cache(
+  async (): Promise<string[]> => {
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select({ id: venues.id })
+        .from(venues)
+        .where(sql`${foldSql(sql`${venues.name}`)} ~ ${SIGNATURE_VENUE_REGEX}`)
+        .limit(500)
+    )
+    return rows.map((r) => String(r.id))
+  },
+  ['signature-venue-ids-v1'],
+  { revalidate: 6 * 3600, tags: ['venues'] }
+)
+
+export async function getSignatureVenueIds(): Promise<string[]> {
+  try {
+    return await withTimeout(loadSignatureVenueIds(), STATEMENT_TIMEOUT_MS + 1500, 'signatureVenueIds')
+  } catch (err) {
+    console.error('[events] signature venues failed', err)
+    return []
+  }
+}
+
+export function signatureVenueSql(ids: string[]): SQL {
+  return ids.length ? sql`${events.venueId} in ${ids}` : sql`false`
+}
 
 /** Venue in Paris proper (arrondissement known or 75xxx zip). */
 const inParisSql = sql`(${venues.arrondissement} is not null or ${venues.zipCode} like '75%')`
@@ -120,10 +163,11 @@ const inParisSql = sql`(${venues.arrondissement} is not null or ${venues.zipCode
  * Paris first (petite couronne a bit lower), real outings before administrative
  * or professional sessions (mairie, permanence, job dating…).
  */
-function relevanceSql(now: Date): SQL {
+function relevanceSql(now: Date, signatureIds: string[]): SQL {
   return sql`(
     ${events.qualityScore}
     + case when ${venues.id} is null then -4 when ${inParisSql} then 0 else -10 end
+    ${signatureIds.length ? sql`+ case when ${signatureVenueSql(signatureIds)} then 6 else 0 end` : sql``}
     + case when ${categories.slug} in ${OUTING_CATEGORIES} then 4 when ${categories.slug} is null then -4 else 0 end
     + least(${events.saveCount} * 3 + ${events.viewCount} / 25, 25)
     + case when ${events.imageUrl} is null then -25 else 0 end
@@ -194,6 +238,7 @@ export function toCard(r: CardRow): CardEvent {
           city: !r.venueArr && !String(r.venueZip ?? '').startsWith('75') && r.venueCity ? String(r.venueCity) : null,
           lat: r.venueLat == null ? null : Number(r.venueLat),
           lng: r.venueLng == null ? null : Number(r.venueLng),
+          signature: isSignatureVenue(String(r.venueName)),
         }
       : null,
     distanceKm: r.distanceKm == null ? null : Math.round(Number(r.distanceKm) * 10) / 10,
@@ -219,7 +264,11 @@ function toIsoList(v: unknown): string[] {
   return list.map((x) => (x instanceof Date ? x : new Date(String(x)))).filter((d) => !Number.isNaN(d.getTime())).map((d) => d.toISOString())
 }
 
-export function buildConditions(query: EventQuery, now: Date): { where: SQL; window: TimeWindow | null } {
+export function buildConditions(
+  query: EventQuery,
+  now: Date,
+  signatureIds: string[] = []
+): { where: SQL; window: TimeWindow | null } {
   // Cancellations and administrative topics are scored at ingestion (scrapers/validation):
   // computing them here on every row made each listing ~10x heavier (outage of 9 Oct, 14:00).
   const conds: SQL[] = [liveCondition(now)]
@@ -249,6 +298,7 @@ export function buildConditions(query: EventQuery, now: Date): { where: SQL; win
   if (query.oneOffOnly) conds.push(sql`not ${isLongRunSql}`)
   if (query.withImage) conds.push(sql`${events.imageUrl} is not null`)
   if (query.venueSlug) conds.push(eq(venues.slug, query.venueSlug))
+  if (query.signatureOnly) conds.push(signatureVenueSql(signatureIds))
   if (query.ids) conds.push(query.ids.length ? sql`${events.id} in ${query.ids}` : sql`false`)
   if (query.excludeIds?.length) conds.push(sql`${events.id} not in ${query.excludeIds}`)
   for (const slug of query.intents ?? []) {
@@ -286,9 +336,10 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
   const now = new Date(nowMs)
   const limit = Math.min(Math.max(query.limit ?? 24, 1), 100)
   const offset = Math.max(query.offset ?? 0, 0)
-  const { where, window } = buildConditions(query, now)
-
   const sort = query.sort ?? (query.near ? 'distance' : 'relevance')
+  const signatureIds = query.signatureOnly || sort === 'relevance' ? await getSignatureVenueIds() : []
+  const { where, window } = buildConditions(query, now, signatureIds)
+
   const order: SQL[] = []
   switch (sort) {
     case 'soon':
@@ -302,13 +353,14 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
       order.push(asc(effectiveEndSql))
       break
     case 'distance':
-      if (query.near) order.push(asc(distanceSql(query.near.lat, query.near.lng)))
+      // Same venue (same distance): soonest first.
+      if (query.near) order.push(asc(distanceSql(query.near.lat, query.near.lng)), asc(events.startDate))
       break
     case 'random':
       order.push(sql`md5(${events.id}::text || ${Math.floor(nowMs / 3600_000)})`)
       break
     default:
-      order.push(desc(relevanceSql(now)))
+      order.push(desc(relevanceSql(now, signatureIds)))
   }
   order.push(asc(events.id))
 

@@ -6,6 +6,7 @@ const DISCOVER = [
   { href: '/ce-week-end', label: 'Sorties ce week-end' },
   { href: '/gratuit', label: 'Sorties gratuites' },
   { href: '/carte', label: 'Carte des sorties' },
+  { href: '/autour-de-moi', label: 'Autour de moi, maintenant' },
   { href: '/collections', label: 'Nos sélections' },
   { href: '/lieux', label: 'Lieux culturels' },
 ]

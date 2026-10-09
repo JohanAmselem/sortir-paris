@@ -11,6 +11,8 @@ vi.mock('@sortir/db', async () => {
   const ca = await import('../../../../../packages/db/src/schema/categories')
   const { drizzle } = await import('drizzle-orm/pg-proxy')
   const db = drizzle(async (q: string) => {
+    // Signature venue ids (cached list, see getSignatureVenueIds).
+    if (/from "venues" where translate/.test(q)) return { rows: [['00000000-0000-0000-0000-000000000001'], ['00000000-0000-0000-0000-000000000002']] }
     logged.push(q)
     return { rows: nextRows.shift() ?? [] }
   })
@@ -75,5 +77,32 @@ describe('toCard', () => {
     const c = toCard({ ...base, venueArr: '5e', venueCity: 'Paris', venueZip: '75005', filmN: 1, filmM: 1, filmTimes: '{"2026-10-09 18:00:00+00"}', filmImage: null })
     expect(c.film).toBeNull()
     expect(c.venue?.city).toBeNull()
+  })
+})
+
+describe('lot 4A SQL', () => {
+  it('boosts signature venues with a plain id list (no regex per listing) and can filter on them', async () => {
+    await queryEvents({ when: 'week', limit: 5, q: 'signature-a' })
+    expect(logged[0]).toMatch(/case when "events"\."venue_id" in \(\$\d+, \$\d+\) then 6 else 0 end/)
+    expect(logged[0]).not.toContain('from "venues" where translate')
+    logged.length = 0
+    await queryEvents({ when: 'week', limit: 5, signatureOnly: true, sort: 'soon', q: 'signature-b' })
+    expect(logged[0]).toMatch(/and "events"\."venue_id" in \(\$\d+, \$\d+\)/)
+  })
+
+  it('sorts by distance, then start time', async () => {
+    await queryEvents({ when: 'next3h', near: { lat: 48.85, lng: 2.35, radiusKm: 2 }, limit: 5, q: 'near-a' })
+    expect(logged[0]).toMatch(/order by \(111\.32 \* sqrt\([^]*\) asc, "events"\."start_date" asc/)
+  })
+
+  it('marks signature venues on cards', () => {
+    const row = {
+      id: 'a', slug: 's', title: 'X', shortDesc: null, imageUrl: null, startDate: new Date(), endDate: null, timeKnown: true,
+      priceMin: 0, priceMax: 0, priceStatus: 'unknown', isFree: false, saveCount: 0, qualityScore: 0, categorySlug: null,
+      categoryName: null, categoryIcon: null, venueName: 'Philharmonie de Paris', venueSlug: 'philharmonie', venueArr: '19e',
+      venueCity: 'Paris', venueZip: '75019', venueLat: null, venueLng: null,
+    }
+    expect(toCard(row).venue?.signature).toBe(true)
+    expect(toCard({ ...row, venueName: 'Le Petit Bain' }).venue?.signature).toBe(false)
   })
 })

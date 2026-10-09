@@ -14,6 +14,8 @@ import { EventActionBar } from '@/components/events/sticky-booking-cta'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
 import { getEventBySlug, getRunEnd, type EventDetail } from '@/lib/events/detail'
+import { safeGetWorkDates } from '@/lib/events/works'
+import { WORK_CATEGORIES, isGenericWorkSlug, workSlug } from '@/lib/events/works-utils'
 import { bucketNow, diversify, safeQueryEvents } from '@/lib/events/query'
 import { effectiveEnd, formatFullWhen, formatShortDay, formatTime, isLongRun, urgencyBadge } from '@/lib/paris-time'
 import { formatPrice, looksCancelled, safeUrl, sourceLabel } from '@/lib/format'
@@ -165,13 +167,20 @@ export default async function EventPage({ params }: Props) {
     event.category?.slug === 'expos' && event.venue && !isLongRun(event) && !past
       ? getRunEnd(event.venue.id, event.title).catch(() => null)
       : Promise.resolve(null)
-  const [nearby, sameVenue, runEnd] = await Promise.all([
+  // Same work elsewhere / on other dates ("Aussi joué à …"): live shows only.
+  const work = workSlug(event.title)
+  const hasWork =
+    !past && !!event.category && (WORK_CATEGORIES as readonly string[]).includes(event.category.slug) && !isGenericWorkSlug(work)
+  const [nearby, sameVenue, runEnd, workDates] = await Promise.all([
     event.category && venueGeo ? safeQueryEvents({ ...similarBase, near: venueGeo }) : Promise.resolve({ events: [], total: 0, hasMore: false }),
     event.venue
       ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], excludeTitle: event.title, sort: 'soon', limit: 6 })
       : Promise.resolve({ events: [], total: 0, hasMore: false }),
     runEndPromise,
+    hasWork ? safeGetWorkDates(work) : Promise.resolve([]),
   ])
+  const otherDates = workDates.filter((d) => d.id !== event.id)
+  const otherVenues = [...new Map(otherDates.filter((d) => d.venue && d.venue.slug !== event.venue?.slug).map((d) => [d.venue!.slug, d.venue!.name])).values()]
   // Not enough nearby: the same category anywhere in Paris.
   const similar =
     nearby.events.length >= 4 || !event.category ? nearby : await safeQueryEvents({ ...similarBase, excludeIds: [event.id, ...nearby.events.map((e) => e.id)] })
@@ -323,6 +332,28 @@ export default async function EventPage({ params }: Props) {
                   Ajouter à l’agenda
                 </a>
               </div>
+            )}
+
+            {otherDates.length > 0 && (otherVenues.length > 0 || event.category?.slug !== 'expos') && (
+              <p className="mt-4 rounded-lg border border-border bg-surface px-4 py-3 text-[15px] text-ink">
+                {otherVenues.length > 0 ? (
+                  <>
+                    {event.category?.slug === 'expos' ? 'Aussi présenté à' : 'Aussi joué à'}{' '}
+                    <span className="font-semibold">
+                      {otherVenues.slice(0, 2).join(', ')}
+                      {otherVenues.length > 2 ? ` et ${otherVenues.length - 2} autre${otherVenues.length > 3 ? 's' : ''} lieu${otherVenues.length > 3 ? 'x' : ''}` : ''}
+                    </span>
+                    .{' '}
+                  </>
+                ) : (
+                  <>
+                    {otherDates.length} autre{otherDates.length > 1 ? 's' : ''} date{otherDates.length > 1 ? 's' : ''} ici.{' '}
+                  </>
+                )}
+                <Link href={`/oeuvres/${work}`} className="font-semibold text-accent underline underline-offset-2 hover:text-accent-hover">
+                  Toutes les dates
+                </Link>
+              </p>
             )}
 
             {(event.saveCount > 1 || event.attendanceCount > 1) && (

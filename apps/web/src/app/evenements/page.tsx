@@ -31,9 +31,11 @@ export default async function EvenementsPage({ searchParams }: Props) {
   const params = await searchParams
   let query = parseEventParams(params)
   let understood: { summary: string; source: 'rules' | 'ai' | 'empty'; editHref: string } | null = null
+  // The typed text, before search words were turned into filters ("stand up" → humour).
+  const rawQ = typeof params.q === 'string' ? params.q.trim().slice(0, 120) : ''
 
-  if (query.q && looksLikeSentence(query.q) && params.raw !== '1') {
-    const { intent, source } = await parseOutingRequest(query.q)
+  if (rawQ && looksLikeSentence(rawQ) && params.raw !== '1') {
+    const { intent, source } = await parseOutingRequest(rawQ)
     if (source !== 'empty') {
       const fromIntent = intentToQuery(intent, query.near)
       const merged: EventQuery = {
@@ -42,6 +44,9 @@ export default async function EvenementsPage({ searchParams }: Props) {
         when: query.when ?? intent.date ?? intent.when ?? null,
         categories: query.categories?.length ? query.categories : fromIntent.categories,
         arrondissements: query.arrondissements?.length ? query.arrondissements : fromIntent.arrondissements,
+        intents: [...new Set([...(query.intents ?? []), ...(fromIntent.intents ?? [])])],
+        topics: [...new Set([...(query.topics ?? []), ...(fromIntent.topics ?? [])])],
+        free: Boolean(query.free || fromIntent.free),
         near: query.near ?? fromIntent.near ?? null,
       }
       understood = {
@@ -55,8 +60,8 @@ export default async function EvenementsPage({ searchParams }: Props) {
 
   return (
     <div className="px-4">
-      <PageIntro title={query.q || understood ? 'Résultats' : 'Explorer'}>
-        {!query.q && !understood && 'Toutes les sorties à venir à Paris. Commence par une envie, un quartier ou une date.'}
+      <PageIntro title={rawQ || understood ? 'Résultats' : 'Explorer'}>
+        {!rawQ && !understood && 'Toutes les sorties à venir à Paris. Commence par une envie, un quartier ou une date.'}
       </PageIntro>
 
       <SearchBox initial={typeof params.q === 'string' ? params.q : ''} className="mb-4 max-w-2xl" />
@@ -77,7 +82,7 @@ export default async function EvenementsPage({ searchParams }: Props) {
         query={query}
         basePath="/evenements"
         emptyTitle="Aucune sortie trouvée"
-        emptyText={query.q ? 'Essaie un mot plus simple, ou retire un filtre.' : 'Essaie d’enlever un filtre ou d’élargir la période.'}
+        emptyText={rawQ ? 'Essaie un mot plus simple, ou retire un filtre.' : 'Essaie d’enlever un filtre ou d’élargir la période.'}
         emptyActions={[
           { href: '/ce-soir', label: 'Ce soir' },
           { href: '/ce-week-end', label: 'Ce week-end' },

@@ -1,7 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues, withStatementTimeout } from '@sortir/db'
+import { events, venues, withStatementTimeout } from '@sortir/db'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { STATEMENT_TIMEOUT_MS, bucketNow, liveCondition, withTimeout } from './events/query'
 
@@ -32,7 +32,7 @@ export const listActiveVenues = unstable_cache(
       .limit(limit))
     return rows.map((r) => ({ ...r, upcoming: Number(r.upcoming) }))
   },
-  ['active-venues-v2'],
+  ['active-venues-v3'],
   { revalidate: 3600, tags: ['events'] }
 )
 
@@ -51,16 +51,26 @@ export interface VenueDetail {
   canonicalSlug: string | null
 }
 
+/** Thrown (never cached) when a slug is unknown: see getVenueBySlug. */
+class VenueNotFound extends Error {}
+
 const loadVenue = unstable_cache(
-  async (slug: string): Promise<VenueDetail | null> => {
-    const rows = await db.select().from(venues).where(eq(venues.slug, slug)).limit(1)
-    const v = rows[0]
-    if (!v) return null
-    let canonicalSlug: string | null = null
-    if (v.canonicalVenueId) {
-      const c = await db.select({ slug: venues.slug }).from(venues).where(eq(venues.id, v.canonicalVenueId)).limit(1)
-      canonicalSlug = c[0]?.slug ?? null
-    }
+  async (slug: string): Promise<VenueDetail> => {
+    const { v, canonicalSlug } = await withStatementTimeout(STATEMENT_TIMEOUT_MS, async (tx) => {
+      const rows = await tx.select().from(venues).where(eq(venues.slug, slug)).limit(1)
+      const v = rows[0]
+      if (!v) return { v: null, canonicalSlug: null }
+      let canonicalSlug: string | null = null
+      if (v.canonicalVenueId) {
+        const c = await tx.select({ slug: venues.slug }).from(venues).where(eq(venues.id, v.canonicalVenueId)).limit(1)
+        canonicalSlug = c[0]?.slug ?? null
+      }
+      return { v, canonicalSlug }
+    })
+    // A "not found" must not be cached for an hour: venues are created by the
+    // scrapers all day long and the /lieux list (cached separately) links to
+    // them as soon as they have events (lucernaire, reflet-medicis returned 404).
+    if (!v) throw new VenueNotFound(slug)
     return {
       id: v.id,
       slug: v.slug,
@@ -80,6 +90,13 @@ const loadVenue = unstable_cache(
   { revalidate: 3600, tags: ['venues'] }
 )
 
-export const getVenueBySlug = cache((slug: string) => withTimeout(loadVenue(slug), 8000, 'getVenueBySlug'))
+export const getVenueBySlug = cache(async (slug: string): Promise<VenueDetail | null> => {
+  try {
+    return await withTimeout(loadVenue(slug), 8000, 'getVenueBySlug')
+  } catch (err) {
+    if (err instanceof VenueNotFound || (err instanceof Error && err.constructor.name === 'VenueNotFound')) return null
+    throw err
+  }
+})
 
-export const getActiveVenues = (limit = 200) => withTimeout(listActiveVenues(limit), STATEMENT_TIMEOUT_MS + 1500, 'listActiveVenues')
+export const getActiveVenues = (limit = 2000) => withTimeout(listActiveVenues(limit), STATEMENT_TIMEOUT_MS + 1500, 'listActiveVenues')

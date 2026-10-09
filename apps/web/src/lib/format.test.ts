@@ -10,7 +10,13 @@ describe('formatPrice', () => {
     expect(formatPrice({ priceMin: 1200, priceMax: 1200, priceStatus: 'paid' }).label).toBe('12 €')
     expect(formatPrice({ priceMin: 1200, priceMax: 2500, priceStatus: 'paid' }).label).toBe('12 – 25 €')
     expect(formatPrice({ priceMin: 1000, priceMax: 9000, priceStatus: 'paid' }).label).toBe('Dès 10 €')
-    expect(formatPrice({ priceMin: 1999, priceMax: 1999, priceStatus: 'paid' }).label).toBe('19,99 €')
+    expect(formatPrice({ priceMin: 1999, priceMax: 1999, priceStatus: 'paid' }).label).toBe('20 €')
+    expect(formatPrice({ priceMin: 0, priceMax: 1250, priceStatus: 'paid' }).label).toBe('13 €')
+  })
+  it('treats tiny paid prices as unreliable', () => {
+    expect(formatPrice({ priceMin: 200, priceMax: 200, priceStatus: 'paid' })).toEqual({ label: 'Prix sur le site', tone: 'unknown' })
+    expect(formatPrice({ priceMin: 150, priceMax: 3500, priceStatus: 'paid' }).label).toBe('Prix sur le site')
+    expect(formatPrice({ priceMin: 300, priceMax: 3500, priceStatus: 'paid' }).label).toBe('Dès 3 €')
   })
   it('never prints an inverted range', () => {
     expect(formatPrice({ priceMin: 3000, priceMax: 1200, priceStatus: 'paid' }).label).toBe('12 – 30 €')

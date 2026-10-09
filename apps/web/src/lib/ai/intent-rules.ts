@@ -39,9 +39,9 @@ const CATEGORY_WORDS: Array<[RegExp, string]> = [
   [/\b(concerts?|musique|live|jazz|rock|rap|electro|classique|opera|chanson|dj|groupe)\b/, 'concerts'],
   [/\b(expos?|expositions?|musees?|galeries?|peinture|photo(graphie)?s?|art contemporain|vernissage)\b/, 'expos'],
   [/\b(theatre|piece|comedie(?! musicale))\b/, 'theatre'],
-  [/\b(spectacles?|humour|stand-?up|one man|cirque|magie|cabaret|comedie musicale|impro)\b/, 'spectacles'],
+  [/\b(spectacles?|humour|humoriste|stand[ -]?up|one man|cirque|magie|cabaret|comedie musicale|impro)\b/, 'spectacles'],
   [/\b(danse|ballet|choregraph\w*)\b/, 'danse'],
-  [/\b(cinema|films?|projections?|seances?|avant-premiere)\b/, 'cinema'],
+  [/\b(cine|cinema|films?|projections?|seances?|avant-premiere)\b/, 'cinema'],
   [/\b(festivals?)\b/, 'festivals'],
   [/\b(conferences?|rencontres?|debats?|lectures?|talks?)\b/, 'conferences'],
   [/\b(ateliers?|workshops?|cours|initiation)\b/, 'ateliers'],
@@ -100,7 +100,7 @@ export function parseIntentRules(raw: string): OutingIntent {
   for (const [re, slug] of INTENT_WORDS) if (re.test(t) && !intent.intents.includes(slug)) intent.intents.push(slug)
 
   // Specific genre words kept as keywords (they narrow within a category).
-  const genre = t.match(/\b(jazz|rock|rap|electro|classique|opera|blues|soul|funk|reggae|metal|techno|house|salsa|tango|photo|street art|impressionnis\w*|manga|bd|cirque|magie|impro|stand-?up|piano|orgue)\b/g)
+  const genre = t.match(/\b(jazz|rock|rap|electro|classique|opera|blues|soul|funk|reggae|metal|techno|house|salsa|tango|photo|street art|impressionnis\w*|manga|bd|cirque|magie|impro|stand[ -]?up|piano|orgue)\b/g)
   if (genre) intent.keywords = [...new Set(genre.map((g) => g.trim()))].slice(0, 4)
 
   intent.summary = summarize(intent)

@@ -31,6 +31,7 @@ export default async function CartePage({ searchParams }: Props) {
             when: sp.when && WHEN.has(sp.when) ? sp.when : 'week',
             cat: sp.cat && CATEGORY_BY_SLUG[sp.cat] ? sp.cat : null,
             free: sp.free === '1',
+            noCinema: sp.xcat === 'cinema',
           }}
         />
       </div>

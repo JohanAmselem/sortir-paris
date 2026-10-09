@@ -8,7 +8,9 @@ import { diversify, safeQueryEvents } from '@/lib/events/query'
 import { CATEGORY_BY_SLUG, INTENT_BY_SLUG } from '@/lib/events/taxonomy'
 import type { CardEvent, EventQuery } from '@/lib/events/types'
 import { formatPrice } from '@/lib/format'
-import type { OutingIntent } from './intent-rules'
+import { intentToQuery } from './recommend-query'
+
+export { intentToQuery }
 
 export interface Recommendation {
   events: CardEvent[]
@@ -16,19 +18,6 @@ export interface Recommendation {
   /** Human note when constraints had to be relaxed. */
   relaxed: string | null
   query: EventQuery
-}
-
-export function intentToQuery(i: OutingIntent, near?: { lat: number; lng: number } | null): EventQuery {
-  return {
-    when: i.date ?? i.when ?? 'week',
-    categories: i.categories,
-    arrondissements: i.arrondissements,
-    free: i.free,
-    maxPrice: i.free ? null : i.maxPrice,
-    intents: i.intents,
-    q: i.keywords.length ? i.keywords.join(' ') : null,
-    near: i.nearMe && near ? { ...near, radiusKm: 2.5 } : null,
-  }
 }
 
 const RELAX_STEPS: Array<{ note: string; apply: (q: EventQuery) => EventQuery | null }> = [

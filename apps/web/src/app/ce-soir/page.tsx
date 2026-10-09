@@ -18,7 +18,7 @@ export default async function CeSoirPage({ searchParams }: Props) {
   return (
     <div className="px-4">
       <PageIntro kicker="Paris, heure par heure" title="Ce soir">
-        Tout ce qui commence ce soir, du premier verre au dernier set. Les expositions ont leur propre rubrique.
+        Tout ce qui commence ce soir, du premier verre au dernier set. Les films sont regroupés juste en dessous, les expositions ont leur propre rubrique.
       </PageIntro>
       <Listing
         query={query}
@@ -26,6 +26,7 @@ export default async function CeSoirPage({ searchParams }: Props) {
         locked={['when']}
         basePath="/ce-soir"
         layout="slots"
+        filmsBlock={{ title: 'Films ce soir' }}
         emptyTitle="La soirée est calme"
         emptyText="Aucune sortie repérée pour ce soir avec ces critères."
         emptyActions={[

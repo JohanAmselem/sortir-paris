@@ -8,8 +8,8 @@ import { unstable_cache } from 'next/cache'
 import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { DEFAULT_DURATION_MS, LONG_RUN_MS, resolveWindow, type TimeWindow } from '@/lib/paris-time'
-import { INTENT_RULES } from './taxonomy'
-import { foldText } from './fold'
+import { INSTITUTIONAL_TERMS, INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULES } from './taxonomy'
+import { ACCENTS_FROM, ACCENTS_TO, filmSlug, foldText } from './fold'
 
 export { foldText }
 import type { CardEvent, EventPage, EventQuery } from './types'
@@ -57,9 +57,7 @@ export function windowCondition(w: TimeWindow, now: Date): SQL {
   )!
 }
 
-/** Lowercase + strip French accents, same transform on both sides. */
-const ACCENTS_FROM = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ'
-const ACCENTS_TO = 'aaaaaaceeeeiiiinooooouuuuyy'
+/** Lowercase + strip French accents, same transform on both sides (constants in ./fold). */
 // Inlined constants (not bind parameters) so the expression matches the trigram
 // index idx_events_search_trgm (packages/db/sql/0006) character for character.
 const foldSql = (expr: SQL) => sql`translate(lower(${expr}), ${sql.raw(`'${ACCENTS_FROM}'`)}, ${sql.raw(`'${ACCENTS_TO}'`)})`
@@ -71,7 +69,7 @@ const eventSearchText = foldSql(
 
 /** Text match on the event or on its venue name (venues is small). `= any(array(…))`
  * lets Postgres combine both indexes (BitmapOr): 4.2 s → 0.17 s for "jazz". */
-function textMatch(op: 'like' | '~', pattern: string): SQL {
+export function textMatch(op: 'like' | '~', pattern: string): SQL {
   return sql`(${eventSearchText} ${sql.raw(op)} ${pattern}
     or ${events.venueId} = any(array(select v.id from venues v where ${foldSql(sql`v.name`)} ${sql.raw(op)} ${pattern})))`
 }
@@ -106,10 +104,31 @@ function distanceSql(lat: number, lng: number): SQL {
   return sql`(111.32 * sqrt(power(${venues.lat} - ${lat}, 2) + power((${venues.lng} - ${lng}) * cos(radians(${lat})), 2)))`
 }
 
-/** Editorial-ish ranking: quality, popularity, has picture, known time, soonness. */
+/**
+ * Film key of a séance (same as filmSlug() in ./fold): one card per film.
+ * Only evaluated on cinema rows.
+ */
+export const filmKeySql = sql`trim(both '-' from regexp_replace(${foldSql(sql`${events.title}`)}, '[^a-z0-9]+', '-', 'g'))`
+
+const INSTITUTIONAL_LIKE = sql.raw(`array[${INSTITUTIONAL_TERMS.map((t) => `'%${t.replace(/'/g, "''")}%'`).join(', ')}]`)
+
+/** Cancelled but still "active" at the source: "ANNULÉ – …" (see looksCancelled in lib/format). */
+const cancelledTextSql = sql`(${foldSql(sql`${events.title}`)} like '%annule%' or ${foldSql(sql`coalesce(${events.shortDesc}, '')`)} like 'annule%')`
+
+/** Venue in Paris proper (arrondissement known or 75xxx zip). */
+const inParisSql = sql`(${venues.arrondissement} is not null or ${venues.zipCode} like '75%')`
+
+/**
+ * Editorial-ish ranking: quality, popularity, has picture, known time, soonness.
+ * Paris first (petite couronne a bit lower), real outings before administrative
+ * or professional sessions (mairie, permanence, job dating…).
+ */
 function relevanceSql(now: Date): SQL {
   return sql`(
     ${events.qualityScore}
+    + case when ${venues.id} is null then -4 when ${inParisSql} then 0 else -10 end
+    + case when ${foldSql(sql`${events.title}`)} like any (${INSTITUTIONAL_LIKE}) then -22 else 0 end
+    + case when ${categories.slug} in ${OUTING_CATEGORIES} then 4 when ${categories.slug} is null then -4 else 0 end
     + least(${events.saveCount} * 3 + ${events.viewCount} / 25, 25)
     + case when ${events.imageUrl} is null then -25 else 0 end
     + case when ${events.timeKnown} then 0 else -8 end
@@ -140,13 +159,15 @@ const cardColumns = {
   venueName: venues.name,
   venueSlug: venues.slug,
   venueArr: venues.arrondissement,
+  venueCity: venues.city,
+  venueZip: venues.zipCode,
   venueLat: venues.lat,
   venueLng: venues.lng,
 }
 
 type CardRow = {
   [K in keyof typeof cardColumns]: unknown
-} & { distanceKm?: unknown; total?: unknown }
+} & { distanceKm?: unknown; filmN?: unknown; filmM?: unknown; filmTimes?: unknown; filmImage?: unknown }
 
 export function toCard(r: CardRow): CardEvent {
   const iso = (d: unknown) => (d instanceof Date ? d.toISOString() : d ? String(d) : null)
@@ -155,7 +176,7 @@ export function toCard(r: CardRow): CardEvent {
     slug: String(r.slug),
     title: String(r.title),
     shortDesc: (r.shortDesc as string) ?? null,
-    imageUrl: (r.imageUrl as string) ?? null,
+    imageUrl: (r.imageUrl as string) ?? (r.filmImage as string) ?? null,
     startDate: iso(r.startDate)!,
     endDate: iso(r.endDate),
     timeKnown: r.timeKnown !== false,
@@ -173,20 +194,51 @@ export function toCard(r: CardRow): CardEvent {
           name: String(r.venueName),
           slug: String(r.venueSlug),
           arrondissement: (r.venueArr as string) ?? null,
+          // Only kept outside Paris, where the town is what people need.
+          city: !r.venueArr && !String(r.venueZip ?? '').startsWith('75') && r.venueCity ? String(r.venueCity) : null,
           lat: r.venueLat == null ? null : Number(r.venueLat),
           lng: r.venueLng == null ? null : Number(r.venueLng),
         }
       : null,
     distanceKm: r.distanceKm == null ? null : Math.round(Number(r.distanceKm) * 10) / 10,
+    film:
+      r.filmN != null && Number(r.filmN) > 1
+        ? {
+            slug: filmSlug(String(r.title)),
+            seances: Number(r.filmN),
+            salles: Number(r.filmM ?? 1),
+            nextTimes: toIsoList(r.filmTimes).slice(0, 4),
+          }
+        : null,
   }
 }
 
+/** Postgres arrays come back as JS arrays or as '{…}' literals depending on the driver path. */
+function toIsoList(v: unknown): string[] {
+  const list = Array.isArray(v)
+    ? v
+    : typeof v === 'string'
+      ? v.replace(/^\{|\}$/g, '').split(',').map((x) => x.replace(/^"|"$/g, '')).filter(Boolean)
+      : []
+  return list.map((x) => (x instanceof Date ? x : new Date(String(x)))).filter((d) => !Number.isNaN(d.getTime())).map((d) => d.toISOString())
+}
+
 export function buildConditions(query: EventQuery, now: Date): { where: SQL; window: TimeWindow | null } {
-  const conds: SQL[] = [liveCondition(now)]
+  const conds: SQL[] = [liveCondition(now), sql`not ${cancelledTextSql}`]
   const window = resolveWindow(query.when, now)
   if (window) conds.push(windowCondition(window, now))
 
   if (query.categories?.length) conds.push(inArray(categories.slug, query.categories))
+  if (query.excludeCategories?.length) {
+    conds.push(sql`(${categories.slug} is null or ${categories.slug} not in ${query.excludeCategories})`)
+  }
+  if (query.excludeTitle) conds.push(sql`lower(${events.title}) <> ${query.excludeTitle.toLowerCase()}`)
+  if (window?.key === 'tonight') {
+    // Weekly classes stored as one long run (yoga, conversation, atelier hebdo)
+    // start "tonight" every week: they stay in their category, not in "Ce soir".
+    conds.push(sql`not (${events.endDate} is not null and ${events.endDate} - ${events.startDate} > interval '60 days'
+      and (${categories.slug} is null or ${categories.slug} in ${RECURRING_CLASS_CATEGORIES}))`)
+  }
   if (query.arrondissements?.length) conds.push(inArray(venues.arrondissement, query.arrondissements))
   if (query.free) conds.push(eq(events.priceStatus, 'free'))
   if (query.maxPrice != null && query.maxPrice >= 0) {
@@ -204,6 +256,12 @@ export function buildConditions(query: EventQuery, now: Date): { where: SQL; win
   for (const slug of query.intents ?? []) {
     const c = intentCondition(slug)
     if (c) conds.push(c)
+  }
+  for (const slug of query.topics ?? []) {
+    const rule = TOPIC_RULES[slug]
+    if (!rule) continue
+    const match = textMatch('~', foldText(rule.pattern))
+    conds.push(rule.excludePattern ? sql`(${match} and not ${textMatch('~', foldText(rule.excludePattern))})` : match)
   }
   if (query.q) {
     const tokens = searchTokens(query.q)
@@ -256,17 +314,45 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
   }
   order.push(asc(events.id))
 
+  const groupFilms = shouldGroupFilms(query)
+
   return withStatementTimeout(STATEMENT_TIMEOUT_MS, async (tx) => {
-    // limit + 1 tells whether there is more without counting everything.
-    const rows = await tx
+    // One row per film among the cinema séances matching the same filters: the
+    // next séance stands for the film, with counts and the next times. Computed
+    // on the cinema rows only (one GROUP BY), joined back on the chosen séance.
+    const films = groupFilms
+      ? tx
+          .select({
+            best: sql<string>`(array_agg(${events.id} order by ${events.startDate}, ${events.id}))[1]`.as('film_best'),
+            n: sql<number>`count(*)`.as('film_n'),
+            m: sql<number>`count(distinct ${events.venueId})`.as('film_m'),
+            times: sql<string[]>`(array_agg(${events.startDate} order by ${events.startDate}))[1:4]`.as('film_times'),
+            image: sql<string | null>`(array_agg(${events.imageUrl} order by ${events.startDate}) filter (where ${events.imageUrl} is not null))[1]`.as('film_image'),
+          })
+          .from(events)
+          .leftJoin(venues, eq(events.venueId, venues.id))
+          .leftJoin(categories, eq(events.categoryId, categories.id))
+          .where(and(where, eq(categories.slug, 'cinema')))
+          .groupBy(filmKeySql)
+          .as('films')
+      : null
+
+    const filmWhere = films ? and(where, sql`(${categories.slug} is distinct from 'cinema' or ${films.best} is not null)`)! : where
+    const base = tx
       .select({
         ...cardColumns,
         distanceKm: query.near ? distanceSql(query.near.lat, query.near.lng) : sql`null`,
+        filmN: films ? films.n : sql`null`,
+        filmM: films ? films.m : sql`null`,
+        filmTimes: films ? films.times : sql`null`,
+        filmImage: films ? films.image : sql`null`,
       })
       .from(events)
       .leftJoin(venues, eq(events.venueId, venues.id))
       .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(where)
+    // limit + 1 tells whether there is more without counting everything.
+    const rows = await (films ? base.leftJoin(films, sql`${films.best} = ${events.id}`) : base)
+      .where(filmWhere)
       .orderBy(...order)
       .limit(limit + 1)
       .offset(offset)
@@ -275,9 +361,14 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
     const page = rows.slice(0, limit)
     let total = offset + page.length + (hasMore ? 1 : 0)
     // The exact total is only shown with the first page ("1 234 sorties").
+    // Films count once each, like the cards.
     if (offset === 0 && hasMore) {
       const [c] = await tx
-        .select({ n: sql<number>`count(*)` })
+        .select({
+          n: groupFilms
+            ? sql<number>`count(*) filter (where ${categories.slug} is distinct from 'cinema') + count(distinct ${filmKeySql}) filter (where ${categories.slug} = 'cinema')`
+            : sql<number>`count(*)`,
+        })
         .from(events)
         .leftJoin(venues, eq(events.venueId, venues.id))
         .leftJoin(categories, eq(events.categoryId, categories.id))
@@ -286,6 +377,14 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
     }
     return { events: page.map(toCard), total, hasMore }
   })
+}
+
+/** Cinema séances are grouped per film unless the query targets precise events. */
+export function shouldGroupFilms(query: EventQuery): boolean {
+  if (query.groupFilms === false || query.ids) return false
+  if (query.categories?.length && !query.categories.includes('cinema')) return false
+  if (query.excludeCategories?.includes('cinema')) return false
+  return true
 }
 
 /** Reject after `ms` so a stuck query can never hang a page render. */
@@ -301,7 +400,7 @@ export function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'query'):
 
 // Keyed by the query only: entries are refreshed in the background every 5 min and
 // the previous result keeps being served while (or if) the refresh fails.
-const cachedQuery = unstable_cache(runQuery, ['events-query-v2'], { revalidate: 300, tags: ['events'] })
+const cachedQuery = unstable_cache(runQuery, ['events-query-v3'], { revalidate: 300, tags: ['events'] })
 
 /** Cached, time-bucketed event query. Geolocated queries are rounded to ~100 m for cache hits. */
 export function queryEvents(query: EventQuery): Promise<EventPage> {

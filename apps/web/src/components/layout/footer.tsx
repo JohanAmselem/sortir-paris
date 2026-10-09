@@ -48,7 +48,7 @@ export function Footer() {
               <li key={arr}>
                 <Link
                   href={`/paris/${arr}`}
-                  className="inline-block rounded px-2 py-1.5 text-[14px] text-paper/75 transition-colors hover:bg-paper/10 hover:text-paper"
+                  className="inline-flex h-10 min-w-10 items-center justify-center rounded px-2 text-[14px] text-paper/75 transition-colors hover:bg-paper/10 hover:text-paper"
                 >
                   {arr}
                 </Link>
@@ -70,10 +70,10 @@ function FooterList({ title, links }: { title: string; links: Array<{ href: stri
   return (
     <div>
       <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/60">{title}</h2>
-      <ul className="mt-4 space-y-1">
+      <ul className="mt-4">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="inline-block py-1 text-[15px] text-paper/80 transition-colors hover:text-paper">
+            <Link href={l.href} className="inline-flex min-h-10 items-center text-[15px] text-paper/80 transition-colors hover:text-paper">
               {l.label}
             </Link>
           </li>

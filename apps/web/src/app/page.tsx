@@ -12,7 +12,6 @@ import { COLLECTIONS } from '@/lib/collections'
 import { getWindow, parisDate, parisNightDay, parisParts } from '@/lib/paris-time'
 import { safeJsonLd } from '@/lib/json-ld'
 import { SITE_URL } from '@/lib/site'
-import type { CardEvent } from '@/lib/events/types'
 
 // Anonymous, identical for everyone → static + revalidated every 5 minutes.
 export const revalidate = 300
@@ -26,22 +25,21 @@ export const metadata = {
 
 const WEEKDAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
-/** Split the weekend window into Paris days (Friday night → Sunday). */
-function groupWeekend(events: CardEvent[], now: Date): ProgramDay[] {
+/**
+ * The weekend's Paris days (Friday → Sunday, from today when the weekend has
+ * started). Each day gets its own small query: one query for the whole weekend
+ * ranked by soonness only ever returned Friday.
+ */
+function weekendDays(now: Date): Array<{ key: string; label: string; iso: string }> {
   const w = getWindow('weekend', now)
   const first = parisNightDay(w.start)
   const last = parisNightDay(new Date(w.end.getTime() - 1))
-  const days: ProgramDay[] = []
+  const days: Array<{ key: string; label: string; iso: string }> = []
   for (let i = 0; i < 4; i++) {
     const d = parisNightDay(parisDate(first.year, first.month, first.day + i, 12))
-    days.push({ key: `${d.year}-${d.month}-${d.day}`, label: WEEKDAYS[d.weekday], events: [] })
+    const iso = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
+    days.push({ key: iso, label: WEEKDAYS[d.weekday], iso })
     if (d.year === last.year && d.month === last.month && d.day === last.day) break
-  }
-  for (const e of events) {
-    const start = new Date(e.startDate)
-    const d = parisNightDay(start < now ? now : start)
-    const day = days.find((x) => x.key === `${d.year}-${d.month}-${d.day}`)
-    if (day && day.events.length < 6) day.events.push(e)
   }
   return days
 }
@@ -49,10 +47,11 @@ function groupWeekend(events: CardEvent[], now: Date): ProgramDay[] {
 export default async function HomePage() {
   const now = bucketNow()
 
-  const [discover, tonight, weekend, expos, lastChance, free] = await Promise.all([
+  const days = weekendDays(now)
+  const [discover, tonight, weekendPages, expos, lastChance, free] = await Promise.all([
     recommend({ when: 'tonight' }, 4),
-    safeQueryEvents({ when: 'tonight', withImage: true, oneOffOnly: true, limit: 24 }),
-    safeQueryEvents({ when: 'weekend', oneOffOnly: true, limit: 60 }),
+    safeQueryEvents({ when: 'tonight', withImage: true, oneOffOnly: true, excludeCategories: ['cinema'], limit: 24 }),
+    Promise.all(days.map((d) => safeQueryEvents({ when: d.iso, oneOffOnly: true, limit: 10 }))),
     safeQueryEvents({ categories: ['expos'], when: 'month', runsEndingWithinDays: 400, withImage: true, limit: 16 }),
     safeQueryEvents({ runsEndingWithinDays: 7, withImage: true, sort: 'ending', limit: 10 }),
     safeQueryEvents({ free: true, when: 'week', withImage: true, oneOffOnly: true, limit: 12 }),
@@ -61,7 +60,8 @@ export default async function HomePage() {
   const shown = new Set(discover.events.map((e) => e.id))
   const picks = diversify(tonight.events.filter((e) => !shown.has(e.id)), 3)
   picks.forEach((e) => shown.add(e.id))
-  const program = groupWeekend(diversify(weekend.events, 60), now)
+  const program: ProgramDay[] = days.map((d, i) => ({ key: d.key, label: d.label, events: diversify(weekendPages[i].events, 6) }))
+  const weekendError = weekendPages.every((p) => p.error)
   const freeWeek = diversify(free.events.filter((e) => !shown.has(e.id)), 8)
   const hour = parisParts(now).hour
   const tonightIsLate = hour >= 21 || hour < 4
@@ -144,7 +144,7 @@ export default async function HomePage() {
             Du vendredi soir au dimanche, jour par jour. Les expositions sont dans la rubrique d’à côté.
           </p>
         </div>
-        {weekend.error ? <DataUnavailable /> : <WeekendProgram days={program} nowIso={now.toISOString()} />}
+        {weekendError ? <DataUnavailable /> : <WeekendProgram days={program} nowIso={now.toISOString()} />}
       </section>
 
       {/* Exhibitions: tall posters */}
@@ -224,7 +224,7 @@ export default async function HomePage() {
 
       {discover.events.length === 0 && picks.length === 0 && (
         <section className="px-4 pt-10">
-          <EventList events={weekend.events.slice(0, 5)} now={now} />
+          <EventList events={weekendPages.flatMap((p) => p.events).slice(0, 5)} now={now} />
         </section>
       )}
     </div>

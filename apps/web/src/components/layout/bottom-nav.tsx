@@ -27,7 +27,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation"
-      className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border/70 safe-area-bottom md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/[0.97] backdrop-blur-md safe-area-bottom md:hidden"
     >
       <ul className="grid h-16 grid-cols-5">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {

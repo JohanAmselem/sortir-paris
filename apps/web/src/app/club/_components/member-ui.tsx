@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
-import { BADGES, getXpProgress, type MemberStats } from '@/lib/gamification'
+import { BADGES, EMPTY_STATS, getXpProgress, type MemberStats } from '@/lib/gamification'
 import { cn } from '@/lib/utils'
 
 /** Level + XP bar. Server-safe (no hooks). */
@@ -64,10 +64,17 @@ export function BadgeGrid({
             </div>
             <p className={cn('mt-2 text-[14px] font-semibold', has ? 'text-accent' : 'text-ink')}>{b.name}</p>
             <p className="mt-0.5 text-[12px] leading-snug text-text-secondary">{b.desc}</p>
-            {!has && p && p.goal > 1 && (
-              <p className="mt-auto pt-1 text-[12px] font-semibold tabular-nums text-text-muted">
-                {p.value}/{p.goal}
-              </p>
+            {!has && (
+              // Always a progress hint, "0/1" included: says how far the badge is.
+              <div className="mt-auto pt-2">
+                <div className="flex items-center justify-between text-[12px] font-semibold tabular-nums text-text-secondary">
+                  <span>{p ? `${p.value}/${p.goal}` : `0/${b.progress(EMPTY_STATS).goal}`}</span>
+                  {!stats && <span className="font-normal text-text-muted">avec un compte</span>}
+                </div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-border" aria-hidden>
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${p ? Math.round((p.value / p.goal) * 100) : 0}%` }} />
+                </div>
+              </div>
             )}
             <span className="sr-only">{has ? 'Badge obtenu' : 'Badge à débloquer'}</span>
           </li>

@@ -296,7 +296,12 @@ export function formatWhen(e: EventTiming, now: Date = new Date()): string {
   }
 
   const time = timeKnown ? ` · ${formatTime(start)}` : ''
-  if (start <= now && effectiveEnd(e) >= now) return timeKnown ? `En ce moment · depuis ${formatTime(start)}` : "Aujourd'hui"
+  if (start <= now && effectiveEnd(e) >= now) {
+    if (!timeKnown) return "Aujourd'hui"
+    // Opening hours (an exhibition open 9h–19h today), not a show that started.
+    if (end && end.getTime() - start.getTime() >= 4 * 3600_000) return `Aujourd'hui · jusqu'à ${formatTime(end)}`
+    return `En ce moment · depuis ${formatTime(start)}`
+  }
 
   const diff = dayDiff(now, start)
   if (diff === 0) {
@@ -311,6 +316,20 @@ export function formatWhen(e: EventTiming, now: Date = new Date()): string {
   }
   const label = formatDayLabel(start)
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}${time}`
+}
+
+/**
+ * Next séances of a film: "Ce soir · 18h, 20h30, 22h15" (times of the first day
+ * only, so the line stays short).
+ */
+export function formatFilmTimes(times: string[], now: Date = new Date()): string {
+  const dates = times.map((t) => new Date(t)).filter((d) => d >= new Date(now.getTime() - 15 * 60_000))
+  if (!dates.length) return ''
+  const first = dates[0]
+  const sameDay = dates.filter((d) => sameNightDay(d, first)).slice(0, 3)
+  const label = formatWhen({ startDate: first }, now)
+  if (sameDay.length < 2) return label
+  return `${label}, ${sameDay.slice(1).map(formatTime).join(', ')}`
 }
 
 /** Short relative badge for the image overlay, or null. */

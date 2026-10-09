@@ -11,6 +11,7 @@ import { track as vercelTrack } from '@vercel/analytics'
 
 export type AnalyticsEvent =
   | 'search'
+  | 'search_suggest'
   | 'intent_chip'
   | 'filter'
   | 'event_open'

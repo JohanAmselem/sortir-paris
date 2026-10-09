@@ -20,6 +20,14 @@ Ils ont été rejoués sur une copie locale du schéma de production (PGlite, Po
 Ordre : `0007` puis `0008`, puis `cd scrapers && python cron.py --post` (liaison des lieux,
 géocodage par nom, séries, dédoublonnage, reclassement des catégories).
 
+### Lot 4B « Suivis » (9 octobre 2026)
+
+| Fichier | Quoi | Risque |
+|---|---|---|
+| `0009_follows.sql` | Nouvelle table `user_follows` (un membre suit un lieu canonique ou un artiste / une œuvre, terme normalisé), colonnes `last_seen_at` (« Nouveautés pour toi ») et `last_notified_at` (réservée à un futur envoi d'alertes), index sur `user_id` et `venue_id`, unicité par (membre, type, cible). Index partiel `venues(canonical_venue_id)` pour retrouver les alias d'un lieu. RLS activé, aucun droit `anon` / `authenticated` (comme 0003). | Faible : table neuve ; l'index sur `venues` (petite table) prend quelques millisecondes |
+
+À appliquer **avant** de déployer le code du lot 4B : sans la table, les pages `/compte` et `/club` affichent « données indisponibles » pour les suivis et les boutons « Suivre » échouent.
+
 ## Appliquer
 
 Supabase, SQL Editor : coller le contenu de chaque fichier dans l’ordre, puis *Run*. Ou en ligne de commande :

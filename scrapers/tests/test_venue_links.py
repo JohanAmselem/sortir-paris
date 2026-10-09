@@ -90,6 +90,19 @@ def test_names_compatibility_helpers():
     assert not venue_names_compatible("Sunset", "Sunside")
 
 
+def test_resolver_matches_same_distinctive_words_without_new_venue():
+    from pipelines.venues import VenueResolver
+
+    r = VenueResolver()
+    r._add({"id": "v38", "canonical_venue_id": None, "lat": 48.856427, "lng": 2.356483, "name": "38Riv",
+            "normalized_name": "38riv", "address": "38 Rue de Rivoli", "zip_code": "75004",
+            "website": None, "arrondissement": "4e"})
+    assert r._match({"venue_name": "38 RIV - Jazz Club & Bar", "venue_zip": "75004"}, "38 riv", None, None) == "v38"
+    assert r._match({"venue_name": "38 RIV - Jazz Club & Bar", "venue_zip": None}, "38 riv", None, None) == "v38"
+    # a conflicting postcode is another place
+    assert r._match({"venue_name": "38 Riv", "venue_zip": "93100"}, "38 riv", None, None) is None
+
+
 class _Cur:
     def __init__(self, rows):
         self.rows, self.sql = rows, []

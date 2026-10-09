@@ -2,7 +2,9 @@
 Venue resolution: find the canonical venue for a scraped event, or create one.
 
 Matching order (AUDIT D10):
-  1. same normalized name (unidecode, lowercase, articles/punctuation/"paris" stripped)
+  1. same normalized name (unidecode, lowercase, articles/punctuation/"paris" stripped),
+     or same distinctive words (utils.matching.venue_key: "38 RIV - Jazz Club & Bar" ~ "38Riv")
+     with no conflicting postcode
   2. same normalized address in the same postcode AND a compatible name
      (several distinct halls share one address, e.g. 211 av. Jean-Jaurès)
   3. < 100 m from the event's coordinates AND trigram name similarity ≥ 0.4
@@ -15,8 +17,15 @@ from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
 from utils.event import stable_id
-from utils.matching import haversine_m, normalize_address, normalize_venue_name, trigram_similarity
-from utils.normalize import arrondissement_from_zip, generate_slug, in_idf
+from utils.matching import (
+    VENUE_GENERIC_KEYS,
+    haversine_m,
+    normalize_address,
+    normalize_venue_name,
+    trigram_similarity,
+    venue_key,
+)
+from utils.normalize import arrondissement_from_zip, generate_slug, in_idf, normalize_zip
 
 NAME_SIM_NEAR = 0.4
 NAME_SIM_SAME_ADDRESS = 0.3
@@ -45,6 +54,7 @@ class VenueResolver:
         self._cache: Dict[str, Tuple[str, bool]] = {}
         self._rows: Dict[str, dict] = {}
         self._by_nn: Dict[str, str] = {}
+        self._by_key: Dict[str, list] = {}
         self._by_zip: Dict[str, list] = {}
         self._grid: Dict[Tuple[int, int], list] = {}
         self._unsaved: list = []
@@ -77,6 +87,9 @@ class VenueResolver:
         self._rows[v["id"]] = v
         if v["normalized_name"]:
             self._by_nn.setdefault(v["normalized_name"], v["id"])  # first = preferred (ORDER BY)
+        key = venue_key(v.get("name"))
+        if len(key) >= 4 and key not in VENUE_GENERIC_KEYS:
+            self._by_key.setdefault(key, []).append(v["id"])
         if v.get("zip_code"):
             self._by_zip.setdefault(v["zip_code"], []).append(v["id"])
         if v.get("lat") is not None and v.get("lng") is not None:
@@ -88,6 +101,10 @@ class VenueResolver:
             v = self._rows.pop(vid, None)
             if v and self._by_nn.get(v["normalized_name"]) == vid:
                 del self._by_nn[v["normalized_name"]]
+            if v:
+                ids = self._by_key.get(venue_key(v.get("name")))
+                if ids and vid in ids:
+                    ids.remove(vid)
         self._unsaved = []
         self._cache.clear()
 
@@ -129,6 +146,15 @@ class VenueResolver:
         vid = self._by_nn.get(nn)
         if vid:
             return vid
+
+        # same distinctive words ("38 RIV - Jazz Club & Bar" ~ "38Riv"), postcode not contradicting
+        zip_code = normalize_zip(event.get("venue_zip"))
+        for cand in self._by_key.get(venue_key(event.get("venue_name")), []):
+            v = self._rows.get(cand)
+            vz = normalize_zip(v.get("zip_code")) if v else None
+            if v and not (zip_code and vz and zip_code != vz):
+                if lat is None or v.get("lat") is None or haversine_m(lat, lng, v["lat"], v["lng"]) < 1500:
+                    return cand
 
         addr = event.get("venue_address")
         zip_code = event.get("venue_zip")

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { MapPin } from 'lucide-react'
 import { EventImage } from '@/components/ui/event-image'
 import { SaveButton } from './save-button'
+import { SignatureBadge } from './signature-badge'
 import { formatPrice } from '@/lib/format'
 import { formatFilmTimes, formatWhen, isLongRun, urgencyBadge } from '@/lib/paris-time'
 import { cn } from '@/lib/utils'
@@ -54,7 +55,8 @@ function Where({ event, className }: { event: CardEvent; className?: string }) {
     <p className={cn('flex min-w-0 items-center gap-1 text-[13px] text-text-secondary', className)}>
       <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="truncate">{event.venue.name}</span>
-      {area && <span className="shrink-0 text-text-muted">· {area}</span>}
+      {event.venue.signature && <SignatureBadge compact />}
+      {area &&<span className="shrink-0 text-text-muted">· {area}</span>}
     </p>
   )
 }

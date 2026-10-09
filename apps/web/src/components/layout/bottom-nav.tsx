@@ -15,6 +15,7 @@ const NAV_ITEMS = [
 
 const MATCHES: Record<string, string[]> = {
   '/evenements': ['/evenements', '/ce-soir', '/ce-week-end', '/gratuit', '/categories', '/collections', '/paris', '/lieux'],
+  '/carte': ['/carte', '/autour-de-moi'],
   '/club': ['/club', '/match', '/drop', '/quiz', '/top', '/surprise'],
   '/compte': ['/compte', '/login', '/onboarding'],
 }

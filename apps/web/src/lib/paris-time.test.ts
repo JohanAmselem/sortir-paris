@@ -158,3 +158,25 @@ describe('formatting', () => {
     expect(parisWeekStart(new Date('2026-10-11T21:30:00Z'))).toBe('2026-10-05') // Sun 23:30
   })
 })
+
+describe('next3h window', () => {
+  it('runs from now to now + 3 h, without long runs', () => {
+    const w = getWindow('next3h', WED_AFTERNOON)
+    expect(w.start.toISOString()).toBe('2026-10-07T13:00:00.000Z')
+    expect(w.end.toISOString()).toBe('2026-10-07T16:00:00.000Z')
+    expect(w.includeOngoing).toBe(false)
+  })
+  it('is reachable from the URL value and its alias', () => {
+    expect(resolveWindow('next3h', WED_AFTERNOON)?.key).toBe('next3h')
+    expect(resolveWindow('3h', WED_AFTERNOON)?.key).toBe('next3h')
+  })
+  it('keeps a concert started 30 min ago, not an exhibition nor a later event', () => {
+    const w = getWindow('next3h', WED_AFTERNOON)
+    const concert = { startDate: '2026-10-07T12:30:00Z', endDate: null }
+    const expo = { startDate: '2026-09-01T08:00:00Z', endDate: '2026-12-01T18:00:00Z' }
+    const later = { startDate: '2026-10-07T17:00:00Z', endDate: null }
+    expect(overlapsWindow(concert, w, WED_AFTERNOON)).toBe(true)
+    expect(overlapsWindow(expo, w, WED_AFTERNOON)).toBe(false)
+    expect(overlapsWindow(later, w, WED_AFTERNOON)).toBe(false)
+  })
+})

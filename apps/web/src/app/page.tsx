@@ -48,14 +48,20 @@ export default async function HomePage() {
   const now = bucketNow()
 
   const days = weekendDays(now)
-  const [discover, tonight, weekendPages, expos, lastChance, free] = await Promise.all([
+  const signatureBase = { signatureOnly: true, withImage: true, oneOffOnly: true, excludeCategories: ['cinema'], limit: 24 }
+  const [discover, tonight, weekendPages, expos, lastChance, free, bigTonight] = await Promise.all([
     recommend({ when: 'tonight' }, 4),
     safeQueryEvents({ when: 'tonight', withImage: true, oneOffOnly: true, excludeCategories: ['cinema'], limit: 24 }),
     Promise.all(days.map((d) => safeQueryEvents({ when: d.iso, oneOffOnly: true, limit: 10 }))),
     safeQueryEvents({ categories: ['expos'], when: 'month', runsEndingWithinDays: 400, withImage: true, limit: 16 }),
     safeQueryEvents({ runsEndingWithinDays: 7, withImage: true, sort: 'ending', limit: 10 }),
     safeQueryEvents({ free: true, when: 'week', withImage: true, oneOffOnly: true, limit: 12 }),
+    safeQueryEvents({ ...signatureBase, when: 'tonight' }),
   ])
+  // "Les grandes scènes": tonight when there is enough, else the week. One venue each.
+  const bigTonightPicks = diversify(bigTonight.events, 8)
+  const bigUseWeek = bigTonightPicks.length < 4
+  const bigScenes = bigUseWeek ? diversify((await safeQueryEvents({ ...signatureBase, when: 'week' })).events, 8) : bigTonightPicks
 
   const shown = new Set(discover.events.map((e) => e.id))
   const picks = diversify(tonight.events.filter((e) => !shown.has(e.id)), 3)
@@ -113,13 +119,13 @@ export default async function HomePage() {
       {/* Interactive shortcuts */}
       <section aria-label="Autres façons de chercher" className="grid gap-3 px-4 pt-10 sm:grid-cols-2">
         <Link
-          href="/carte"
+          href="/autour-de-moi"
           className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-ink"
         >
           <MapPinned className="h-9 w-9 shrink-0 text-accent" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-[17px] font-semibold text-ink">Autour de moi</p>
-            <p className="text-[14px] text-text-secondary">La carte de tout ce qui se passe, filtrable en un geste.</p>
+            <p className="text-[17px] font-semibold text-ink">Autour de moi, maintenant</p>
+            <p className="text-[14px] text-text-secondary">Ce qui commence dans les 3 heures, au plus près de toi.</p>
           </div>
           <ArrowRight className="h-5 w-5 text-text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
         </Link>
@@ -146,6 +152,21 @@ export default async function HomePage() {
         </div>
         {weekendError ? <DataUnavailable /> : <WeekendProgram days={program} nowIso={now.toISOString()} />}
       </section>
+
+      {/* Big venues: factual list in lib/venues-signature.ts */}
+      {bigScenes.length > 0 && (
+        <section aria-labelledby="big-title" className="px-4 pt-14">
+          <SectionHeader
+            id="big-title"
+            kicker="Lieux phares"
+            title={bigUseWeek ? 'Les grandes scènes cette semaine' : 'Les grandes scènes ce soir'}
+          />
+          <p className="mt-2 max-w-xl text-[15px] text-text-secondary">
+            Philharmonie, Châtelet, Opéra, Olympia, Comédie-Française… ce qui s’y joue, une salle à la fois.
+          </p>
+          <EventRail events={bigScenes} now={now} className="mt-5" />
+        </section>
+      )}
 
       {/* Exhibitions: tall posters */}
       {expos.events.length > 0 && (

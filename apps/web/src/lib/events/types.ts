@@ -26,6 +26,8 @@ export interface CardEvent {
     city?: string | null
     lat: number | null
     lng: number | null
+    /** One of the "lieux phares" (lib/venues-signature.ts). */
+    signature?: boolean
   } | null
   /**
    * Set when the card stands for several séances of the same film (cinema
@@ -68,6 +70,8 @@ export interface EventQuery {
   runsEndingWithinDays?: number | null
   /** Only one-off events (no exhibitions / long runs). */
   oneOffOnly?: boolean
+  /** Only events at a "lieu phare" (lib/venues-signature.ts). */
+  signatureOnly?: boolean
   /** Only events with an image (homepage blocks). */
   withImage?: boolean
   sort?: SortKey

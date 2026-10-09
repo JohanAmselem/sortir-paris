@@ -10,6 +10,8 @@ import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { DEFAULT_DURATION_MS, LONG_RUN_MS, resolveWindow, type TimeWindow } from '@/lib/paris-time'
 import { INSTITUTIONAL_TERMS, INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULES } from './taxonomy'
 import { ACCENTS_FROM, ACCENTS_TO, filmSlug, foldText } from './fold'
+import { workLikePattern } from './works-utils'
+import { SIGNATURE_VENUE_REGEX, isSignatureVenue } from '@/lib/venues-signature'
 
 export { foldText }
 import type { CardEvent, EventPage, EventQuery } from './types'
@@ -110,10 +112,26 @@ function distanceSql(lat: number, lng: number): SQL {
  */
 export const filmKeySql = sql`trim(both '-' from regexp_replace(${foldSql(sql`${events.title}`)}, '[^a-z0-9]+', '-', 'g'))`
 
+/**
+ * Rows of a work (same title key, see lib/events/works-utils.ts). The LIKE on
+ * the indexed event text narrows the candidates with idx_events_search_trgm;
+ * the exact key check runs on those few rows only.
+ */
+export function workMatchSql(slug: string): SQL {
+  return sql`(${eventSearchText} like ${workLikePattern(slug)} and ${filmKeySql} = ${slug})`
+}
+
 const INSTITUTIONAL_LIKE = sql.raw(`array[${INSTITUTIONAL_TERMS.map((t) => `'%${t.replace(/'/g, "''")}%'`).join(', ')}]`)
 
 /** Cancelled but still "active" at the source: "ANNULÉ – …" (see looksCancelled in lib/format). */
-const cancelledTextSql = sql`(${foldSql(sql`${events.title}`)} like '%annule%' or ${foldSql(sql`coalesce(${events.shortDesc}, '')`)} like 'annule%')`
+export const cancelledTextSql = sql`(${foldSql(sql`${events.title}`)} like '%annule%' or ${foldSql(sql`coalesce(${events.shortDesc}, '')`)} like 'annule%')`
+
+/**
+ * Event at one of the "lieux phares" (lib/venues-signature.ts). Uncorrelated
+ * subquery on the small venues table: evaluated once per query (hashed SubPlan
+ * in a CASE, semi-join in a WHERE), never once per row.
+ */
+export const signatureVenueSql = sql`${events.venueId} in (select v.id from venues v where ${foldSql(sql`v.name`)} ~ ${SIGNATURE_VENUE_REGEX})`
 
 /** Venue in Paris proper (arrondissement known or 75xxx zip). */
 const inParisSql = sql`(${venues.arrondissement} is not null or ${venues.zipCode} like '75%')`
@@ -128,6 +146,7 @@ function relevanceSql(now: Date): SQL {
     ${events.qualityScore}
     + case when ${venues.id} is null then -4 when ${inParisSql} then 0 else -10 end
     + case when ${foldSql(sql`${events.title}`)} like any (${INSTITUTIONAL_LIKE}) then -22 else 0 end
+    + case when ${signatureVenueSql} then 6 else 0 end
     + case when ${categories.slug} in ${OUTING_CATEGORIES} then 4 when ${categories.slug} is null then -4 else 0 end
     + least(${events.saveCount} * 3 + ${events.viewCount} / 25, 25)
     + case when ${events.imageUrl} is null then -25 else 0 end
@@ -198,6 +217,7 @@ export function toCard(r: CardRow): CardEvent {
           city: !r.venueArr && !String(r.venueZip ?? '').startsWith('75') && r.venueCity ? String(r.venueCity) : null,
           lat: r.venueLat == null ? null : Number(r.venueLat),
           lng: r.venueLng == null ? null : Number(r.venueLng),
+          signature: isSignatureVenue(String(r.venueName)),
         }
       : null,
     distanceKm: r.distanceKm == null ? null : Math.round(Number(r.distanceKm) * 10) / 10,
@@ -251,6 +271,7 @@ export function buildConditions(query: EventQuery, now: Date): { where: SQL; win
   if (query.oneOffOnly) conds.push(sql`not ${isLongRunSql}`)
   if (query.withImage) conds.push(sql`${events.imageUrl} is not null`)
   if (query.venueSlug) conds.push(eq(venues.slug, query.venueSlug))
+  if (query.signatureOnly) conds.push(signatureVenueSql)
   if (query.ids) conds.push(query.ids.length ? sql`${events.id} in ${query.ids}` : sql`false`)
   if (query.excludeIds?.length) conds.push(sql`${events.id} not in ${query.excludeIds}`)
   for (const slug of query.intents ?? []) {
@@ -304,7 +325,8 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
       order.push(asc(effectiveEndSql))
       break
     case 'distance':
-      if (query.near) order.push(asc(distanceSql(query.near.lat, query.near.lng)))
+      // Same venue (same distance): soonest first.
+      if (query.near) order.push(asc(distanceSql(query.near.lat, query.near.lng)), asc(events.startDate))
       break
     case 'random':
       order.push(sql`md5(${events.id}::text || ${Math.floor(nowMs / 3600_000)})`)

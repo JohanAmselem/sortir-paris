@@ -74,7 +74,7 @@ export function parisNightDay(date: Date): { year: number; month: number; day: n
   return { year: p.year, month: p.month, day: p.day, weekday: p.weekday }
 }
 
-export type WindowKey = 'now' | 'tonight' | 'today' | 'tomorrow' | 'weekend' | 'week' | 'month'
+export type WindowKey = 'now' | 'next3h' | 'tonight' | 'today' | 'tomorrow' | 'weekend' | 'week' | 'month'
 
 export interface TimeWindow {
   key: WindowKey | 'date'
@@ -103,6 +103,16 @@ export function getWindow(key: WindowKey, now: Date = new Date()): TimeWindow {
         end: new Date(now.getTime() + 2 * 3600_000),
         includeOngoing: true,
         label: 'En ce moment',
+      }
+    case 'next3h':
+      // "Autour de moi, maintenant": starting within 3 hours, or a one-off
+      // already under way. No exhibitions (shown in their own block).
+      return {
+        key,
+        start: now,
+        end: new Date(now.getTime() + 3 * 3600_000),
+        includeOngoing: false,
+        label: 'Dans les 3 heures',
       }
     case 'tonight':
       return {
@@ -174,7 +184,7 @@ export function getDateWindow(iso: string, now: Date = new Date()): TimeWindow |
   }
 }
 
-export const WINDOW_KEYS: WindowKey[] = ['now', 'tonight', 'today', 'tomorrow', 'weekend', 'week', 'month']
+export const WINDOW_KEYS: WindowKey[] = ['now', 'next3h', 'tonight', 'today', 'tomorrow', 'weekend', 'week', 'month']
 
 /** Accepts the legacy URL values too (`date=today|weekend|week`). */
 export function resolveWindow(value: string | null | undefined, now: Date = new Date()): TimeWindow | null {
@@ -189,6 +199,7 @@ export function resolveWindow(value: string | null | undefined, now: Date = new 
     semaine: 'week',
     mois: 'month',
     maintenant: 'now',
+    '3h': 'next3h',
   }
   const key = (WINDOW_KEYS as string[]).includes(v) ? (v as WindowKey) : alias[v]
   if (key) return getWindow(key, now)

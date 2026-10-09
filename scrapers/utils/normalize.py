@@ -403,7 +403,8 @@ CATEGORY_KEYWORDS = {
     "spectacles": [
         "spectacle", "spectacles", "cirque", "magie", "magicien", "one man show",
         "one woman show", "humour", "humoriste", "stand-up", "stand up", "cabaret",
-        "marionnettes", "comedie musicale", "conte", "contes",
+        "marionnettes", "comedie musicale", "conte", "contes", "comedy club", "comedy",
+        "impro", "improvisation",
     ],
     "ateliers": [
         "atelier", "ateliers", "workshop", "stage", "cours", "initiation",
@@ -418,6 +419,7 @@ CATEGORY_KEYWORDS = {
         "karaoke", "afterwork", "after work", "after-work", "boum", "blind test", "blind-test",
         "soiree jeux", "soiree jeu", "jeux de societe", "quiz", "rave", "techno", "house music",
         "soiree dansante", "dancefloor", "silent disco", "apero", "aperitif", "teuf", "bingo",
+        "dancehall", "amapiano", "shatta", "reggaeton", "bar latino", "soiree latino", "slows",
     ],
     "sport": [
         "sport", "sports", "sportif", "sportive", "yoga", "fitness", "pilates", "zumba",

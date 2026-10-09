@@ -57,9 +57,11 @@ TAG_PRIORITY = [
     ("Photo", "expos"),
     ("Peinture", "expos"),
     ("Street-art", "expos"),
+    ("Sport", "sport"),  # "Paris sport proximité"
+    ("Nuit", "soirees"),
 ]
-# Unmapped on purpose (no matching slug): Sport, Loisirs, Enfants, Solidarité, Santé,
-# Nuit, Histoire, Nature, Sciences, Innovation, Gourmand, Salon, Senior, Numérique…
+# Unmapped on purpose (no matching slug): Loisirs, Enfants, Solidarité, Santé,
+# Histoire, Nature, Sciences, Innovation, Gourmand, Salon, Senior, Numérique…
 # → make_event falls back to keyword detection on the title.
 
 _PLACEHOLDER_TIMES = {time(0, 0), time(12, 0)}

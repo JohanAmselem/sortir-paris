@@ -75,3 +75,32 @@ def test_collapse_series():
     assert s["start_date"] == "2026-10-10T09:00:00Z" and s["end_date"] == "2026-10-14T10:00:00Z"
     assert s["time_known"] is False
     assert tm.collapse_series(slots)[0]["source_id"] == s["source_id"]  # stable across runs
+
+
+def _tm_event(name, segment="Undefined", genre="Undefined", venue="Le Point Virgule", attractions=()):
+    return {
+        "id": "X1", "name": name, "url": "https://www.ticketmaster.fr/x",
+        "dates": {"start": {"dateTime": "2026-11-20T19:00:00Z"}, "status": {"code": "onsale"}},
+        "classifications": [{"primary": True, "segment": {"name": segment}, "genre": {"name": genre}}],
+        "_embedded": {"venues": [{"name": venue, "postalCode": "75004",
+                                  "location": {"latitude": "48.857", "longitude": "2.353"}}],
+                      "attractions": [{"name": a} for a in attractions]},
+    }
+
+
+def test_short_titles_get_attraction_or_venue():
+    assert tm.display_title("ELI", ["Eli & The Band"], "La Cigale") == "Eli & The Band"
+    assert tm.display_title("ELI", ["ELI"], "La Cigale") == "ELI · La Cigale"
+    assert tm.display_title("Fakear", [], "La Cigale") == "Fakear"
+    ev = tm.event_from_tm(_tm_event("ELI", segment="Music", venue="La Cigale"))
+    assert ev["title"] == "ELI · La Cigale"
+
+
+def test_categories_music_undefined_genres_and_venue_hints():
+    assert tm.category_for([{"segment": {"name": "Music"}, "genre": {"name": "Undefined"}}]) == ("concerts", False)
+    assert tm.category_for([{"segment": {"name": "Undefined"}, "genre": {"name": "Rock"}}]) == ("concerts", False)
+    assert tm.event_from_tm(_tm_event("TAHITI 80", segment="Music"))["category_slug"] == "concerts"
+    assert tm.event_from_tm(_tm_event("Bruno Peki"))["category_slug"] == "spectacles"
+    assert tm.event_from_tm(_tm_event("Vivaldi Saisons", venue="Eglise de la Madeleine"))["category_slug"] == "concerts"
+    assert tm.event_from_tm(_tm_event("Sherlock Holmes", venue="La scène Montparnasse"))["category_slug"] == "theatre"
+    assert tm.event_from_tm(_tm_event("Laponie", venue="Bercy Village"))["category_slug"] is None

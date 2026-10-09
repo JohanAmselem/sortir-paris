@@ -305,26 +305,34 @@ def _enricher():
 
 def fetch_events(
     max_cinemas: int = 30,
-    days_ahead: int = 3,
+    days_ahead: int = 7,
     max_pages_per_day: int = 5,
 ) -> Generator[dict, None, None]:
     """Real showtimes for the first `max_cinemas` cinemas over `days_ahead` days.
 
-    Requests ≈ max_cinemas × days_ahead × pages (≈2-3 pages for multiplexes), 1 req/s.
+    Day by day (all cinemas for today, then tomorrow…), so a spent time budget only costs
+    the farthest days. Allociné publishes the week's programme on Monday/Tuesday (the
+    French cinema week starts on Wednesday): once a cinema has a day without any showtime,
+    its later days are not requested (not published yet).
+    Requests ≈ max_cinemas × published days × pages (≈2-3 pages for multiplexes), 1 req/s.
     """
     codes = list(PARIS_CINEMAS)[:max_cinemas]
     today: date = now_paris().date()
     enrich = _enricher()
     total = 0
     seen: set = set()
+    per_cinema: Dict[str, int] = {code: 0 for code in codes}
+    unpublished: set = set()  # cinemas whose programme stops before days_ahead
 
     with PoliteClient() as client:
-        for idx, code in enumerate(codes):
-            venue = PARIS_CINEMAS[code]
-            n_cinema = 0
-            try:
-                for offset in range(days_ahead):
-                    day = (today + timedelta(days=offset)).isoformat()
+        for offset in range(days_ahead):
+            day = (today + timedelta(days=offset)).isoformat()
+            n_day = 0
+            for code in codes:
+                if code in unpublished:
+                    continue
+                venue = PARIS_CINEMAS[code]
+                try:
                     page = 1
                     while True:
                         url = SHOWTIMES_URL.format(code=code, day=day)
@@ -344,19 +352,23 @@ def fetch_events(
                         except ValueError:
                             print(f"  [allocine] {venue[0]} {day}: invalid JSON")
                             break
+                        if page == 1 and offset > 0 and not (data.get("results") or []):
+                            unpublished.add(code)  # programme not published that far yet
+                            break
                         for ev in parse_showtimes(data, code, day, venue, enrich=enrich):
                             if ev["source_id"] in seen:
                                 continue
                             seen.add(ev["source_id"])
-                            n_cinema += 1
+                            per_cinema[code] += 1
+                            n_day += 1
                             yield ev
                         if page >= min(total_pages(data), max_pages_per_day):
                             break
                         page += 1
-            except BudgetExceeded:
-                raise
-            except Exception as e:  # noqa: BLE001
-                print(f"  [allocine] {venue[0]} error: {e}")
-            total += n_cinema
-            print(f"  [allocine] {venue[0]}: {n_cinema} film-days")
+                except BudgetExceeded:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    print(f"  [allocine] {venue[0]} {day} error: {e}")
+            total += n_day
+            print(f"  [allocine] {day}: {n_day} film-days ({len(unpublished)} cinemas not published yet)")
     print(f"  [allocine] total: {total} film-days")

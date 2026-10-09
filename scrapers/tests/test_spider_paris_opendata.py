@@ -94,7 +94,7 @@ def test_price_rules():
 def test_category_priority():
     assert map_category(["Concert", "Festival"]) == "concerts"
     assert map_category(["Atelier", "Enfants", "Expo"]) == "ateliers"
-    assert map_category(["Sport"]) is None
+    assert map_category(["Sport"]) == "sport"  # category added by 0007_categories.sql
 
 
 def test_past_record_skipped(data):
@@ -132,3 +132,11 @@ def test_fetch_switches_to_keyset_past_offset_cap(monkeypatch, data):
     assert sorted(e["source_id"] for e in got) == [str(i) for i in range(1, 8)]
     assert all(c["offset"] + c["limit"] <= 4 for c in calls)
     assert any("event_id >=" in c["where"] for c in calls)
+
+
+def test_sport_and_night_tags():
+    from spiders.paris_opendata import map_category
+
+    assert map_category(["Sport"]) == "sport"
+    assert map_category(["Nuit"]) == "soirees"
+    assert map_category(["Concert", "Nuit"]) == "concerts"

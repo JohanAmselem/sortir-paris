@@ -64,6 +64,50 @@ ARTS_GENRES = {
 }
 
 
+# Genre names that mean "a concert" whatever the segment (segment "Undefined" happens).
+MUSIC_GENRES = {
+    "rock", "pop", "pop/rock", "hip-hop/rap", "hip hop", "rap", "r&b", "jazz", "blues", "classical",
+    "classique", "metal", "hard rock", "electronic", "dance/electronic", "electro", "world",
+    "musiques du monde", "chanson française", "chanson francaise", "variété", "variete",
+    "variété française", "folk", "reggae", "soul", "funk", "alternative", "country", "latin",
+    "gospel", "musique classique", "opéra", "opera", "punk", "indie", "new age",
+}
+
+# Last resort when neither the classification nor the title says anything: the kind of
+# venue ("Église de la Madeleine" sells concerts, "Le Point Virgule" sells stand-up).
+VENUE_CATEGORY_HINTS = [
+    (re.compile(r"\b([eé]glise|cath[eé]drale|basilique|chapelle|temple|philharmonie|salle pleyel|"
+                r"salle gaveau|olympia|bataclan|z[eé]nith|cigale|trianon|[eé]lys[eé]e montmartre|"
+                r"accor arena|seine musicale|maroquinerie|new morning|cabaret sauvage|boule noire|"
+                r"fl[eè]che d.or|alhambra|casino de paris|folies berg[eè]re|d[eé]fense arena)\b", re.I),
+     "concerts"),
+    (re.compile(r"\b(point virgule|comedy|com[eé]die club|caf[eé][ -]th[eé][aâ]tre|caf[eé] de la gare|"
+                r"palais des glaces|spotlight|th[eé][aâ]tre de dix heures|apollo|barbizon)\b", re.I),
+     "spectacles"),
+    (re.compile(r"\b(th[eé][aâ]tre|theater|theatre|com[eé]die|bouffes|op[eé]ra comique|"
+                r"la scala|sc[eè]ne)\b", re.I), "theatre"),
+]
+
+
+def venue_category_hint(venue_name: Optional[str]) -> Optional[str]:
+    for rx, slug in VENUE_CATEGORY_HINTS:
+        if venue_name and rx.search(venue_name):
+            return slug
+    return None
+
+
+def display_title(name: str, attractions: List[str], venue_name: Optional[str]) -> str:
+    """A 1-3 character name ("ELI") says nothing: use the attraction's longer name, or
+    append the venue ("ELI · La Cigale")."""
+    t = (name or "").strip()
+    if len(t) > 3:
+        return t
+    for a in attractions:
+        if a and len(a.strip()) > 3 and a.strip().lower() != t.lower():
+            return a.strip()
+    return f"{t} · {venue_name}" if venue_name else t
+
+
 def tm_datetime(dt: datetime) -> str:
     """Discovery API format: YYYY-MM-DDTHH:mm:ssZ (UTC)."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -82,6 +126,8 @@ def category_for(classifications) -> Tuple[Optional[str], bool]:
     if segment in ("sports", "sport"):
         return None, True
     if segment in ("music", "musique"):
+        return "concerts", False  # genre "Undefined" included
+    if genre in MUSIC_GENRES:
         return "concerts", False
     if segment in ("film", "cinéma", "cinema"):
         return "cinema", False
@@ -187,10 +233,10 @@ def event_from_tm(e: dict) -> Optional[dict]:
             if n and n.lower() != "undefined" and n not in genre_tags:
                 genre_tags.append(n)
     attractions = [a.get("name") for a in (e.get("_embedded") or {}).get("attractions") or [] if a.get("name")]
-    return make_event(
+    ev = make_event(
         source=SOURCE,
         source_id=f"tm-{e['id']}",
-        title=e["name"],
+        title=display_title(e["name"], attractions, v.get("name")),
         start=start,
         end=_when(dates.get("end")),
         description=e.get("info") or e.get("description") or e.get("pleaseNote"),
@@ -210,6 +256,9 @@ def event_from_tm(e: dict) -> Optional[dict]:
         event_status="cancelled" if status == "cancelled" else "scheduled",
         is_online=False,
     )
+    if not ev["category_slug"]:
+        ev["category_slug"] = venue_category_hint(v.get("name"))
+    return ev
 
 
 def parse_api(data) -> Tuple[List[dict], dict]:

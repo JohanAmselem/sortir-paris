@@ -119,12 +119,30 @@ def _flatten_address(loc):
 _CITY_ONLY = re.compile(r"^\s*(paris|paris\s*\d{1,2}(e|er|ème)?|france|[a-zà-ÿ' -]+,\s*france)\s*$", re.I)
 
 
+# A location named like a room of the venue itself, with no address ("Grande Salle" at the
+# Châtelet): the default venue applies — never a venue of its own (all "Grande Salle"s of
+# Paris would otherwise share one venue row without address).
+_ROOM_RE = re.compile(
+    r"^\s*(?:(?:la|le|l')\s*)?(?:"
+    r"(?:grande|petite|moyenne|nouvelle)\s+(?:salle|sc[eè]ne)(?:\s+\w+)?"
+    r"|(?:salle|studio|sc[eè]ne)\s+(?:\d+|[a-d]|haute|basse|du haut|du bas)"
+    r"|grand\s+(?:foyer|studio|plateau|hall)|petit\s+(?:studio|plateau|foyer)"
+    r"|foyer|auditorium|amphith[eé][aâ]tre|hall|plateau|rotonde|atrium|terrasse|bar|chapiteau"
+    r"|salle principale|salle de spectacle|salle de concert)\s*$",
+    re.I,
+)
+
+
+def is_room_name(name) -> bool:
+    return isinstance(name, str) and bool(_ROOM_RE.match(name))
+
+
 def _tidy_location(loc, venue: VenueSource):
     """Normalise the schema.org location of one Event before mapping:
     - name given as a list → joined; a bare city name ("Paris") → no name;
     - address string identical to the name → no address (it carries nothing);
-    - single-site venue: a location without any address is a room of the venue → None,
-      so the default venue applies in full."""
+    - single-site venue, or a room name ("Grande Salle", "Studio 2", "Foyer") without
+      address: a room of the venue → None, so the default venue applies in full."""
     if isinstance(loc, list):
         loc = next((x for x in loc if isinstance(x, dict)), loc[0] if loc else None)
     if not isinstance(loc, dict):
@@ -142,12 +160,11 @@ def _tidy_location(loc, venue: VenueSource):
     if isinstance(addr, str) and isinstance(loc.get("name"), str) and \
             addr.strip().lower().replace("-", " ") == loc["name"].strip().lower().replace("-", " "):
         loc.pop("address", None)
-    if venue.single_site:
-        a = loc.get("address")
-        has_addr = (isinstance(a, dict) and (a.get("streetAddress") or a.get("postalCode"))) or \
-                   (isinstance(a, str) and a.strip()) or isinstance(loc.get("geo"), dict)
-        if not has_addr:
-            return None
+    a = loc.get("address")
+    has_addr = (isinstance(a, dict) and (a.get("streetAddress") or a.get("postalCode"))) or \
+               (isinstance(a, str) and a.strip()) or isinstance(loc.get("geo"), dict)
+    if not has_addr and (venue.single_site or (venue.default_venue and is_room_name(loc.get("name")))):
+        return None
     return loc
 
 

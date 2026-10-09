@@ -84,7 +84,8 @@ SOURCES: List[SourceSpec] = [
                notes="not implemented: event pages behind a DataDome captcha (not bypassed)"),
     # ── cinema ──
     SourceSpec("allocine", "cinema", "spiders.allocine", budget=35 * 60,
-               kwargs={"max_cinemas": 82, "days_ahead": 3}),
+               kwargs={"max_cinemas": 82, "days_ahead": 7},
+               notes="7 days; Allociné publishes Wed→Tue programmes on Mon/Tue, later days skipped"),
     SourceSpec("tmdb", "cinema", "spiders.tmdb_cinema", enabled=False,
                notes="enrichment only (posters/synopsis for allocine) — never an event source"),
 ]

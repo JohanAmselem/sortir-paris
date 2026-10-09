@@ -15,7 +15,10 @@ export default defineConfig({
     locale: 'fr-FR',
     timezoneId: 'Europe/Paris',
     trace: 'retain-on-failure',
-    extraHTTPHeaders: process.env.VERCEL_BYPASS ? { 'x-vercel-protection-bypass': process.env.VERCEL_BYPASS } : undefined,
+    // The bypass also sets a cookie, so client-side fetches after the first page pass too.
+    extraHTTPHeaders: process.env.VERCEL_BYPASS
+      ? { 'x-vercel-protection-bypass': process.env.VERCEL_BYPASS, 'x-vercel-set-bypass-cookie': 'samesitenone' }
+      : undefined,
   },
   projects: [
     { name: 'mobile', use: { ...devices['iPhone 13'] } },

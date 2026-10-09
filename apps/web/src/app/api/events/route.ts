@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { queryEvents } from '@/lib/events/query'
 import { parseEventParams } from '@/lib/events/params'
 
@@ -7,6 +8,11 @@ import { parseEventParams } from '@/lib/events/params'
  * Same URL scheme as the pages (see lib/events/params.ts) + offset/limit.
  */
 export async function GET(request: NextRequest) {
+  // Uncached combinations (search, filters) reach the database: cap bursts per IP.
+  const rl = rateLimit(`events:${clientIp(request.headers)}`, 120, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Trop de requêtes, réessaie dans un instant.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } })
+  }
   const sp = request.nextUrl.searchParams
   const query = parseEventParams(sp)
   const limit = Math.min(Math.max(Number(sp.get('limit')) || 24, 1), 48)

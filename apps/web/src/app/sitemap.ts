@@ -30,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let venuePages: MetadataRoute.Sitemap = []
   try {
-    const venues = await getActiveVenues(2000)
+    const venues = await getActiveVenues(20000) // every venue with an upcoming event (was capped at 2 000)
     venuePages = venues
       .filter((v) => v.upcoming >= 1)
       .map((v) => ({ url: `${SITE_URL}/lieux/${v.slug}`, changeFrequency: 'weekly' as const, priority: 0.5 }))

@@ -1,5 +1,12 @@
 import type { Metadata } from 'next'
 
+export const DEFAULT_OG_IMAGE = {
+  url: '/og-default.png',
+  width: 1200,
+  height: 630,
+  alt: 'Paname Club : que faire à Paris ce soir ?',
+}
+
 type SearchParams = Record<string, string | string[] | undefined>
 
 /**
@@ -13,6 +20,7 @@ export function listingMetadata(path: string, title: string, description: string
     description,
     alternates: { canonical: path },
     robots: filtered ? { index: false, follow: true } : undefined,
-    openGraph: { title, description, url: path, type: 'website' },
+    // Redefining openGraph replaces the layout's: repeat the default share image.
+    openGraph: { title, description, url: path, type: 'website', images: [DEFAULT_OG_IMAGE] },
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { unstable_cache } from 'next/cache'
 import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, eq, sql } from 'drizzle-orm'
@@ -60,6 +61,11 @@ const load = unstable_cache(
 )
 
 export async function GET(req: NextRequest) {
+  // Uncached combinations (search, filters) reach the database: cap bursts per IP.
+  const rl = rateLimit(`map:${clientIp(req.headers)}`, 60, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Trop de requêtes, réessaie dans un instant.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } })
+  }
   const query = parseEventParams(req.nextUrl.searchParams)
   // The map shows everything in the window; geolocation only recentres it.
   query.near = null

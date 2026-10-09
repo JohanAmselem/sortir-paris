@@ -11,20 +11,33 @@ jobs:
     if: github.event.deployment_status.state == 'success' && contains(github.event.deployment_status.environment_url, 'vercel.app')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}
     steps:
+      # Preview deployments are behind Vercel Authentication: without the bypass
+      # secret every page is a 401 and all tests fail. Skip (with a notice) instead.
+      - name: Bypass secret present?
+        if: env.HAS_BYPASS != 'true'
+        run: echo "::notice::VERCEL_AUTOMATION_BYPASS_SECRET is not set — E2E skipped (Vercel → Settings → Deployment Protection → Protection Bypass for Automation)."
       - uses: actions/checkout@v4
+        if: env.HAS_BYPASS == 'true'
         with:
           ref: ${{ github.event.deployment.sha }}
       - uses: pnpm/action-setup@v4
+        if: env.HAS_BYPASS == 'true'
         with:
           version: 9.15.0
       - uses: actions/setup-node@v4
+        if: env.HAS_BYPASS == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: env.HAS_BYPASS == 'true'
       - run: pnpm --filter @sortir/web exec playwright install --with-deps chromium webkit
+        if: env.HAS_BYPASS == 'true'
       - run: pnpm --filter @sortir/web e2e
+        if: env.HAS_BYPASS == 'true'
         env:
           E2E_BASE_URL: ${{ github.event.deployment_status.environment_url }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

@@ -6,6 +6,7 @@ import { PageIntro } from '@/components/events/listing'
 import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
 import { LoadMore } from '@/components/events/load-more'
 import { SignatureBadge } from '@/components/events/signature-badge'
+import { FollowButton } from '@/components/follow/follow-button'
 import { getVenueBySlug } from '@/lib/venues'
 import { isSignatureVenue } from '@/lib/venues-signature'
 import { bucketNow, safeQueryEvents } from '@/lib/events/query'
@@ -96,6 +97,7 @@ export default async function VenuePage({ params }: Props) {
             </a>
           )}
         </div>
+        <FollowButton target={{ kind: 'venue', venueId: venue.id }} label="Suivre ce lieu" className="mt-3 items-start" />
       </PageIntro>
 
       {hasGeo && mapToken && (

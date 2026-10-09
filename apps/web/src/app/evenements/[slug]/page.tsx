@@ -10,6 +10,8 @@ import { ShareButton } from '@/components/ui/share-button'
 import { ViewTracker } from '@/components/events/view-tracker'
 import { EventReviews } from '@/components/events/event-reviews'
 import { AttendButton } from '@/components/events/attend-button'
+import { FollowButton } from '@/components/follow/follow-button'
+import { followableFromTitle } from '@/lib/follows'
 import { EventActionBar } from '@/components/events/sticky-booking-cta'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
@@ -148,6 +150,8 @@ export default async function EventPage({ params }: Props) {
   const price = formatPrice(event)
   const action = cta(event)
   const badge = past ? null : urgencyBadge(event, now)
+  // Artist / work to follow: the title (sources do not store Ticketmaster attractions separately).
+  const followable = followableFromTitle(event.title)
 
   // "Tu aimeras aussi": same category, near the venue, around the same time,
   // never another séance / date of the same title.
@@ -354,6 +358,14 @@ export default async function EventPage({ params }: Props) {
                   Toutes les dates
                 </Link>
               </p>
+            )}
+
+            {followable && (
+              <FollowButton
+                target={{ kind: 'artist', term: followable.term, label: followable.label }}
+                label={`Suivre « ${followable.label} »`}
+                className="mt-4 items-start"
+              />
             )}
 
             {(event.saveCount > 1 || event.attendanceCount > 1) && (

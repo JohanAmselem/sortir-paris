@@ -12,6 +12,10 @@ import { getAnonymousDrop, getMemberDrop } from './_lib/drop'
 import { BadgeGrid, LevelMeter, StatTiles } from './_components/member-ui'
 import { LocalSync } from './_components/local-sync'
 import { LocalProgress } from './_components/local-progress'
+import { ChallengeCard, RankList } from './_components/community'
+import { getCommunityHighlights, getWeeklyChallenge } from './_lib/community'
+import { getFollowFeed } from './_lib/follows'
+import { NewForYouTeaser } from '@/components/follow/follow-feed'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,14 +95,21 @@ const toneClass: Record<Feature['tone'], string> = {
 export default async function ClubPage() {
   const now = bucketNow()
   const user = await getSessionUser()
-  const [overview, drop, top] = await Promise.all([
+  const [overview, drop, top, community, challenge, feed] = await Promise.all([
     user ? getMemberOverview(user.id) : Promise.resolve(null),
     (user ? getMemberDrop(user.id) : getAnonymousDrop()).catch((err) => {
       console.error('[club] drop failed', err)
       return null
     }),
     getMembersTopThisWeek().catch(() => []),
+    getCommunityHighlights(),
+    getWeeklyChallenge(user?.id ?? null),
+    user ? getFollowFeed(user.id) : Promise.resolve(null),
   ])
+  // Members' tops empty: the most saved events overall stand in (real counts only).
+  const showSaved = top.length === 0 && community.mostSaved.length > 0
+  // Said only when the count really came back empty (not when the query failed).
+  const noMemberActivity = top.length === 0 && community.mostSaved.length === 0 && !community.savedError
   const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
   const firstName = overview?.name?.split(/\s+/)[0] ?? null
 
@@ -178,6 +189,13 @@ export default async function ClubPage() {
         )}
       </header>
 
+      {/* Follows */}
+      {feed && !feed.error && (
+        <section aria-label="Nouveautés pour toi" className="pt-10">
+          <NewForYouTeaser groups={feed.groups} followCount={feed.follows.length} />
+        </section>
+      )}
+
       {/* Games */}
       <section aria-labelledby="jeux-title" className="pt-14">
         <h2 id="jeux-title" className="sr-only">
@@ -226,6 +244,14 @@ export default async function ClubPage() {
         </Link>
       </section>
 
+      {/* Weekly challenge */}
+      <section aria-labelledby="defi-title" className="pt-14">
+        <SectionHeader id="defi-title" kicker="Défi de la semaine" title="Ton défi" />
+        <div className="mt-5">
+          <ChallengeCard data={challenge} loggedIn={!!user} />
+        </div>
+      </section>
+
       {/* Drop teaser */}
       <section aria-labelledby="drop-title" className="pt-14">
         <SectionHeader
@@ -268,6 +294,48 @@ export default async function ClubPage() {
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {/* What the club looks at: real views and saves only */}
+      {(showSaved || community.mostViewed.length > 0 || noMemberActivity) && (
+        <section aria-labelledby="community-title" className="pt-14">
+          <SectionHeader
+            id="community-title"
+            kicker="Le club en ce moment"
+            title={showSaved ? 'Ce que le club garde et regarde' : 'Ce que le club regarde'}
+            href="/top"
+            linkLabel="Tout le top"
+          />
+          {noMemberActivity && (
+            <p className="mt-3 max-w-xl text-[15px] text-text-secondary">
+              Aucun membre n’a encore gardé de sortie à venir : le top se remplira avec les vôtres.{' '}
+              {user ? 'Garde une sortie qui te tente et tu seras le premier.' : (
+                <>
+                  <Link href="/login?next=/club" className="font-semibold text-accent underline underline-offset-2">
+                    Crée ton compte
+                  </Link>{' '}
+                  et sois le premier.
+                </>
+              )}
+            </p>
+          )}
+          <div className="mt-5 grid gap-6 lg:grid-cols-2">
+            {showSaved && (
+              <RankList
+                title="Les plus gardées"
+                items={community.mostSaved}
+                unit={(n) => (n > 1 ? `${n} membres l’ont gardée` : '1 membre l’a gardée')}
+              />
+            )}
+            {community.mostViewed.length > 0 && (
+              <RankList
+                title="Les sorties de la semaine les plus consultées"
+                items={community.mostViewed}
+                unit={(n) => `${n.toLocaleString('fr-FR')} vue${n > 1 ? 's' : ''}`}
+              />
+            )}
+          </div>
         </section>
       )}
 

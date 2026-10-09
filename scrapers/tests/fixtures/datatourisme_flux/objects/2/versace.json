@@ -1,0 +1,109 @@
+{
+  "@id": "https://data.datatourisme.fr/13/46c479e8-2132-384e-a3cf-c84e8a67ec10",
+  "@type": [
+    "schema:Event",
+    "CulturalEvent",
+    "EntertainmentAndEvent",
+    "Exhibition",
+    "schema:ExhibitionEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "@value": "Gianni Versace Retrospective",
+    "@language": "fr"
+  },
+  "rdfs:comment": {
+    "fr": [
+      "À partir du 5 juin, le musée Maillol accueille la première grande rétrospective française consacrée à Gianni Versace. Une plongée spectaculaire dans l’univers flamboyant du créateur italien, au cœur de Paris, capitale mondiale de la mode."
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": [
+        {
+          "@value": "À partir du 5 juin, le musée Maillol accueille la première grande rétrospective française consacrée à Gianni Versace. Une plongée spectaculaire dans l’univers flamboyant du créateur italien, au cœur de Paris, capitale mondiale de la mode.",
+          "@language": "fr"
+        }
+      ]
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Paris",
+          "schema:postalCode": "75007",
+          "schema:streetAddress": [
+            "59-61 rue de Grenelle",
+            "Musée Maillol"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France75107",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Paris"
+              ]
+            },
+            "insee": "75107",
+            "isPartOfDepartment": {
+              "@id": "kb:France75",
+              "insee": "75"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "schema:latitude": {
+          "@value": "48.854795",
+          "@type": "xsd:decimal"
+        },
+        "schema:longitude": {
+          "@value": "2.324924",
+          "@type": "xsd:decimal"
+        }
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-06-05",
+      "endDate": "2026-10-31"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://museemaillol.com/"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Choose Paris Region"
+  },
+  "lastUpdate": "2026-09-21"
+}

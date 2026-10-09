@@ -1,0 +1,106 @@
+{
+  "@id": "https://data.datatourisme.fr/13/aa115e1c-3281-3002-adab-ab45c7fa4bbd",
+  "@type": [
+    "schema:Event",
+    "EntertainmentAndEvent",
+    "SaleEvent",
+    "Market",
+    "schema:SaleEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Marché de Cachan"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Produits frais, légumes, viandes, poissons ..."
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Produits frais, légumes, viandes, poissons ..."
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Cachan",
+          "schema:postalCode": "94230",
+          "schema:streetAddress": [
+            "Marché",
+            "avenue Léon Eyrolles"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France94016",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Cachan"
+              ]
+            },
+            "insee": "94016",
+            "isPartOfDepartment": {
+              "@id": "kb:France94",
+              "insee": "94"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.796652,
+        "schema:longitude": 2.328282
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "http://www.ville-cachan.fr/"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Choose Paris Region"
+  },
+  "lastUpdate": "2016-04-22"
+}

@@ -24,8 +24,61 @@ NEAR_METERS = 100
 
 
 class VenueResolver:
-    def __init__(self) -> None:
+    """Resolves venues against an in-memory index loaded once (one query), so a source
+    with thousands of events does not pay several round trips per event."""
+
+    def __init__(self, cur=None) -> None:
         self._cache: Dict[str, Tuple[str, bool]] = {}
+        self._rows: Dict[str, dict] = {}
+        self._by_nn: Dict[str, str] = {}
+        self._by_zip: Dict[str, list] = {}
+        self._grid: Dict[Tuple[int, int], list] = {}
+        self._unsaved: list = []
+        if cur is not None:
+            self._load(cur)
+
+    # ── index ──
+    def _load(self, cur) -> None:
+        cur.execute(
+            """
+            SELECT id, canonical_venue_id, lat, lng, name, normalized_name, address, zip_code,
+                   website, arrondissement
+            FROM venues
+            ORDER BY canonical_venue_id NULLS FIRST, (lat IS NULL), created_at
+            """
+        )
+        for row in cur.fetchall() or []:
+            if len(row) < 10:
+                continue
+            vid, cvid, lat, lng, name, nn, address, zip_code, website, arr = row
+            self._add({"id": vid, "canonical_venue_id": cvid, "lat": lat, "lng": lng, "name": name,
+                       "normalized_name": nn or normalize_venue_name(name or ""), "address": address,
+                       "zip_code": zip_code, "website": website, "arrondissement": arr})
+
+    @staticmethod
+    def _cell(lat, lng) -> Tuple[int, int]:
+        return int(float(lat) * 1000), int(float(lng) * 1000)
+
+    def _add(self, v: dict) -> None:
+        self._rows[v["id"]] = v
+        if v["normalized_name"]:
+            self._by_nn.setdefault(v["normalized_name"], v["id"])  # first = preferred (ORDER BY)
+        if v.get("zip_code"):
+            self._by_zip.setdefault(v["zip_code"], []).append(v["id"])
+        if v.get("lat") is not None and v.get("lng") is not None:
+            self._grid.setdefault(self._cell(v["lat"], v["lng"]), []).append(v["id"])
+
+    def forget_unsaved(self) -> None:
+        """The savepoint that created these venues was rolled back."""
+        for vid in self._unsaved:
+            v = self._rows.pop(vid, None)
+            if v and self._by_nn.get(v["normalized_name"]) == vid:
+                del self._by_nn[v["normalized_name"]]
+        self._unsaved = []
+        self._cache.clear()
+
+    def saved(self) -> None:
+        self._unsaved = []
 
     def resolve(self, cur, event: dict) -> Tuple[Optional[str], bool]:
         """Return (canonical venue id, is_geocoded)."""
@@ -41,71 +94,78 @@ class VenueResolver:
         if lat is not None and lng is not None and not in_idf(lat, lng):
             lat = lng = None  # never store coordinates outside Île-de-France on a venue
 
-        row = self._match(cur, event, nn, lat, lng)
-        if row:
-            venue_id, canonical_id, v_lat = row
-            self._enrich(cur, venue_id, event, nn, lat, lng)
-            result = (canonical_id or venue_id, v_lat is not None or lat is not None)
+        vid = self._match(event, nn, lat, lng)
+        if vid:
+            v = self._rows[vid]
+            self._enrich(cur, vid, event, nn, lat, lng)
+            result = (v["canonical_venue_id"] or vid, v["lat"] is not None or lat is not None)
         else:
-            result = (self._create(cur, event, name, nn, lat, lng), lat is not None)
+            new_id = self._create(cur, event, name, nn, lat, lng)
+            self._add({"id": new_id, "canonical_venue_id": None, "lat": lat, "lng": lng, "name": name,
+                       "normalized_name": nn, "address": event.get("venue_address"),
+                       "zip_code": event.get("venue_zip"), "website": event.get("venue_website"),
+                       "arrondissement": arrondissement_from_zip(event.get("venue_zip"))})
+            self._unsaved.append(new_id)
+            result = (new_id, lat is not None)
         self._cache[cache_key] = result
         return result
 
-    # ── matching ──
-    def _match(self, cur, event, nn, lat, lng):
-        cur.execute(
-            """
-            SELECT id, canonical_venue_id, lat FROM venues
-            WHERE normalized_name = %s
-               OR (normalized_name IS NULL AND lower(name) = lower(%s))
-            ORDER BY canonical_venue_id NULLS FIRST, (lat IS NULL), created_at
-            LIMIT 1
-            """,
-            (nn, event.get("venue_name")),
-        )
-        row = cur.fetchone()
-        if row:
-            return row
+    # ── matching (in memory) ──
+    def _match(self, event, nn, lat, lng) -> Optional[str]:
+        vid = self._by_nn.get(nn)
+        if vid:
+            return vid
 
         addr = event.get("venue_address")
         zip_code = event.get("venue_zip")
         if addr and zip_code:
             na = normalize_address(addr)
             if na:
-                cur.execute(
-                    "SELECT id, canonical_venue_id, lat, name, address FROM venues WHERE zip_code = %s LIMIT 500",
-                    (zip_code,),
-                )
-                for vid, cvid, vlat, vname, vaddr in cur.fetchall():
-                    if normalize_address(vaddr) != na:
+                for cand in self._by_zip.get(zip_code, []):
+                    v = self._rows.get(cand)
+                    if not v or normalize_address(v["address"]) != na:
                         continue
-                    vn = normalize_venue_name(vname)
+                    vn = v["normalized_name"]
                     if nn in vn or vn in nn or trigram_similarity(nn, vn) >= NAME_SIM_SAME_ADDRESS:
-                        return vid, cvid, vlat
+                        return cand
 
         if lat is not None and lng is not None:
-            cur.execute(
-                """
-                SELECT id, canonical_venue_id, lat, lng, name FROM venues
-                WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s
-                LIMIT 200
-                """,
-                (float(lat) - 0.001, float(lat) + 0.001, float(lng) - 0.0015, float(lng) + 0.0015),
-            )
+            cx, cy = self._cell(lat, lng)
             best = None
-            for vid, cvid, vlat, vlng, vname in cur.fetchall():
-                if haversine_m(lat, lng, vlat, vlng) > NEAR_METERS:
-                    continue
-                sim = trigram_similarity(nn, normalize_venue_name(vname))
-                if sim >= NAME_SIM_NEAR and (best is None or sim > best[0]):
-                    best = (sim, vid, cvid, vlat)
+            for dx in (-1, 0, 1):
+                for dy in (-2, -1, 0, 1, 2):
+                    for cand in self._grid.get((cx + dx, cy + dy), []):
+                        v = self._rows.get(cand)
+                        if not v or haversine_m(lat, lng, v["lat"], v["lng"]) > NEAR_METERS:
+                            continue
+                        sim = trigram_similarity(nn, v["normalized_name"])
+                        if sim >= NAME_SIM_NEAR and (best is None or sim > best[0]):
+                            best = (sim, cand)
             if best:
-                return best[1], best[2], best[3]
+                return best[1]
         return None
 
     # ── writes ──
     def _enrich(self, cur, venue_id, event, nn, lat, lng) -> None:
         zip_code = event.get("venue_zip")
+        v = self._rows.get(venue_id)
+        if v is not None:
+            fills = {
+                "address": (not v.get("address")) and event.get("venue_address"),
+                "zip_code": (not v.get("zip_code")) and zip_code,
+                "website": (not v.get("website")) and event.get("venue_website"),
+                "geo": v.get("lat") is None and lat is not None,
+            }
+            if not any(fills.values()):
+                return  # nothing to fill: no round trip
+            if fills["address"]:
+                v["address"] = event.get("venue_address")
+            if fills["zip_code"]:
+                v["zip_code"] = zip_code
+            if fills["website"]:
+                v["website"] = event.get("venue_website")
+            if fills["geo"]:
+                v["lat"], v["lng"] = lat, lng
         cur.execute(
             """
             UPDATE venues SET

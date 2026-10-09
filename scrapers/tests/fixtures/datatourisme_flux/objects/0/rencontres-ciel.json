@@ -1,0 +1,106 @@
+{
+  "@id": "https://data.datatourisme.fr/13/5802f421-b8c1-3f16-bcf7-8ce30b4416e8",
+  "@type": [
+    "schema:Event",
+    "Conference",
+    "CulturalEvent",
+    "EntertainmentAndEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Les Rencontres du Ciel et de l’Espace"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "En novembre 2026, la Cité des sciences et de l’industrie accueille un événement exceptionnel dédié aux passionnés d’astronomie. Conférences, découvertes scientifiques et rencontres avec des experts vous plongent au cœur des mystères du cosmos."
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "En novembre 2026, la Cité des sciences et de l’industrie accueille un événement exceptionnel dédié aux passionnés d’astronomie. Conférences, découvertes scientifiques et rencontres avec des experts vous plongent au cœur des mystères du cosmos."
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Paris",
+          "schema:postalCode": "75019",
+          "schema:streetAddress": [
+            "30 avenue Corentin Cariou",
+            "Cité des sciences et de l'industrie"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France75119",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Paris"
+              ]
+            },
+            "insee": "75119",
+            "isPartOfDepartment": {
+              "@id": "kb:France75",
+              "insee": "75"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.895602,
+        "schema:longitude": 2.388069
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-11-13",
+      "endDate": "2026-11-15"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://www.afastronomie.fr/",
+        "https://www.cite-sciences.fr/fr/accueil"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Choose Paris Region"
+  },
+  "lastUpdate": "2026-06-19"
+}

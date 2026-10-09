@@ -1,0 +1,105 @@
+{
+  "@id": "https://data.datatourisme.fr/13/d0e57e4e-60d0-3809-893d-1f0aed3358eb",
+  "@type": [
+    "schema:Event",
+    "EntertainmentAndEvent",
+    "SportsCompetition",
+    "SportsEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Rugby - France / Afrique du Sud"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Le XV de France jouera son cinquième match du Championnat des Nations au Stade de France face à l’Afrique du Sud."
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Le XV de France jouera son cinquième match du Championnat des Nations au Stade de France face à l’Afrique du Sud."
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Saint-Denis",
+          "schema:postalCode": "93200",
+          "schema:streetAddress": [
+            "Avenue Jules Rimet",
+            "Stade de France"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France93066",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Saint-Denis"
+              ]
+            },
+            "insee": "93066",
+            "isPartOfDepartment": {
+              "@id": "kb:France93",
+              "insee": "93"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.924666,
+        "schema:longitude": 2.360184
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-11-13",
+      "endDate": "2026-11-13"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://www.stadefrance.com/fr/billetterie/france-afrique-du-sud-2026"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Agence POP – Plaine commune vous Ouvre ses Portes"
+  },
+  "lastUpdate": "2026-08-08"
+}

@@ -1,0 +1,107 @@
+{
+  "@id": "https://data.datatourisme.fr/13/aa39210c-790f-33e9-8772-08ca0f5b210c",
+  "@type": [
+    "schema:Event",
+    "CulturalEvent",
+    "EntertainmentAndEvent",
+    "Exhibition",
+    "SportsEvent",
+    "schema:ExhibitionEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Les Coupes Auto Légende"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Les Coupes Auto Légende sont un vrai spectacle pour les passionnés d’autos anciennes !"
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Les Coupes Auto Légende sont un vrai spectacle pour les passionnés d’autos anciennes !"
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Linas",
+          "schema:postalCode": "91310",
+          "schema:streetAddress": [
+            "Autodrome de Linas-Montlhéry",
+            "Avenue Georges Boillot"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France91339",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Linas"
+              ]
+            },
+            "insee": "91339",
+            "isPartOfDepartment": {
+              "@id": "kb:France91",
+              "insee": "91"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.622911,
+        "schema:longitude": 2.248145
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-11"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://www.coupes-auto-legende.fr/"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Destination Paris-Saclay"
+  },
+  "lastUpdate": "2026-07-07"
+}

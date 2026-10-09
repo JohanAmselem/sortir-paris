@@ -6,7 +6,7 @@ Source: Ticketmaster Discovery API v2 (official)
 Legal basis: official API (free key, 5000 calls/day, 5 req/s).
 Env: TICKETMASTER_API_KEY (optional — without it the source is skipped).
 
-Query: countryCode=FR, latlong=48.8566,2.3522, radius=30 km, locale=fr-fr, size=200,
+Query: countryCode=FR, latlong=48.8566,2.3522, radius=18 km, locale=fr-fr, size=200,
 sort=date,asc. Deep paging is limited to size*page < 1000, so the date range is split
 into windows (default 7 days) and each window is paginated (≤ 5 pages of 200); a window
 that still exceeds the limit is split in two.
@@ -27,7 +27,10 @@ from typing import Generator, List, Optional, Tuple
 
 from utils.event import make_event
 from utils.http import BudgetExceeded, PoliteClient
-from utils.normalize import IDF_DEPARTMENTS, UNKNOWN_PRICE, in_idf, price_from_numbers
+import re
+from collections import Counter
+
+from utils.normalize import IDF_DEPARTMENTS, SERVICE_DEPARTMENTS, UNKNOWN_PRICE, in_idf, price_from_numbers
 
 SOURCE = "ticketmaster"
 API_URL = "https://app.ticketmaster.com/discovery/v2/events.json"
@@ -37,7 +40,7 @@ DEEP_PAGING_LIMIT = 1000  # size * page must stay < 1000
 BASE_PARAMS = {
     "countryCode": "FR",
     "latlong": "48.8566,2.3522",
-    "radius": "30",
+    "radius": "18",  # Paris + petite couronne (Nanterre 11 km, Créteil 12 km, Orly 14 km)
     "unit": "km",
     "locale": "fr-fr",
     "size": str(PAGE_SIZE),
@@ -133,9 +136,31 @@ def _when(block: Optional[dict]):
     return local_date
 
 
+# Products that are not outings: parking, passes, upgrades, gift cards, hospitality…
+NOT_AN_EVENT = re.compile(
+    r"\b(parking|stationnement|pass\b|passeport|billet dat[ée]|carte cadeau|gift card|upgrade|"
+    r"surclassement|hospitalit|vip package|package vip|forfait|abonnement|souvenir|merch|"
+    r"visite libre|entr[ée]e (?:au parc|parc)|disneyland|parc ast[ée]rix)\b",
+    re.I,
+)
+
+STATS: Counter = Counter()
+
+
 def event_from_tm(e: dict) -> Optional[dict]:
     if not e.get("id") or not e.get("name"):
         return None
+    if NOT_AN_EVENT.search(e["name"]):
+        STATS["skip:not_an_event"] += 1
+        return None
+    venue0 = ((e.get("_embedded") or {}).get("venues") or [{}])[0]
+    zip0 = str(venue0.get("postalCode") or "")
+    if re.fullmatch(r"\d{5}", zip0) and zip0[:2] not in SERVICE_DEPARTMENTS:
+        STATS["skip:out_of_zone"] += 1
+        return None
+    cls0 = next((c for c in e.get("classifications") or [] if isinstance(c, dict)), {})
+    STATS[f"type:{(cls0.get('segment') or {}).get('name')}/{(cls0.get('genre') or {}).get('name')}"] += 1
+    STATS[f"venue:{venue0.get('name')}"] += 1
     category, skip = category_for(e.get("classifications"))
     if skip:
         return None
@@ -264,3 +289,9 @@ def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int =
                     break
                 page += 1
     print(f"  [{SOURCE}] {len(seen)} events from {requests} requests")
+    skipped = {k: v for k, v in STATS.items() if k.startswith("skip:")}
+    types = [(k[5:], v) for k, v in STATS.most_common() if k.startswith("type:")][:12]
+    venues = [(k[6:], v) for k, v in STATS.most_common() if k.startswith("venue:")][:12]
+    print(f"  [{SOURCE}] skipped {skipped}")
+    print(f"  [{SOURCE}] top types {types}")
+    print(f"  [{SOURCE}] top venues {venues}")

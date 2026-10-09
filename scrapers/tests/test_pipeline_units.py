@@ -76,8 +76,12 @@ class FakeCursor:
         self.db.log.append(s[:40])
         if s.startswith("SELECT slug, id FROM categories"):
             self._result = [("concerts", "cat-1")]
-        elif s.startswith("SELECT id FROM events WHERE source"):
-            self._result = [("ev-existing",)] if params[1] == "exists" else []
+        elif s.startswith("SELECT source_id, id FROM events WHERE source"):
+            self._result = [("exists", "ev-existing")]
+        elif s.startswith("SELECT slug FROM events"):
+            self._result = []
+        elif s.startswith("SELECT id, canonical_venue_id, lat, lng, name"):
+            self._result = []
         elif s.startswith("SELECT id, canonical_venue_id, lat FROM venues"):
             self._result = []
         elif s.startswith("INSERT INTO venues"):
@@ -137,6 +141,8 @@ def test_run_pipeline_isolates_failures(monkeypatch):
     conn = FakeConn()
     stats = run_pipeline(events, "test", conn=conn)
     assert stats["new"] == 1 and stats["updated"] == 1 and stats["errors"] == 1
+    # the batch failed on "Boom" → replayed row by row: "a" stored, "Boom" isolated
+    assert sum(1 for p in conn.inserted if p["source_id"] == "a") >= 1
     assert stats["skipped"] == 1 and stats["rejected"] == 1
     assert "simulated" in stats["error_list"][0]
     assert any(s.startswith("ROLLBACK TO SAVEPOINT") for s in conn.log)

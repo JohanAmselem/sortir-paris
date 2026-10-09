@@ -1,0 +1,61 @@
+{
+  "@id": "https://data.datatourisme.fr/19/c9df2160-972d-3c8e-9823-8756fad702ec",
+  "@type": [
+    "PlaceOfInterest",
+    "PointOfInterest",
+    "Accommodation",
+    "Hotel",
+    "HotelTrade",
+    "schema:Hotel",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Golden Tulip Washington Opéra"
+    ]
+  },
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Paris",
+          "schema:postalCode": "75001",
+          "schema:streetAddress": [
+            "50 rue de Richelieu"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France75101",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Paris"
+              ]
+            },
+            "insee": "75101",
+            "isPartOfDepartment": {
+              "@id": "kb:France75",
+              "insee": "75"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.86627,
+        "schema:longitude": 2.3372612
+      }
+    }
+  ]
+}

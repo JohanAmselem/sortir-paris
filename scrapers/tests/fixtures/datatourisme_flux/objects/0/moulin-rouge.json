@@ -1,0 +1,102 @@
+{
+  "@id": "https://data.datatourisme.fr/13/cb77dc71-3b33-3410-aca4-23abed93ebf7",
+  "@type": [
+    "schema:Event",
+    "EntertainmentAndEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Dîner-revue Moulin Rouge"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Restaurant traditionnel"
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Restaurant traditionnel"
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Paris",
+          "schema:postalCode": "75018",
+          "schema:streetAddress": [
+            "82 boulevard de Clichy"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France75118",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Paris"
+              ]
+            },
+            "insee": "75118",
+            "isPartOfDepartment": {
+              "@id": "kb:France75",
+              "insee": "75"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.88413,
+        "schema:longitude": 2.332464
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "http://www.moulin-rouge.com/"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Choose Paris Region"
+  },
+  "lastUpdate": "2018-06-29"
+}

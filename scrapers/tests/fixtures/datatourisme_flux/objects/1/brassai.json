@@ -1,0 +1,106 @@
+{
+  "@id": "https://data.datatourisme.fr/13/6aa79f23-08d3-3734-929e-bed9cce5152c",
+  "@type": [
+    "schema:Event",
+    "CulturalEvent",
+    "EntertainmentAndEvent",
+    "Exhibition",
+    "schema:ExhibitionEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Brassaï – L’œil de Paris"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Le Hangar Y présente une rétrospective exceptionnelle consacrée à Brassaï. Cent œuvres rarement montrées invitent à redécouvrir le Paris des années 1930 à travers le regard de l’un des maîtres de la photographie moderne."
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Le Hangar Y présente une rétrospective exceptionnelle consacrée à Brassaï. Cent œuvres rarement montrées invitent à redécouvrir le Paris des années 1930 à travers le regard de l’un des maîtres de la photographie moderne."
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Meudon",
+          "schema:postalCode": "92190",
+          "schema:streetAddress": [
+            "9 avenue de Trivaux",
+            "Hangar Y"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France92048",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Meudon"
+              ]
+            },
+            "insee": "92048",
+            "isPartOfDepartment": {
+              "@id": "kb:France92",
+              "insee": "92"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.798874,
+        "schema:longitude": 2.233179
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-17",
+      "endDate": "2026-02-21"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://hangar-y.com/"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Choose Paris Region"
+  },
+  "lastUpdate": "2026-10-06"
+}

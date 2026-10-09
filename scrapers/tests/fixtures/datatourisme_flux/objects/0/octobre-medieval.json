@@ -1,0 +1,142 @@
+{
+  "@id": "https://data.datatourisme.fr/13/895f8f4c-7f76-306a-82d9-7c6d509b9fb4",
+  "@type": [
+    "schema:Event",
+    "Conference",
+    "CulturalEvent",
+    "EntertainmentAndEvent",
+    "Concert",
+    "schema:MusicEvent",
+    "PointOfInterest",
+    "urn:resource"
+  ],
+  "rdfs:label": {
+    "fr": [
+      "Événement - Octobre médiéval 2026"
+    ]
+  },
+  "rdfs:comment": {
+    "fr": [
+      "Octobre Médiéval revient à la  basilique cathédrale Saint-Denis ! Au cœur de ce chef-d’œuvre gothique, plongez dans l’univers du Moyen Âge grâce à une série de concerts de musiques médiévales et à des conférences captivantes !"
+    ]
+  },
+  "hasDescription": [
+    {
+      "@type": [
+        "Description"
+      ],
+      "dc:description": {
+        "fr": [
+          "Octobre Médiéval revient à la  basilique cathédrale Saint-Denis ! Au cœur de ce chef-d’œuvre gothique, plongez dans l’univers du Moyen Âge grâce à une série de concerts de musiques médiévales et à des conférences captivantes !"
+        ]
+      }
+    }
+  ],
+  "isLocatedAt": [
+    {
+      "@type": [
+        "schema:Place",
+        "Place"
+      ],
+      "schema:address": [
+        {
+          "@type": [
+            "schema:PostalAddress",
+            "PostalAddress"
+          ],
+          "schema:addressLocality": "Saint-Denis",
+          "schema:postalCode": "93200",
+          "schema:streetAddress": [
+            "Basilique cathédrale de Saint-Denis",
+            "1 rue de la Légion d'honneur"
+          ],
+          "hasAddressCity": {
+            "@id": "kb:France93066",
+            "@type": [
+              "City"
+            ],
+            "rdfs:label": {
+              "fr": [
+                "Saint-Denis"
+              ]
+            },
+            "insee": "93066",
+            "isPartOfDepartment": {
+              "@id": "kb:France93",
+              "insee": "93"
+            }
+          }
+        }
+      ],
+      "schema:geo": {
+        "@type": [
+          "schema:GeoCoordinates"
+        ],
+        "schema:latitude": 48.935499,
+        "schema:longitude": 2.359854
+      }
+    }
+  ],
+  "takesPlaceAt": [
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-16",
+      "endDate": "2026-10-16"
+    },
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-10",
+      "endDate": "2026-10-10"
+    },
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-13",
+      "endDate": "2026-10-13"
+    },
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-03",
+      "endDate": "2026-10-03"
+    },
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-24"
+    },
+    {
+      "@type": [
+        "Period"
+      ],
+      "startDate": "2026-10-06",
+      "endDate": "2026-10-06"
+    }
+  ],
+  "hasContact": [
+    {
+      "@type": [
+        "foaf:Agent",
+        "Agent"
+      ],
+      "foaf:homepage": [
+        "https://www.saint-denis-basilique.fr/agenda/octobre-medieval-2026"
+      ]
+    }
+  ],
+  "hasBeenCreatedBy": {
+    "@type": [
+      "foaf:Agent"
+    ],
+    "schema:legalName": "Agence POP – Plaine commune vous Ouvre ses Portes"
+  },
+  "lastUpdate": "2026-09-26"
+}

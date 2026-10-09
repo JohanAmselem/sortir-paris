@@ -51,6 +51,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENAGENDA_API_KEY: ${{ secrets.OPENAGENDA_API_KEY }}
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          DATATOURISME_API_KEY: ${{ secrets.DATATOURISME_API_KEY }}
+          DATATOURISME_FLUX_URL: ${{ secrets.DATATOURISME_FLUX_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: python cron.py --group ${{ matrix.group }}
 
@@ -73,6 +75,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENAGENDA_API_KEY: ${{ secrets.OPENAGENDA_API_KEY }}
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          DATATOURISME_API_KEY: ${{ secrets.DATATOURISME_API_KEY }}
+          DATATOURISME_FLUX_URL: ${{ secrets.DATATOURISME_FLUX_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           SOURCE: ${{ inputs.source }}
         run: python cron.py --source "$SOURCE"

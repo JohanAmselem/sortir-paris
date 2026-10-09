@@ -1,0 +1,38 @@
+[
+  {
+    "label": "Événement - Octobre médiéval 2026",
+    "file": "objects/0/octobre-medieval.json"
+  },
+  {
+    "label": "Brassaï – L’œil de Paris",
+    "file": "objects/1/brassai.json"
+  },
+  {
+    "label": "Gianni Versace Retrospective",
+    "file": "objects/2/versace.json"
+  },
+  {
+    "label": "Les Rencontres du Ciel et de l’Espace",
+    "file": "objects/0/rencontres-ciel.json"
+  },
+  {
+    "label": "Rugby - France / Afrique du Sud",
+    "file": "objects/1/rugby.json"
+  },
+  {
+    "label": "Marché de Cachan",
+    "file": "objects/2/marche-cachan.json"
+  },
+  {
+    "label": "Dîner-revue Moulin Rouge",
+    "file": "objects/0/moulin-rouge.json"
+  },
+  {
+    "label": "Les Coupes Auto Légende",
+    "file": "objects/1/coupes-linas.json"
+  },
+  {
+    "label": "Golden Tulip Washington Opéra",
+    "file": "objects/2/hotel.json"
+  }
+]

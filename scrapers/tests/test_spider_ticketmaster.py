@@ -52,7 +52,7 @@ def test_params_and_skip(monkeypatch, capsys):
     p = tm.build_params("KEY", datetime(2026, 10, 7, 8, 0, tzinfo=timezone.utc),
                         datetime(2026, 10, 14, 8, 0, tzinfo=timezone.utc), 2)
     assert p["startDateTime"] == "2026-10-07T08:00:00Z" and p["page"] == "2"
-    assert p["countryCode"] == "FR" and p["radius"] == "30" and p["size"] == "200"
+    assert p["countryCode"] == "FR" and p["radius"] == "18" and p["size"] == "200"
     assert int(p["size"]) * (tm.DEEP_PAGING_LIMIT // tm.PAGE_SIZE - 1) < 1000
     monkeypatch.delenv("TICKETMASTER_API_KEY", raising=False)
     assert list(tm.fetch_events()) == []

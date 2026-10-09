@@ -209,3 +209,9 @@ def test_api_filter_targets_zone_and_future():
     assert "isPartOfDepartment.insee[in]=75,92,93,94" in p["filters"]
     assert "takesPlaceAt.endDate[gte]=2026-10-09" in p["filters"]
     assert int(p["page_size"]) <= 100
+
+
+def test_texts_api_v1_language_keys():
+    from spiders.datatourisme import _text
+    assert _text({"@fr": "Concert de Noël", "@en": "Christmas concert"}) == "Concert de Noël"
+    assert _text([{"@en": "Only English"}]) == "Only English"

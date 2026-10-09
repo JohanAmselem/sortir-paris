@@ -153,8 +153,9 @@ def _texts(v, lang: str = "fr") -> List[str]:
                 return  # a reference, not a literal
             else:
                 for k, y in x.items():
-                    if re.fullmatch(r"[a-z]{2}(-[A-Za-z]{2})?|@none", k):
-                        walk(y, k[:2] if k != "@none" else None)
+                    # "fr" (flux) or "@fr" (API v1) language keys
+                    if re.fullmatch(r"@?[a-z]{2}(-[A-Za-z]{2})?|@none", k):
+                        walk(y, k.lstrip("@")[:2] if k != "@none" else None)
 
     walk(v)
     return preferred + other

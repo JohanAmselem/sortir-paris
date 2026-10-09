@@ -35,6 +35,8 @@ interface MapState {
   when: string
   cat: string | null
   free: boolean
+  /** Hide cinemas: hundreds of séances otherwise drown the map. */
+  noCinema?: boolean
 }
 
 export interface EventMapProps {
@@ -46,6 +48,7 @@ function stateParams(s: MapState) {
   const p = new URLSearchParams({ when: s.when })
   if (s.cat) p.set('cat', s.cat)
   if (s.free) p.set('free', '1')
+  if (s.noCinema && s.cat !== 'cinema') p.set('xcat', 'cinema')
   return p
 }
 
@@ -101,7 +104,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
         cluster: true,
-        clusterRadius: 44,
+        clusterRadius: 60,
         clusterMaxZoom: 15,
         clusterProperties: { total: ['+', ['get', 'n']] },
       })
@@ -341,6 +344,16 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
           >
             Gratuit
           </button>
+          {state.cat !== 'cinema' && (
+            <button
+              type="button"
+              aria-pressed={Boolean(state.noCinema)}
+              onClick={() => setState((s) => ({ ...s, noCinema: !s.noCinema }))}
+              className={cn('h-10 whitespace-nowrap rounded-full px-4 text-[14px] font-semibold shadow-md', state.noCinema ? 'bg-ink text-paper' : 'bg-surface text-ink')}
+            >
+              Sans cinéma
+            </button>
+          )}
           <label className="relative">
             <span className="sr-only">Catégorie</span>
             <select

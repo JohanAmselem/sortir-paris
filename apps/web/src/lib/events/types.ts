@@ -22,9 +22,16 @@ export interface CardEvent {
     name: string
     slug: string
     arrondissement: string | null
+    /** Town, shown for venues outside Paris (Montreuil, Saint-Denis…). */
+    city?: string | null
     lat: number | null
     lng: number | null
   } | null
+  /**
+   * Set when the card stands for several séances of the same film (cinema
+   * listings show one card per film, linking to /films/[slug]).
+   */
+  film?: { slug: string; seances: number; salles: number; nextTimes: string[] } | null
   /** Distance in km when the query was geolocated. */
   distanceKm?: number | null
   /** Why this event is shown (recommendations, AI search). */
@@ -43,6 +50,14 @@ export interface EventQuery {
   /** Max price in euros (free events included). */
   maxPrice?: number | null
   intents?: string[]
+  /** Narrow topics from the search box (see TOPIC_RULES), e.g. 'humour'. */
+  topics?: string[]
+  /** Categories left out (e.g. cinema on "Ce soir", shown in its own block). */
+  excludeCategories?: string[]
+  /** Leave out events with this exact title (case-insensitive): "Tu aimeras aussi". */
+  excludeTitle?: string | null
+  /** One card per film for cinema séances (default true). */
+  groupFilms?: boolean
   near?: { lat: number; lng: number; radiusKm?: number } | null
   q?: string | null
   venueSlug?: string | null

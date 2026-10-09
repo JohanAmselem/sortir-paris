@@ -84,11 +84,31 @@ export function EventRail({
   )
 }
 
-export function EventGrid({ events, now, className }: { events: CardEvent[]; now: Date; className?: string }) {
+/** Responsive grid. `dense`: compact rows on mobile (long listings), posters from `sm`. */
+export function EventGrid({
+  events,
+  now,
+  className,
+  dense = false,
+  itemClassName,
+}: {
+  events: CardEvent[]
+  now: Date
+  className?: string
+  dense?: boolean
+  /** Per-item classes, e.g. to hide the first items where they are shown as features. */
+  itemClassName?: (index: number) => string | undefined
+}) {
   return (
-    <div className={cn('grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', className)}>
+    <div
+      className={cn(
+        'grid grid-cols-1 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-8 lg:grid-cols-3 xl:grid-cols-4',
+        dense ? 'divide-y divide-border sm:divide-y-0' : 'gap-x-5 gap-y-8',
+        className
+      )}
+    >
       {events.map((e, i) => (
-        <EventCard key={e.id} event={e} now={now} priority={i < 2} />
+        <EventCard key={e.id} event={e} now={now} priority={i < 2} variant={dense ? 'compact' : 'poster'} className={itemClassName?.(i)} />
       ))}
     </div>
   )

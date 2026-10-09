@@ -7,20 +7,24 @@ export interface PriceInfo {
   isFree?: boolean | null
 }
 
+/** Rounded to the euro: "19,99 €" reads as noise on a card. */
 function euros(cents: number): string {
-  const v = cents / 100
-  return Number.isInteger(v) ? `${v} €` : `${v.toFixed(2).replace('.', ',')} €`
+  return `${Math.max(1, Math.round(cents / 100))} €`
 }
+
+/** Below this, a "paid" price is almost always a booking fee or a parsing error. */
+const SUSPICIOUS_PRICE_CENTS = 300
 
 export type PriceTone = 'free' | 'paid' | 'unknown'
 
-/** "Gratuit", "12 €", "Dès 12 €", "12 – 35 €", "Prix non communiqué". */
+/** "Gratuit", "12 €", "Dès 12 €", "12 – 35 €", "Prix sur le site", "Prix non communiqué". */
 export function formatPrice(p: PriceInfo): { label: string; tone: PriceTone } {
   const status = p.priceStatus ?? (p.isFree ? 'free' : p.priceMax > 0 || p.priceMin > 0 ? 'paid' : 'unknown')
   if (status === 'free') return { label: 'Gratuit', tone: 'free' }
   const min = Math.min(p.priceMin, p.priceMax || p.priceMin)
   const max = Math.max(p.priceMin, p.priceMax)
   if (status === 'unknown' || max <= 0) return { label: 'Prix non communiqué', tone: 'unknown' }
+  if ((min > 0 && min < SUSPICIOUS_PRICE_CENTS) || max < SUSPICIOUS_PRICE_CENTS) return { label: 'Prix sur le site', tone: 'unknown' }
   if (min <= 0 || min === max) return { label: euros(max), tone: 'paid' }
   if (max > min * 3) return { label: `Dès ${euros(min)}`, tone: 'paid' }
   return { label: `${euros(min).replace(' €', '')} – ${euros(max)}`, tone: 'paid' }
@@ -33,6 +37,16 @@ export function formatPriceShort(p: PriceInfo): string {
   if (tone === 'free') return label
   if (label.includes('–')) return `Dès ${label.split(' –')[0]} €`
   return label
+}
+
+/**
+ * Some sources keep a cancelled event published and only say it in the text
+ * ("ANNULÉ – …", "Annulé en raison des intempéries"). Same rule as the SQL
+ * filter in lib/events/query.ts (cancelledTextSql).
+ */
+export function looksCancelled(title: string, shortDesc?: string | null): boolean {
+  const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return fold(title).includes('annule') || fold(shortDesc ?? '').trimStart().startsWith('annule')
 }
 
 export function formatDistance(km: number | null | undefined): string | null {

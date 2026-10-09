@@ -41,6 +41,8 @@ export const cardColumns = {
   venueName: venues.name,
   venueSlug: venues.slug,
   venueArr: venues.arrondissement,
+  venueCity: venues.city,
+  venueZip: venues.zipCode,
   venueLat: venues.lat,
   venueLng: venues.lng,
 }

@@ -1,11 +1,9 @@
 import path from 'path'
 import type { NextConfig } from 'next'
 
-/**
- * Only well-known image CDNs go through the Vercel optimiser (quota + no open
- * proxy). Other remote images are rendered unoptimized (see EventImage).
- */
-const IMAGE_HOSTS = ['cdn.paris.fr', '**.paris.fr', 'img.openagenda.com', 'cdn.openagenda.com', 'img.evbuc.com', '**.acsta.net', 'image.tmdb.org']
+// Only well-known image hosts go through the Vercel optimiser (quota + no open
+// proxy). Other remote images are rendered unoptimized (see EventImage).
+import { IMAGE_HOSTS } from './src/lib/image-hosts'
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },

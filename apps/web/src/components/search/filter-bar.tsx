@@ -92,7 +92,14 @@ export function FilterBar({ query, basePath, locked = [], total }: FilterBarProp
   }
 
   const nearActive = Boolean(query.near)
-  const active = countFilters({ ...query, when: locked.includes('when') ? null : query.when })
+  // Filters fixed by the page (the "Gratuit" of /gratuit) are not the person's: not counted.
+  const active = countFilters({
+    ...query,
+    when: locked.includes('when') ? null : query.when,
+    categories: locked.includes('categories') ? [] : query.categories,
+    arrondissements: locked.includes('arrondissements') ? [] : query.arrondissements,
+    free: locked.includes('free') ? false : query.free,
+  })
 
   return (
     <div className={cn('transition-opacity', pending && 'opacity-60')}>

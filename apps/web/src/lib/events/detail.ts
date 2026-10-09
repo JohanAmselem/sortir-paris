@@ -1,9 +1,9 @@
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues, categories } from '@sortir/db'
-import { eq } from 'drizzle-orm'
-import { withTimeout } from './query'
+import { db, events, venues, categories, withStatementTimeout } from '@sortir/db'
+import { and, eq, sql } from 'drizzle-orm'
+import { STATEMENT_TIMEOUT_MS, withTimeout } from './query'
 
 export interface EventDetail {
   id: string
@@ -102,6 +102,31 @@ async function load(slug: string): Promise<EventDetail | null> {
 }
 
 const cached = unstable_cache(load, ['event-detail-v1'], { revalidate: 600, tags: ['events'] })
+
+/**
+ * Exhibitions published as one row per opening day (9h–19h): the end of the run
+ * is the last upcoming day with the same title at the same venue. One indexed
+ * lookup (idx_events_venue_id), only for the event page.
+ */
+export const getRunEnd = unstable_cache(
+  async (venueId: string, title: string): Promise<string | null> => {
+    const [row] = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select({ end: sql<Date | string | null>`max(coalesce(${events.endDate}, ${events.startDate}))` })
+        .from(events)
+        .where(
+          and(
+            eq(events.venueId, venueId),
+            eq(events.status, 'active'),
+            sql`lower(${events.title}) = ${title.toLowerCase()}`
+          )
+        )
+    )
+    return iso(row?.end ?? null)
+  },
+  ['event-run-end-v1'],
+  { revalidate: 3600, tags: ['events'] }
+)
 
 /** Deduplicated within a request (metadata + page) and cached 10 min across requests. */
 export const getEventBySlug = cache((slug: string) => withTimeout(cached(slug), 8000, 'getEventBySlug'))

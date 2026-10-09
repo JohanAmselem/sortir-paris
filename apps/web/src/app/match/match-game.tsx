@@ -210,7 +210,7 @@ export function MatchGame() {
                 !leaving && dragStart.current == null && 'transition-transform duration-200'
               )}
             >
-              <div className="relative aspect-[4/3] bg-paper-deep">
+              <div className="relative aspect-[16/10] bg-paper-deep sm:aspect-[4/3]">
                 <EventImage src={current.imageUrl} alt="" sizes="384px" categorySlug={current.category?.slug} priority />
                 {dragX > 30 && (
                   <span className="absolute left-4 top-4 rotate-[-8deg] rounded-md border-2 border-free bg-surface px-2 py-1 text-[15px] font-bold uppercase text-free">
@@ -246,7 +246,8 @@ export function MatchGame() {
               </div>
             </article>
 
-            <div className="mt-5 flex items-center justify-center gap-6">
+            {/* Kept above the bottom navigation (64 px + safe area) on mobile. */}
+            <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] z-20 mt-5 flex items-center justify-center gap-6 md:static">
               <button
                 type="button"
                 onClick={() => swipe('left')}

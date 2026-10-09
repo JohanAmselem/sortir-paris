@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { EventQuery } from '@/lib/events/types'
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound, permanentRedirect } from 'next/navigation'
@@ -12,10 +13,10 @@ import { AttendButton } from '@/components/events/attend-button'
 import { EventActionBar } from '@/components/events/sticky-booking-cta'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
-import { getEventBySlug, type EventDetail } from '@/lib/events/detail'
+import { getEventBySlug, getRunEnd, type EventDetail } from '@/lib/events/detail'
 import { bucketNow, diversify, safeQueryEvents } from '@/lib/events/query'
-import { effectiveEnd, formatFullWhen, isLongRun, urgencyBadge } from '@/lib/paris-time'
-import { formatPrice, safeUrl, sourceLabel } from '@/lib/format'
+import { effectiveEnd, formatFullWhen, formatShortDay, formatTime, isLongRun, urgencyBadge } from '@/lib/paris-time'
+import { formatPrice, looksCancelled, safeUrl, sourceLabel } from '@/lib/format'
 import { safeJsonLd } from '@/lib/json-ld'
 import { absoluteUrl } from '@/lib/site'
 
@@ -138,22 +139,53 @@ export default async function EventPage({ params }: Props) {
 
   const now = bucketNow()
   const past = effectiveEnd(event) < now
-  const cancelled = event.status === 'cancelled'
+  // Some sources keep a cancelled event "active" and only say so in the text.
+  const cancelled = event.status === 'cancelled' || looksCancelled(event.title, event.shortDesc)
   const when = formatFullWhen(event, now)
   const price = formatPrice(event)
   const action = cta(event)
   const badge = past ? null : urgencyBadge(event, now)
 
-  const [similar, sameVenue] = await Promise.all([
-    event.category
-      ? safeQueryEvents({ categories: [event.category.slug], when: 'month', excludeIds: [event.id], withImage: true, limit: 12 })
-      : Promise.resolve({ events: [], total: 0, hasMore: false }),
+  // "Tu aimeras aussi": same category, near the venue, around the same time,
+  // never another séance / date of the same title.
+  const start = new Date(event.startDate)
+  const soon = start.getTime() - now.getTime() < 7 * 86400_000
+  const similarBase: EventQuery = {
+    categories: event.category ? [event.category.slug] : [],
+    when: soon ? 'week' : 'month',
+    excludeIds: [event.id],
+    excludeTitle: event.title,
+    withImage: true,
+    sort: 'relevance',
+    limit: 12,
+  }
+  const venueGeo = event.venue?.lat != null && event.venue?.lng != null ? { lat: event.venue.lat, lng: event.venue.lng, radiusKm: 3 } : null
+  const runEndPromise =
+    event.category?.slug === 'expos' && event.venue && !isLongRun(event) && !past
+      ? getRunEnd(event.venue.id, event.title).catch(() => null)
+      : Promise.resolve(null)
+  const [nearby, sameVenue, runEnd] = await Promise.all([
+    event.category && venueGeo ? safeQueryEvents({ ...similarBase, near: venueGeo }) : Promise.resolve({ events: [], total: 0, hasMore: false }),
     event.venue
-      ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], sort: 'soon', limit: 6 })
+      ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], excludeTitle: event.title, sort: 'soon', limit: 6 })
       : Promise.resolve({ events: [], total: 0, hasMore: false }),
+    runEndPromise,
   ])
+  // Not enough nearby: the same category anywhere in Paris.
+  const similar =
+    nearby.events.length >= 4 || !event.category ? nearby : await safeQueryEvents({ ...similarBase, excludeIds: [event.id, ...nearby.events.map((e) => e.id)] })
   const sameVenueIds = new Set(sameVenue.events.map((e) => e.id))
-  const similarEvents = diversify(similar.events.filter((e) => !sameVenueIds.has(e.id)), 8)
+  const similarPool = similar === nearby ? nearby.events : [...nearby.events, ...similar.events]
+  const similarEvents = diversify(similarPool.filter((e) => !sameVenueIds.has(e.id)), 8)
+  // Exhibition published day by day: show the run ("Jusqu'au 25 janv.").
+  const runEndDate = runEnd ? new Date(runEnd) : null
+  const whenShown =
+    runEndDate && runEndDate.getTime() - start.getTime() > 36 * 3600_000
+      ? {
+          primary: `Jusqu’au ${formatShortDay(runEndDate)}`,
+          secondary: event.timeKnown && event.endDate ? `Ce jour-là : ${formatTime(start)} – ${formatTime(new Date(event.endDate))}` : when.secondary,
+        }
+      : when
 
   const crumbs = [
     { name: 'Accueil', href: '/' },
@@ -216,14 +248,19 @@ export default async function EventPage({ params }: Props) {
                 {event.category.name}
               </Link>
             )}
-            <h1 className="font-display mt-1 text-[2.6rem] text-ink sm:text-[3.2rem]">{event.title}</h1>
+            {cancelled && (
+              <p className="mt-2 inline-flex rounded bg-neon px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-paper">Annulé</p>
+            )}
+            <h1 className={'font-display mt-1 text-[2.6rem] sm:text-[3.2rem] ' + (cancelled ? 'text-text-secondary line-through decoration-2' : 'text-ink')}>
+              {event.title}
+            </h1>
 
             <dl className="mt-5 divide-y divide-border border-y border-border">
               <div className="flex gap-3 py-3">
                 <dt className="w-16 shrink-0 text-[13px] font-semibold uppercase tracking-wide text-text-muted">Quand</dt>
                 <dd>
-                  <p className="text-[16px] font-semibold text-ink">{when.primary}</p>
-                  {when.secondary && <p className="text-[15px] text-text-secondary">{when.secondary}</p>}
+                  <p className="text-[16px] font-semibold text-ink">{whenShown.primary}</p>
+                  {whenShown.secondary && <p className="text-[15px] text-text-secondary">{whenShown.secondary}</p>}
                 </dd>
               </div>
               {event.venue && (
@@ -244,12 +281,16 @@ export default async function EventPage({ params }: Props) {
               <div className="flex gap-3 py-3">
                 <dt className="w-16 shrink-0 text-[13px] font-semibold uppercase tracking-wide text-text-muted">Prix</dt>
                 <dd className={price.tone === 'free' ? 'text-[16px] font-semibold text-free' : price.tone === 'unknown' ? 'text-[15px] text-text-secondary' : 'text-[16px] font-semibold text-ink'}>
-                  {price.tone === 'unknown' ? 'Non communiqué, à vérifier auprès de l’organisateur' : price.label}
+                  {price.tone === 'unknown'
+                    ? price.label === 'Prix sur le site'
+                      ? 'Prix sur le site de l’organisateur'
+                      : 'Non communiqué, à vérifier auprès de l’organisateur'
+                    : price.label}
                 </dd>
               </div>
             </dl>
 
-            {!past && (
+            {!past && !cancelled && (
               <div className="mt-5 hidden flex-wrap items-center gap-2 md:flex">
                 {action.href && (
                   <OutboundLink
@@ -268,7 +309,7 @@ export default async function EventPage({ params }: Props) {
               </div>
             )}
 
-            {!past && (
+            {!past && !cancelled && (
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
                 <AttendButton eventId={event.id} />
                 <a
@@ -399,7 +440,7 @@ export default async function EventPage({ params }: Props) {
         )}
       </article>
 
-      {!past && <EventActionBar eventId={event.id} title={event.title} href={action.href} label={action.label} source={event.source} />}
+      {!past && !cancelled && <EventActionBar eventId={event.id} title={event.title} href={action.href} label={action.label} source={event.source} />}
     </>
   )
 }

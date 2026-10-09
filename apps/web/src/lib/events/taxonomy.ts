@@ -104,3 +104,58 @@ export const INTENT_RULES: Record<string, { pattern: string; categories?: string
     excludePattern: 'dj|clubbing|techno',
   },
 }
+
+/**
+ * Topics: narrower than a category, not shown as filter chips. Reached from the
+ * search box ("stand up" → humour). Same rule format as INTENT_RULES.
+ */
+export const TOPIC_RULES: Record<string, { label: string; pattern: string; excludePattern?: string }> = {
+  humour: {
+    label: 'Humour',
+    pattern: 'stand.?up|humour|humoriste|comedy|comique|one.?man|one.?woman|seul.?en.?scene|impro|sketch',
+    excludePattern: 'enfant|jeune public',
+  },
+}
+
+/**
+ * Institutional / administrative / professional topics: real but not "outings".
+ * Demoted in the default ranking (never hidden). Substrings of the folded title
+ * (lowercase, no accents), matched with LIKE: much cheaper than a regex per row.
+ */
+export const INSTITUTIONAL_TERMS = [
+  'mairie',
+  'forum senior',
+  'forum des senior',
+  'permanence',
+  'metiers de la ville',
+  'conversation en ',
+  'conversation anglaise',
+  'conversation espagnol',
+  'cafe linguistique',
+  'cafe des langues',
+  'reunion publique',
+  "reunion d'information",
+  'job dating',
+  'jobdating',
+  'formation',
+  'recrutement',
+  'conseil de quartier',
+  'conseil municipal',
+  "conseil d'arrondissement",
+  'inscription',
+  'accompagnement',
+  'atelier numerique',
+  'aide aux devoirs',
+  'soutien scolaire',
+  'demarches',
+  'assemblee generale',
+  'webinaire',
+  'networking',
+  "salon de l'emploi",
+]
+
+/** Categories that are real cultural outings (small boost in the default ranking). */
+export const OUTING_CATEGORIES = ['concerts', 'expos', 'theatre', 'spectacles', 'danse', 'festivals']
+
+/** Long runs of these categories (> 60 days) are recurring classes, not "ce soir" picks. */
+export const RECURRING_CLASS_CATEGORIES = ['ateliers', 'conferences', 'visites']

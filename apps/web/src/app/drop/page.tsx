@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { EventCard } from '@/components/events/event-card'
 import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
 import { bucketNow } from '@/lib/events/query'
-import { formatLongDay, parisDate } from '@/lib/paris-time'
+import { formatShortDay, parisDate } from '@/lib/paris-time'
 import { ARCHETYPES } from '@/lib/taste-quiz-data'
 import { getSessionUser } from '@/app/club/_lib/api'
 import { getAnonymousDrop, getMemberDrop, type WeeklyDrop } from '@/app/club/_lib/drop'
@@ -20,9 +20,10 @@ export const metadata: Metadata = {
   alternates: { canonical: '/drop' },
 }
 
-function weekLabel(weekStart: string, now: Date): string {
+/** The drop is weekly (Monday → Sunday): "5 oct.", the Monday it was made. */
+function weekLabel(weekStart: string): string {
   const [y, m, d] = weekStart.split('-').map(Number)
-  return formatLongDay(parisDate(y, m, d, 12), now)
+  return formatShortDay(parisDate(y, m, d, 12))
 }
 
 export default async function DropPage() {
@@ -46,7 +47,7 @@ export default async function DropPage() {
           {user && drop?.personalized ? 'Tes 5 sorties de la semaine' : '5 sorties pour ta semaine'}
         </h1>
         <p className="mt-3 text-[16px] text-text-secondary">
-          {drop ? `Semaine du ${weekLabel(drop.weekStart, now)}. ` : ''}
+          {drop ? `Drop de la semaine du ${weekLabel(drop.weekStart)}. ` : ''}
           {user
             ? archetype
               ? `Choisies pour ton profil ${archetype.name}, tes swipes et tes sorties gardées. Elles ne bougent pas de la semaine.`

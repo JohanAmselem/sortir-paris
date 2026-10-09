@@ -126,6 +126,13 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/* No horizontal page scroll on phones, whatever a component does (clip keeps sticky working). */
+html, body { overflow-x: clip; }
+
+/* Our search fields have their own clear button: hide the browser's one. */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 

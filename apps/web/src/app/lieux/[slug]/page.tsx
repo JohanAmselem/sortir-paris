@@ -117,7 +117,7 @@ export default async function VenuePage({ params }: Props) {
         </EmptyState>
       ) : (
         <>
-          <EventGrid events={page.events} now={now} className="mt-5" />
+          <EventGrid events={page.events} now={now} className="mt-5" dense />
           <LoadMore
             params={new URLSearchParams({ venue: slug, sort: 'soon' }).toString()}
             initialCount={page.events.length}

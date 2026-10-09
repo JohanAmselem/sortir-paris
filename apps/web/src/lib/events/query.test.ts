@@ -11,6 +11,8 @@ vi.mock('@sortir/db', async () => {
   const ca = await import('../../../../../packages/db/src/schema/categories')
   const { drizzle } = await import('drizzle-orm/pg-proxy')
   const db = drizzle(async (q: string) => {
+    // Signature venue ids (cached list, see getSignatureVenueIds).
+    if (/from "venues" where translate/.test(q)) return { rows: [['00000000-0000-0000-0000-000000000001'], ['00000000-0000-0000-0000-000000000002']] }
     logged.push(q)
     return { rows: nextRows.shift() ?? [] }
   })
@@ -79,12 +81,13 @@ describe('toCard', () => {
 })
 
 describe('lot 4A SQL', () => {
-  it('boosts signature venues with one uncorrelated subquery and can filter on them', async () => {
+  it('boosts signature venues with a plain id list (no regex per listing) and can filter on them', async () => {
     await queryEvents({ when: 'week', limit: 5, q: 'signature-a' })
-    expect(logged[0]).toMatch(/case when "events"\."venue_id" in \(select v\.id from venues v where translate\(lower\(v\.name\)/)
+    expect(logged[0]).toMatch(/case when "events"\."venue_id" in \(\$\d+, \$\d+\) then 6 else 0 end/)
+    expect(logged[0]).not.toContain('from "venues" where translate')
     logged.length = 0
-    await queryEvents({ when: 'week', limit: 5, signatureOnly: true, q: 'signature-b' })
-    expect(logged[0].match(/select v\.id from venues v where translate/g)?.length).toBeGreaterThanOrEqual(2)
+    await queryEvents({ when: 'week', limit: 5, signatureOnly: true, sort: 'soon', q: 'signature-b' })
+    expect(logged[0]).toMatch(/and "events"\."venue_id" in \(\$\d+, \$\d+\)/)
   })
 
   it('sorts by distance, then start time', async () => {

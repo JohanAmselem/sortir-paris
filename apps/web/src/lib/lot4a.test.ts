@@ -117,6 +117,15 @@ describe('lieux phares', () => {
     'Théâtre des Bouffes du Nord',
     'Cartoucherie - Théâtre du Soleil',
     'MC93',
+    'Auditorium Michel Laclotte Musée du Louvre',
+    'Musée du Louvre, auditorium Michel Laclotte',
+    'Parc de la Villette - Grande Halle',
+    'Opéra de Paris - Palais Garnier',
+    'Théâtre National de l’Opéra Comique',
+    'LE POINT VIRGULE',
+    'Le Sunset/Sunside',
+    'Zenith de Paris La Villette',
+    'Le CENTQUATRE-PARIS (104)',
   ]
   const no = [
     'Bar Le Sunset Rooftop',
@@ -128,6 +137,12 @@ describe('lieux phares', () => {
     'Grand Palais des Glaces',
     'Le Petit Bain',
     'Point Éphémère',
+    // Seen in the venues table (9 Oct 2026): meeting points and other venues.
+    'Metro Palais Royal - Musée du Louvre',
+    'Isleta central de la plaza Opéra Garnier, frente al Café de la Paix',
+    'Bateau Paris Canal / Embarquement Parc De la Villette',
+    'La Ferme du Parc de la Villette',
+    'Le Grand Point-Virgule',
   ]
   it.each(yes)('matches %s', (name) => expect(signatureVenueOf(name)).not.toBeNull())
   it.each(no)('does not match %s', (name) => expect(signatureVenueOf(name)).toBeNull())

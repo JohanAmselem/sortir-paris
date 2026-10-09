@@ -22,7 +22,7 @@ export const SIGNATURE_VENUES: SignatureVenue[] = [
   // Musique classique, opéra, danse
   { name: 'Philharmonie de Paris', pattern: 'philharmonie de paris|^philharmonie|cite de la musique' },
   { name: 'Théâtre du Châtelet', pattern: 'theatre du chatelet|^(le )?chatelet$' },
-  { name: 'Opéra Garnier', pattern: 'palais garnier|opera garnier' },
+  { name: 'Opéra Garnier', pattern: 'palais garnier|^(l.)?opera garnier' },
   { name: 'Opéra Bastille', pattern: 'opera bastille|opera national de paris|^opera de paris' },
   { name: 'Opéra-Comique', pattern: 'opera.comique' },
   { name: 'Théâtre des Champs-Élysées', pattern: 'theatre des champs.elysees' },
@@ -39,7 +39,7 @@ export const SIGNATURE_VENUES: SignatureVenue[] = [
   { name: 'Théâtre des Bouffes du Nord', pattern: 'bouffes du nord' },
   { name: 'Cartoucherie de Vincennes', pattern: 'cartoucherie|theatre du soleil' },
   { name: 'MC93', pattern: 'mc93|mc 93' },
-  { name: 'Le Point Virgule', pattern: 'point.virgule' },
+  { name: 'Le Point Virgule', pattern: '^(le )?point.virgule$' },
   // Salles de concert
   { name: 'L’Olympia', pattern: '^(l.)?olympia( |$)|olympia bruno coquatrix' },
   { name: 'Le Bataclan', pattern: 'bataclan' },
@@ -53,7 +53,7 @@ export const SIGNATURE_VENUES: SignatureVenue[] = [
   { name: 'Sunset-Sunside', pattern: 'sunset.{0,3}sunside|^(le )?sunside|^(le )?sunset$' },
   // Musées et centres d’art
   { name: 'Centre Pompidou', pattern: 'centre (georges.)?pompidou|^pompidou$' },
-  { name: 'Musée du Louvre', pattern: 'musee du louvre|^(le )?louvre$|auditorium du louvre' },
+  { name: 'Musée du Louvre', pattern: '^musee du louvre|^(le )?louvre$|auditorium.{0,40}louvre' },
   { name: 'Musée d’Orsay', pattern: 'musee d.orsay' },
   { name: 'Grand Palais', pattern: '^(le )?grand palais($| - | immersif| rmn|, )' },
   { name: 'Petit Palais', pattern: '^(le )?petit palais' },
@@ -67,7 +67,7 @@ export const SIGNATURE_VENUES: SignatureVenue[] = [
   // Cinéma et lieux pluridisciplinaires
   { name: 'Cinémathèque française', pattern: 'cinematheque francaise|^(la )?cinematheque$' },
   { name: 'Forum des images', pattern: 'forum des images' },
-  { name: 'La Villette', pattern: 'parc de la villette|grande halle( de la villette|$)|^(la )?villette$' },
+  { name: 'La Villette', pattern: '^(le )?parc de la villette($| - )|grande halle( de la villette|$)|^(la )?villette$' },
   { name: 'La Gaîté Lyrique', pattern: 'gaite lyrique' },
   { name: 'Le Centquatre', pattern: 'centquatre|^(le )?104( |$)' },
 ]

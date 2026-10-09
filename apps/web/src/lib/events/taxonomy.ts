@@ -22,6 +22,8 @@ export const CATEGORIES: CategoryMeta[] = [
   { slug: 'conferences', name: 'Conférence', plural: 'Conférences & rencontres', icon: '🎤' },
   { slug: 'ateliers', name: 'Atelier', plural: 'Ateliers', icon: '🛠️' },
   { slug: 'visites', name: 'Visite', plural: 'Visites & balades', icon: '🏛️' },
+  { slug: 'soirees', name: 'Soirée', plural: 'Soirées & clubs', icon: '🪩' },
+  { slug: 'sport', name: 'Sport', plural: 'Sport & bien-être', icon: '🏃' },
 ]
 
 export const CATEGORY_BY_SLUG = Object.fromEntries(CATEGORIES.map((c) => [c.slug, c])) as Record<

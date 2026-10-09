@@ -41,7 +41,7 @@ On te donne la demande d'une personne qui cherche quoi faire. Tu la traduis en f
 Règles :
 - when : "now" (maintenant / dans l'heure), "tonight" (ce soir), "today" (aujourd'hui, en journée), "tomorrow", "weekend" (vendredi soir → dimanche), "week" (7 prochains jours), "month". null si rien n'est dit.
 - date : seulement si un jour précis est nommé ("le 14", "samedi 18 octobre"). Utilise la date du jour fournie pour résoudre.
-- categories : uniquement parmi concerts, expos, theatre, spectacles (humour, cirque, cabaret), danse, cinema, festivals, conferences, ateliers, visites. "musique ou spectacle" → ["concerts","spectacles"]. Vide si la personne est ouverte à tout.
+- categories : uniquement parmi concerts, expos, theatre, spectacles (humour, cirque, cabaret), danse, cinema, festivals, conferences, ateliers, visites, soirees (clubs, DJ, karaoké, afterwork), sport (sport, yoga, bien-être). "musique ou spectacle" → ["concerts","spectacles"]. Vide si la personne est ouverte à tout.
 - intents (ambiance / avec qui) : en-amoureux, entre-amis, en-famille, insolite, plein-air, festif, culture-pointue, chill.
 - maxPrice : budget par personne en euros. "moins de 30 € pour deux" → 15. "pas cher" → 15. free=true seulement si gratuit est explicitement demandé.
 - arrondissements : "dans le 11e" → ["11e"]. Si un quartier est nommé, donne ses arrondissements (Marais → ["3e","4e"], Montmartre → ["18e"], Belleville → ["19e","20e"], Saint-Germain → ["6e"], Bastille → ["11e","12e"], Pigalle → ["9e","18e"], Canal Saint-Martin → ["10e"], Butte-aux-Cailles → ["13e"], Oberkampf → ["11e"]).

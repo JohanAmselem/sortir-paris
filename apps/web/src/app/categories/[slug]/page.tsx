@@ -20,6 +20,8 @@ const INTROS: Record<string, string> = {
   conferences: 'Conférences, rencontres, débats et lectures à Paris, souvent gratuits.',
   ateliers: 'Ateliers créatifs, initiations et cours ponctuels à Paris, pour adultes et enfants.',
   visites: 'Visites guidées, balades urbaines et découvertes du patrimoine parisien.',
+  soirees: 'Soirées, clubs, DJ sets, karaokés et afterworks à Paris, ce soir et ce week-end.',
+  sport: 'Sport, yoga, randonnées et activités bien-être à Paris et autour.',
 }
 
 export function generateStaticParams() {

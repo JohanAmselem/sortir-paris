@@ -10,6 +10,16 @@ Ils ont été rejoués sur une copie locale du schéma de production (PGlite, Po
 | `0004_data_quality_schema.sql` | Nouvelles colonnes : `price_status`, `time_known`, `quality_reasons`, `last_seen_at`, `canonical_event_id`, et côté lieux `normalized_name`, `geocode_*`, `canonical_venue_id`. Ajoute aussi : contraintes CHECK, arrondissements calculés depuis le code postal, coordonnées « centre de Paris » remises à zéro, table `newsletter_subscribers` (qui manquait), préférences en `text[]`, index (5 créés, 6 doublons supprimés), `statement_timeout` de 15 s sur le rôle `postgres`. | Moyen : la table `events` est verrouillée quelques secondes pendant les ALTER et les index |
 | `0005_data_cleanup.sql` | Corrige les heures de paris_opendata (le flux annonçait `+00:00` pour des heures de Paris). Puis expire les événements passés, rejette les articles Le Bonbon, les événements hors Île-de-France et les salons professionnels, corrige les faux « gratuit » d’InfoConcert, et met en brouillon les prix et durées aberrants. Aucun DELETE : chaque mise à l’écart est tracée dans `quality_reasons`. | Faible |
 
+### Lot 1 « Données » (9 octobre 2026)
+
+| Fichier | Quoi | Risque |
+|---|---|---|
+| `0007_categories.sql` | Ajoute les catégories `soirees` (Soirées & clubs) et `sport` (Sport & bien-être), positions 11 et 12. Les scrapers les produisent déjà ; sans ce fichier ces événements restent sans catégorie. | Faible |
+| `0008_data_cleanup_lot1.sql` | Codes postaux de lieux remis sur 5 chiffres (ou NULL), lieux fictifs (« Adresse communiquée à l'inscription ») et hors zone 75/92/93/94 rejetés, titres « ANNULÉ / reporté » passés en `cancelled`, prix aberrants (> 1 000 €, année lue comme prix) remis à « inconnu », heures 00:00 / 23:59 marquées inconnues. Aucun DELETE, événements avec activité membre jamais touchés, lots de 5 000 lignes. | Faible |
+
+Ordre : `0007` puis `0008`, puis `cd scrapers && python cron.py --post` (liaison des lieux,
+géocodage par nom, séries, dédoublonnage, reclassement des catégories).
+
 ## Appliquer
 
 Supabase, SQL Editor : coller le contenu de chaque fichier dans l’ordre, puis *Run*. Ou en ligne de commande :

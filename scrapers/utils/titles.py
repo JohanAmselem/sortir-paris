@@ -56,6 +56,17 @@ _TAIL_FLAG_RE = re.compile(rf"\s*[–—\-:|•·/,]+\s*({_CANCEL_WORDS}|{_SOLD_
 _CAPS_FLAG_RE = re.compile(r"(?<![A-Za-zÀ-ÿ])(ANNUL[ÉE]E?S?|REPORT[ÉE]E?S?|CANCELL?ED|POSTPONED|COMPLET|SOLD[\s-]?OUT)"
                            r"(?![A-Za-zÀ-ÿ])")
 _CANCEL_RE = re.compile(rf"^(?:{_CANCEL_WORDS})$", re.I)
+# "Annulé en raison d'un nombre insuffisant de participants. X" → the clause goes
+_LEAD_CANCEL_CLAUSE_RE = re.compile(
+    r"^\s*(?:annul|report)[ée]e?s?\s+(?:en raison|faute|pour cause|suite|par manque)[^.!]*[.!]\s*", re.I)
+# a title that starts with the word: "ANNULÉ Apprendre un mouvement…", "Annulé X"
+_LEAD_CANCEL_WORD_RE = re.compile(r"^\s*(?:annul[ée]e?s?|cancell?ed|postponed)\s+(?=\S)", re.I)
+# "Rencontre annulée : Lilia Hassaine"
+_CANCEL_COLON_RE = re.compile(r"\s+(?:annul|report)[ée]e?s?\s*(?=:)", re.I)
+# editorial: "Saez à l'Arena : son concert reporté à l'automne 2027" (kept as is, flagged)
+_CANCEL_EVENT_RE = re.compile(
+    r"\b(?:concerts?|spectacles?|shows?|dates?|repr[ée]sentations?|[ée]v[ée]nements?|soir[ée]es?|matchs?)"
+    r"\s+(?:est\s+|sont\s+)?(?:annul|report)[ée]e?s?\b", re.I)
 
 
 def _tidy(t: str) -> str:
@@ -102,6 +113,12 @@ def title_flags(title: Optional[str]) -> Tuple[str, bool, bool]:
         else:
             sold_out = True
 
+    for rx in (_LEAD_CANCEL_CLAUSE_RE, _CANCEL_COLON_RE):
+        if rx.search(t):
+            cancelled = True
+            t = rx.sub(" ", t, count=1).strip()
+    if _CANCEL_EVENT_RE.search(t):
+        cancelled = True
     for rx in (_BRACKET_FLAG_RE, _LEAD_FLAG_RE, _TAIL_FLAG_RE):
         while True:
             m = rx.search(t)
@@ -115,6 +132,9 @@ def title_flags(title: Optional[str]) -> Tuple[str, bool, bool]:
         for m in list(_CAPS_FLAG_RE.finditer(t)):
             mark(m.group(1))
         t = _CAPS_FLAG_RE.sub(" ", t)
+    if _LEAD_CANCEL_WORD_RE.match(t):
+        cancelled = True
+        t = _LEAD_CANCEL_WORD_RE.sub("", t, count=1)
     t = _tidy(t)
     return (t if len(t) >= 2 else (title or "").strip()), cancelled, sold_out
 

@@ -59,6 +59,21 @@ def test_strip_for_matching_editorial_tail():
     ("Fakear COMPLET", "Fakear", False, True),
     ("Le mariage annulé", "Le mariage annulé", False, False),  # a play title, not a status
     ("Cancelled: Big Show", "Big Show", True, False),
+    # real titles seen in production (9 Oct 2026)
+    ("ANNULÉ Apprendre un mouvement d'Hofesh Shechter", "Apprendre un mouvement d'Hofesh Shechter", True, False),
+    ("Rencontre annulée : Lilia Hassaine", "Rencontre : Lilia Hassaine", True, False),
+    ("Annulé en raison d’un nombre insuffisant de participants. CHAVILLE - Balade nature",
+     "CHAVILLE - Balade nature", True, False),
+    ("Saez à l'Arena Porte de la Chapelle : son concert reporté à l'automne 2027",
+     "Saez à l'Arena Porte de la Chapelle : son concert reporté à l'automne 2027", True, False),
+    ("BIGA*RANX - ZENITH - PARIS - COMPLET", "BIGA*RANX - ZENITH - PARIS", False, True),
+    ("Jean Zay, l'homme complet", "Jean Zay, l'homme complet", False, False),
+    ("JEAN ZAY L'HOMME COMPLET - JEAN ZAY LHOMME COMPLET", "JEAN ZAY L'HOMME COMPLET - JEAN ZAY LHOMME COMPLET",
+     False, False),
+    ("“Le jeudi c’est impro” : le spectacle est déjà presque complet le 15 octobre",
+     "“Le jeudi c’est impro” : le spectacle est déjà presque complet le 15 octobre", False, False),
+    ("La Terre parle quand on creuse - Grand Reporterre #6", "La Terre parle quand on creuse - Grand Reporterre #6",
+     False, False),
 ])
 def test_title_flags(raw, title, cancelled, sold_out):
     assert title_flags(raw) == (title, cancelled, sold_out)

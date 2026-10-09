@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
+import { sql } from 'drizzle-orm'
 import postgres from 'postgres'
 
 // Schema imports
@@ -59,3 +60,18 @@ const client = postgres(connectionString, {
   },
 })
 export const db = drizzle(client, { schema })
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * Run read queries with a server-side time limit. A query abandoned by the app
+ * (withTimeout) used to keep running in Postgres and pile up under load; with
+ * SET LOCAL the database itself cancels it. Works through the Supavisor
+ * transaction pooler (startup parameters and role settings do not).
+ */
+export function withStatementTimeout<T>(ms: number, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`set local statement_timeout = ${Math.max(100, Math.round(ms))}`))
+    return fn(tx)
+  })
+}

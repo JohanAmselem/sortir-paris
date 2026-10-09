@@ -24,7 +24,9 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const v = await getVenueBySlug(slug).catch(() => null)
+  // A database error must not be cached as "not found" / noindex: let it throw
+  // (ISR keeps serving the previous version of the page).
+  const v = await getVenueBySlug(slug)
   if (!v) return { title: 'Lieu introuvable', robots: { index: false } }
   const upcoming = await safeQueryEvents({ venueSlug: slug, limit: 1 })
   const where = v.arrondissement ? ` (${v.arrondissement})` : ''
@@ -32,13 +34,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${v.name}${where} : programme et prochains événements`,
     description: `Le programme de ${v.name}${v.address ? `, ${v.address}` : ''}${where} à Paris : concerts, spectacles et expositions à venir.`,
     alternates: { canonical: `/lieux/${v.canonicalSlug ?? v.slug}` },
-    robots: upcoming.total === 0 ? { index: false, follow: true } : undefined,
+    robots: !upcoming.error && upcoming.total === 0 ? { index: false, follow: true } : undefined,
   }
 }
 
 export default async function VenuePage({ params }: Props) {
   const { slug } = await params
-  const venue = await getVenueBySlug(slug).catch(() => null)
+  const venue = await getVenueBySlug(slug)
   if (!venue) notFound()
   if (venue.canonicalSlug && venue.canonicalSlug !== slug) permanentRedirect(`/lieux/${venue.canonicalSlug}`)
 

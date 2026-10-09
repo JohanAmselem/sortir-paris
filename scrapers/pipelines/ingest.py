@@ -90,32 +90,48 @@ def load_existing(cur, source: str) -> Dict[str, str]:
     return {sid: eid for sid, eid in cur.fetchall()}
 
 
-UPDATE_SQL = """
-UPDATE events SET
-    title = %(title)s,
-    description = COALESCE(%(description)s, description),
-    short_desc = COALESCE(%(short_desc)s, short_desc),
-    image_url = COALESCE(%(image_url)s, image_url),
-    start_date = %(start_date)s,
-    end_date = CASE WHEN %(end_date)s::timestamptz IS NOT NULL THEN %(end_date)s::timestamptz
+# Column → new value expression. Rows are only rewritten when something changed:
+# the old unconditional UPDATE rewrote ~25k rows twice a day (dead tuples, WAL,
+# autovacuum) and saturated the database while the site was serving (9 Oct 2026).
+_UPDATE_SETS = [
+    ("title", "%(title)s"),
+    ("description", "COALESCE(%(description)s, description)"),
+    ("short_desc", "COALESCE(%(short_desc)s, short_desc)"),
+    ("image_url", "COALESCE(%(image_url)s, image_url)"),
+    ("start_date", "%(start_date)s::timestamptz"),
+    ("end_date", """CASE WHEN %(end_date)s::timestamptz IS NOT NULL THEN %(end_date)s::timestamptz
                     WHEN end_date >= %(start_date)s::timestamptz THEN end_date
-                    ELSE NULL END,
-    time_known = %(time_known)s,
-    price_min = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_min)s ELSE price_min END,
-    price_max = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_max)s ELSE price_max END,
-    is_free = CASE WHEN %(price_status)s <> 'unknown' THEN %(is_free)s ELSE is_free END,
-    price_status = CASE WHEN %(price_status)s <> 'unknown' THEN %(price_status)s ELSE price_status END,
-    booking_url = COALESCE(%(booking_url)s, booking_url),
-    source_url = COALESCE(%(source_url)s, source_url),
-    category_id = COALESCE(%(category_id)s, category_id),
-    venue_id = COALESCE(%(venue_id)s, venue_id),
-    keywords = COALESCE(%(keywords)s, keywords),
-    status = %(status)s,
-    quality_score = %(quality_score)s,
-    quality_reasons = %(quality_reasons)s::jsonb,
-    last_seen_at = now(),
-    updated_at = now()
-WHERE id = %(id)s
+                    ELSE NULL END"""),
+    ("time_known", "%(time_known)s"),
+    ("price_min", "CASE WHEN %(price_status)s <> 'unknown' THEN %(price_min)s ELSE price_min END"),
+    ("price_max", "CASE WHEN %(price_status)s <> 'unknown' THEN %(price_max)s ELSE price_max END"),
+    ("is_free", "CASE WHEN %(price_status)s <> 'unknown' THEN %(is_free)s ELSE is_free END"),
+    ("price_status", "CASE WHEN %(price_status)s <> 'unknown' THEN %(price_status)s ELSE price_status END"),
+    ("booking_url", "COALESCE(%(booking_url)s, booking_url)"),
+    ("source_url", "COALESCE(%(source_url)s, source_url)"),
+    ("category_id", "COALESCE(%(category_id)s::uuid, category_id)"),
+    ("venue_id", "COALESCE(%(venue_id)s::uuid, venue_id)"),
+    ("keywords", "COALESCE(%(keywords)s, keywords)"),
+    ("status", "%(status)s"),
+    ("quality_score", "%(quality_score)s"),
+    ("quality_reasons", "%(quality_reasons)s::jsonb"),
+]
+
+UPDATE_SQL = (
+    "UPDATE events SET\n    "
+    + ",\n    ".join(f"{c} = {e}" for c, e in _UPDATE_SETS)
+    + ",\n    last_seen_at = now(),\n    updated_at = now()\nWHERE id = %(id)s\n  AND ("
+    + ", ".join(c for c, _ in _UPDATE_SETS)
+    + ")\n  IS DISTINCT FROM ("
+    + ", ".join(e for _, e in _UPDATE_SETS)
+    + ")\n"
+)
+
+# Unchanged rows still record that the source listed them today (expiry relies on it),
+# at most once every 6 hours: a cheap HOT update (no indexed column changes).
+TOUCH_SQL = """
+UPDATE events SET last_seen_at = now()
+WHERE id = ANY(%(ids)s::uuid[]) AND (last_seen_at IS NULL OR last_seen_at < now() - interval '6 hours')
 """
 
 INSERT_SQL = """
@@ -236,6 +252,8 @@ def _flush(cur, pending: List[tuple], stats: dict, slugs: SlugRegistry) -> None:
     cur.execute("SAVEPOINT batch")
     try:
         _exec_many(cur, UPDATE_SQL, updates)
+        if updates:
+            cur.execute(TOUCH_SQL, {"ids": [p["id"] for p in updates]})
         _exec_many(cur, INSERT_SQL, inserts)
         cur.execute("RELEASE SAVEPOINT batch")
         for action, kind, p, _ in pending:
@@ -335,8 +353,17 @@ def run_pipeline(events: List[dict], source_name: str, conn=None) -> dict:
 
 
 def log_start(conn, source: str, started_at: Optional[datetime] = None) -> Optional[str]:
-    """Insert a 'running' row with the REAL start time of the source run."""
+    """Insert a 'running' row with the REAL start time of the source run.
+
+    A run killed by the CI timeout never reaches log_finish: its row stays 'running'
+    forever. Any 'running' row of this source older than 2 hours is closed as failed."""
     with conn.cursor() as cur:
+        cur.execute(
+            """UPDATE ingestion_logs SET status = 'failed', finished_at = now(),
+                   errors = '["interrupted: the run was killed before it finished"]'::jsonb
+               WHERE source = %s AND status = 'running' AND started_at < now() - interval '2 hours'""",
+            (source,),
+        )
         cur.execute(
             """INSERT INTO ingestion_logs (source, started_at, status)
                VALUES (%s, COALESCE(%s, now()), 'running') RETURNING id""",

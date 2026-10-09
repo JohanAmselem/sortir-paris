@@ -50,7 +50,8 @@ function description(e: EventDetail): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const e = await getEventBySlug(slug).catch(() => null)
+  // Errors propagate: a database outage must not be cached as a noindex "introuvable".
+  const e = await getEventBySlug(slug)
   if (!e || HIDDEN.has(e.status)) return { title: 'Événement introuvable', robots: { index: false } }
   const past = effectiveEnd(e) < new Date()
   const title = `${e.title}${e.venue ? ` · ${e.venue.name}` : ''}`

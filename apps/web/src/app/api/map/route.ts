@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues, categories } from '@sortir/db'
+import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, eq, sql } from 'drizzle-orm'
-import { bucketNow, buildConditions, withTimeout } from '@/lib/events/query'
+import { STATEMENT_TIMEOUT_MS, bucketNow, buildConditions, withTimeout } from '@/lib/events/query'
 import { parseEventParams } from '@/lib/events/params'
 import type { EventQuery } from '@/lib/events/types'
 
@@ -12,9 +12,9 @@ import type { EventQuery } from '@/lib/events/types'
  * Properties are kept tiny; details are fetched on selection via /api/events?venue=.
  */
 const load = unstable_cache(
-  async (query: EventQuery, nowMs: number) => {
-    const { where } = buildConditions(query, new Date(nowMs))
-    const rows = await db
+  async (query: EventQuery) => {
+    const { where } = buildConditions(query, bucketNow())
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) => tx
       .select({
         slug: venues.slug,
         name: venues.name,
@@ -31,7 +31,7 @@ const load = unstable_cache(
       .leftJoin(categories, eq(events.categoryId, categories.id))
       .where(and(where, sql`${venues.lat} is not null`, sql`${venues.lng} is not null`))
       .groupBy(venues.id)
-      .limit(3000)
+      .limit(3000))
 
     return {
       type: 'FeatureCollection' as const,
@@ -50,7 +50,7 @@ const load = unstable_cache(
       })),
     }
   },
-  ['map-venues-v1'],
+  ['map-venues-v2'],
   { revalidate: 300, tags: ['events'] }
 )
 
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   query.q = null
   if (!query.when) query.when = 'week'
   try {
-    const data = await withTimeout(load(query, bucketNow().getTime()), 9000, 'map')
+    const data = await withTimeout(load(query), STATEMENT_TIMEOUT_MS + 1500, 'map')
     return NextResponse.json(data, { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900' } })
   } catch (err) {
     console.error('[api/map]', err)

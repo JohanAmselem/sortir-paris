@@ -1,0 +1,31 @@
+name: Uptime
+
+# Every 15 minutes: the pages that query the database must answer quickly.
+# A failed run makes GitHub email the repository owner (Actions notifications).
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check key URLs
+        run: |
+          fail=0
+          for path in "/" "/ce-soir" "/api/events?limit=1" "/api/events?q=concert&limit=1" "/api/map?when=today"; do
+            # Two tries: one slow answer is tolerated, two in a row is an incident.
+            for attempt in 1 2; do
+              out=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time 15 "https://www.panameclub.fr${path}") || out="000 15"
+              code=${out% *}; t=${out#* }
+              if [ "$code" = "200" ] && awk "BEGIN{exit !($t < 8)}"; then break; fi
+              [ $attempt = 2 ] && { echo "::error::$path → HTTP $code in ${t}s"; fail=1; } || sleep 20
+            done
+            echo "$path → $code (${t}s)"
+          done
+          exit $fail

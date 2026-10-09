@@ -5,7 +5,7 @@
  */
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues, categories } from '@sortir/db'
+import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { DEFAULT_DURATION_MS, LONG_RUN_MS, resolveWindow, type TimeWindow } from '@/lib/paris-time'
 import { INTENT_RULES } from './taxonomy'
@@ -14,7 +14,11 @@ import { foldText } from './fold'
 export { foldText }
 import type { CardEvent, EventPage, EventQuery } from './types'
 
-/** Cache granularity: windows are computed from a 5-minute "now". */
+/**
+ * "Now" rounded to 5 minutes, for display and windows. It is NOT part of any cache
+ * key: keys used to include it, so every cached listing expired at the same instant
+ * every 5 minutes and all pages hit the database together (outage of 9 Oct 2026).
+ */
 const BUCKET_MS = 5 * 60 * 1000
 export const bucketNow = () => new Date(Math.floor(Date.now() / BUCKET_MS) * BUCKET_MS)
 
@@ -56,9 +60,21 @@ export function windowCondition(w: TimeWindow, now: Date): SQL {
 /** Lowercase + strip French accents, same transform on both sides. */
 const ACCENTS_FROM = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ'
 const ACCENTS_TO = 'aaaaaaceeeeiiiinooooouuuuyy'
-const foldSql = (expr: SQL) => sql`translate(lower(${expr}), ${ACCENTS_FROM}, ${ACCENTS_TO})`
+// Inlined constants (not bind parameters) so the expression matches the trigram
+// index idx_events_search_trgm (packages/db/sql/0006) character for character.
+const foldSql = (expr: SQL) => sql`translate(lower(${expr}), ${sql.raw(`'${ACCENTS_FROM}'`)}, ${sql.raw(`'${ACCENTS_TO}'`)})`
 
-const searchableText = sql`(${events.title} || ' ' || coalesce(${events.shortDesc}, '') || ' ' || coalesce(${events.keywords}, '') || ' ' || coalesce(${venues.name}, ''))`
+/** Event text, indexed (GIN trigram) — keep in sync with 0006_search_index.sql. */
+const eventSearchText = foldSql(
+  sql`${events.title} || ' ' || coalesce(${events.shortDesc}, '') || ' ' || coalesce(${events.keywords}, '')`
+)
+
+/** Text match on the event or on its venue name (venues is small). `= any(array(…))`
+ * lets Postgres combine both indexes (BitmapOr): 4.2 s → 0.17 s for "jazz". */
+function textMatch(op: 'like' | '~', pattern: string): SQL {
+  return sql`(${eventSearchText} ${sql.raw(op)} ${pattern}
+    or ${events.venueId} = any(array(select v.id from venues v where ${foldSql(sql`v.name`)} ${sql.raw(op)} ${pattern})))`
+}
 
 const STOP_WORDS = new Set(
   'a au aux avec ce ces dans de des du en et je la le les mon ma mes ou par pas pour quelque chose sur un une veux voudrais cherche ce soir paris sortir sortie truc'.split(
@@ -77,14 +93,13 @@ export function searchTokens(q: string): string[] {
 export function intentCondition(slug: string): SQL | null {
   const rule = INTENT_RULES[slug]
   if (!rule) return null
-  const text = foldSql(searchableText)
-  const parts: SQL[] = [sql`${text} ~ ${foldText(rule.pattern)}`]
+  const parts: SQL[] = [textMatch('~', foldText(rule.pattern))]
   if (rule.categories?.length) {
     parts.push(sql`${categories.slug} in ${rule.categories}`)
   }
   const match = sql`(${sql.join(parts, sql` or `)})`
   if (!rule.excludePattern) return match
-  return sql`(${match} and not ${text} ~ ${foldText(rule.excludePattern)})`
+  return sql`(${match} and not ${textMatch('~', foldText(rule.excludePattern))})`
 }
 
 function distanceSql(lat: number, lng: number): SQL {
@@ -192,8 +207,7 @@ export function buildConditions(query: EventQuery, now: Date): { where: SQL; win
   }
   if (query.q) {
     const tokens = searchTokens(query.q)
-    const text = foldSql(searchableText)
-    for (const t of tokens) conds.push(sql`${text} like ${'%' + t + '%'}`)
+    for (const t of tokens) conds.push(textMatch('like', '%' + t + '%'))
   }
   if (query.near) {
     const radius = query.near.radiusKm ?? 3
@@ -208,7 +222,11 @@ export function buildConditions(query: EventQuery, now: Date): { where: SQL; win
   return { where: and(...conds)!, window }
 }
 
-async function runQuery(query: EventQuery, nowMs: number): Promise<EventPage> {
+/** Server-side limit for listing queries (Postgres cancels them itself). */
+export const STATEMENT_TIMEOUT_MS = 6000
+
+async function runQuery(query: EventQuery): Promise<EventPage> {
+  const nowMs = bucketNow().getTime()
   const now = new Date(nowMs)
   const limit = Math.min(Math.max(query.limit ?? 24, 1), 100)
   const offset = Math.max(query.offset ?? 0, 0)
@@ -238,22 +256,36 @@ async function runQuery(query: EventQuery, nowMs: number): Promise<EventPage> {
   }
   order.push(asc(events.id))
 
-  const rows = await db
-    .select({
-      ...cardColumns,
-      distanceKm: query.near ? distanceSql(query.near.lat, query.near.lng) : sql`null`,
-      total: sql<number>`count(*) over()`,
-    })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(where)
-    .orderBy(...order)
-    .limit(limit)
-    .offset(offset)
+  return withStatementTimeout(STATEMENT_TIMEOUT_MS, async (tx) => {
+    // limit + 1 tells whether there is more without counting everything.
+    const rows = await tx
+      .select({
+        ...cardColumns,
+        distanceKm: query.near ? distanceSql(query.near.lat, query.near.lng) : sql`null`,
+      })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(where)
+      .orderBy(...order)
+      .limit(limit + 1)
+      .offset(offset)
 
-  const total = rows.length ? Number(rows[0].total) : 0
-  return { events: rows.map(toCard), total, hasMore: offset + rows.length < total }
+    const hasMore = rows.length > limit
+    const page = rows.slice(0, limit)
+    let total = offset + page.length + (hasMore ? 1 : 0)
+    // The exact total is only shown with the first page ("1 234 sorties").
+    if (offset === 0 && hasMore) {
+      const [c] = await tx
+        .select({ n: sql<number>`count(*)` })
+        .from(events)
+        .leftJoin(venues, eq(events.venueId, venues.id))
+        .leftJoin(categories, eq(events.categoryId, categories.id))
+        .where(where)
+      total = Number(c?.n ?? total)
+    }
+    return { events: page.map(toCard), total, hasMore }
+  })
 }
 
 /** Reject after `ms` so a stuck query can never hang a page render. */
@@ -267,7 +299,9 @@ export function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'query'):
   ])
 }
 
-const cachedQuery = unstable_cache(runQuery, ['events-query-v1'], { revalidate: 300, tags: ['events'] })
+// Keyed by the query only: entries are refreshed in the background every 5 min and
+// the previous result keeps being served while (or if) the refresh fails.
+const cachedQuery = unstable_cache(runQuery, ['events-query-v2'], { revalidate: 300, tags: ['events'] })
 
 /** Cached, time-bucketed event query. Geolocated queries are rounded to ~100 m for cache hits. */
 export function queryEvents(query: EventQuery): Promise<EventPage> {
@@ -280,7 +314,7 @@ export function queryEvents(query: EventQuery): Promise<EventPage> {
     }
   }
   if (q.q) q.q = q.q.trim().slice(0, 120)
-  return withTimeout(cachedQuery(q, bucketNow().getTime()), 9000, 'queryEvents')
+  return withTimeout(cachedQuery(q), STATEMENT_TIMEOUT_MS + 1500, 'queryEvents')
 }
 
 /** Same as queryEvents but never throws: returns an empty page and logs. */
@@ -320,16 +354,17 @@ export function diversify(list: CardEvent[], max: number): CardEvent[] {
 
 /** Counts per category for the live catalogue (navigation badges). */
 export const getCategoryCounts = unstable_cache(
-  async (nowMs: number) => {
-    const rows = await db
-      .select({ slug: categories.slug, n: sql<number>`count(*)` })
-      .from(events)
-      .innerJoin(categories, eq(events.categoryId, categories.id))
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .where(liveCondition(new Date(nowMs)))
-      .groupBy(categories.slug)
+  async () => {
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select({ slug: categories.slug, n: sql<number>`count(*)` })
+        .from(events)
+        .innerJoin(categories, eq(events.categoryId, categories.id))
+        .where(liveCondition(bucketNow()))
+        .groupBy(categories.slug)
+    )
     return Object.fromEntries(rows.map((r) => [r.slug, Number(r.n)])) as Record<string, number>
   },
-  ['category-counts-v1'],
+  ['category-counts-v2'],
   { revalidate: 1800, tags: ['events'] }
 )

@@ -1,9 +1,9 @@
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues } from '@sortir/db'
+import { db, events, venues, withStatementTimeout } from '@sortir/db'
 import { and, desc, eq, sql } from 'drizzle-orm'
-import { bucketNow, liveCondition, withTimeout } from './events/query'
+import { STATEMENT_TIMEOUT_MS, bucketNow, liveCondition, withTimeout } from './events/query'
 
 export interface VenueSummary {
   slug: string
@@ -15,8 +15,8 @@ export interface VenueSummary {
 
 /** Venues with at least one live event, most active first. */
 export const listActiveVenues = unstable_cache(
-  async (nowMs: number, limit: number): Promise<VenueSummary[]> => {
-    const rows = await db
+  async (limit: number): Promise<VenueSummary[]> => {
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) => tx
       .select({
         slug: venues.slug,
         name: venues.name,
@@ -26,13 +26,13 @@ export const listActiveVenues = unstable_cache(
       })
       .from(events)
       .innerJoin(venues, eq(events.venueId, venues.id))
-      .where(and(liveCondition(new Date(nowMs)), sql`${venues.canonicalVenueId} is null`))
+      .where(and(liveCondition(bucketNow()), sql`${venues.canonicalVenueId} is null`))
       .groupBy(venues.id)
       .orderBy(desc(sql`count(*)`), venues.name)
-      .limit(limit)
+      .limit(limit))
     return rows.map((r) => ({ ...r, upcoming: Number(r.upcoming) }))
   },
-  ['active-venues-v1'],
+  ['active-venues-v2'],
   { revalidate: 3600, tags: ['events'] }
 )
 
@@ -82,4 +82,4 @@ const loadVenue = unstable_cache(
 
 export const getVenueBySlug = cache((slug: string) => withTimeout(loadVenue(slug), 8000, 'getVenueBySlug'))
 
-export const getActiveVenues = (limit = 200) => withTimeout(listActiveVenues(bucketNow().getTime(), limit), 8000, 'listActiveVenues')
+export const getActiveVenues = (limit = 200) => withTimeout(listActiveVenues(limit), STATEMENT_TIMEOUT_MS + 1500, 'listActiveVenues')

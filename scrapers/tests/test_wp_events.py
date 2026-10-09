@@ -107,7 +107,8 @@ def test_bizzart_no_venue_uses_fixed_venue():
     assert len(evs) == 3
     assert {e["venue_name"] for e in evs} == {"Le Bizz'Art"}
     assert {e["venue_zip"] for e in evs} == {"75010"}
-    assert all(e["category_slug"] == "concerts" for e in evs)
+    # "… AFTERWORK feat … DJ …" is a party (soirees); the two others are concerts
+    assert sorted(e["category_slug"] for e in evs) == ["concerts", "concerts", "soirees"]
     # without a default venue the event has no place (never guessed)
     bare = events_from_tribe(_data("bizzart"), source="t")
     assert all(e["venue_name"] is None and e["venue_zip"] is None for e in bare)

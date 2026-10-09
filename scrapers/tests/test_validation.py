@@ -85,7 +85,7 @@ def test_status_decisions():
 
 
 def test_unknown_category_becomes_null_with_penalty():
-    ev = good(category_slug="sport")
+    ev = good(category_slug="bowling")
     out, hard, soft, _ = validate(ev, now=NOW)
     assert out.category_slug is None and "no_category" in soft and hard == []
 

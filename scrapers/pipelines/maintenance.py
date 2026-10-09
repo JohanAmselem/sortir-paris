@@ -4,6 +4,8 @@ End-of-run maintenance steps (run once after all sources, before the Meilisearch
 
 from __future__ import annotations
 
+from validation import HARD_REASONS
+
 EXPIRE_SQL = """
 UPDATE events
 SET status = 'expired', updated_at = now()
@@ -20,10 +22,7 @@ SET quality_score = LEAST(100, e.quality_score + 15),
     status = CASE WHEN e.status = 'draft' AND e.quality_score + 15 >= 50
                        AND NOT EXISTS (
                          SELECT 1 FROM jsonb_array_elements_text(e.quality_reasons) r
-                         WHERE r.value IN ('no_title','junk_title','no_start_date','ended','too_far_ahead',
-                                           'end_before_start','span_too_long','price_outlier',
-                                           'price_inconsistent','free_with_price','out_of_zone',
-                                           'online','cancelled')
+                         WHERE r.value IN (%s)
                        )
                   THEN 'active' ELSE e.status END,
     updated_at = now()
@@ -32,7 +31,7 @@ WHERE v.id = e.venue_id
   AND v.lat IS NOT NULL
   AND e.quality_reasons ? 'venue_not_geocoded'
   AND e.status IN ('draft', 'active')
-"""
+""" % ", ".join(f"'{r}'" for r in HARD_REASONS + ("series_collapsed",))
 
 
 def expire_events(conn) -> int:

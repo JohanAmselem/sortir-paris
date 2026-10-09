@@ -114,6 +114,85 @@ def extract_zip(text: Optional[str]) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def smart_title_case_safe(text: Optional[str]) -> Optional[str]:
+    """utils.titles.smart_title_case (imported lazily)."""
+    from utils.titles import smart_title_case
+
+    return smart_title_case(text)
+
+
+def normalize_zip(raw) -> Optional[str]:
+    """Postcode as 5 digits, or None.
+
+    '75 018' / '75018.' / '75002 Paris' / '75010 - 75018' → first valid code;
+    '750009' (typo, 6 digits) → '75009'; 'à venir' / '7500' / '1050' → None."""
+    if raw is None:
+        return None
+    t = str(raw).strip()
+    if not t:
+        return None
+    t = re.sub(r"\b(\d{2})\s(\d{3})\b", r"\1\2", t)  # "75 018"
+    m = re.search(r"(?<!\d)(\d{5})(?!\d)", t)
+    if m:
+        return m.group(1)
+    m = re.fullmatch(r"(75)0(0\d{2}|1[01]\d)", re.sub(r"\D", "", t))  # "750009" → "75009"
+    if m and len(re.sub(r"\D", "", t)) == 6:
+        return m.group(1) + m.group(2)
+    return None
+
+
+# Venue "names" that are not places (event published without its address).
+_PLACEHOLDER_VENUE_RE = re.compile(
+    r"^\s*(a venir|a definir|a confirmer|a determiner|tba|tbc|tbd|n/?a|nc|non communique\w*|"
+    r"lieu (a venir|a definir|a confirmer|secret|communique\w*|precise\w*|surprise)|secret location|"
+    r"adresse (secrete|communiquee\w*|transmise\w*|envoyee\w*|precisee\w*|donnee\w*)\b.*|"
+    r"lieu (communique|transmis|precise|envoye|donne)\w* (a|apres|lors|par|aux|sur)\b.*|"
+    r".*\b(communique|transmis|envoye|precise)e?s? (a|apres|lors de) l'?\s*inscription\b.*|"
+    r"en ligne|online|visioconference)\s*$"
+)
+
+
+def is_placeholder_venue(*texts: Optional[str]) -> bool:
+    """True when the venue name (or address) is a placeholder such as
+    'Adresse communiquée à l'inscription', 'Lieu secret', 'à venir'."""
+    return any(_PLACEHOLDER_VENUE_RE.match(_fold(t).replace("’", "'")) for t in texts if t)
+
+
+# Cities / countries that are certainly outside Paris + petite couronne. Used when a venue
+# has neither coordinates nor postcode ("Auditorium de la Grotte Cosquer, Marseille").
+_FAR_PLACES = (
+    "marseille", "lyon", "lille", "bordeaux", "toulouse", "nantes", "nice", "strasbourg",
+    "montpellier", "rennes", "reims", "rouen", "le havre", "grenoble", "dijon", "angers",
+    "nimes", "avignon", "tours", "orleans", "amiens", "metz", "nancy", "caen", "brest",
+    "limoges", "clermont-ferrand", "perpignan", "besancon", "annecy", "la rochelle",
+    "aix-en-provence", "cannes", "toulon", "poitiers", "pau", "bayonne", "biarritz", "deauville",
+    "chartres", "beauvais", "compiegne", "chantilly", "fontainebleau", "versailles",
+    "belgique", "bruxelles", "suisse", "geneve", "lausanne", "luxembourg", "canada", "quebec",
+    "montreal", "allemagne", "berlin", "londres", "london", "espagne", "italie", "slovenie",
+    "pays-bas", "amsterdam", "royaume-uni", "etats-unis", "new york",
+)
+_FAR_RE = re.compile(r"(?<![a-z-])(" + "|".join(re.escape(p) for p in _FAR_PLACES) + r")(?![a-z-])")
+
+
+def far_from_zone(name: Optional[str], address: Optional[str], city: Optional[str]) -> bool:
+    """True when the city, the address or a ', <City>' suffix of the venue name points
+    outside the service zone (no coordinates/postcode needed). Street names are not
+    matched: 'rue de Marseille' (Paris 10e) stays in zone."""
+    c = _fold(city)
+    if c and _FAR_RE.fullmatch(c.replace("cedex", "").strip()):
+        return True
+    for text in (address, name):
+        t = _fold(text)
+        if not t:
+            continue
+        # only the last comma-separated part counts: "…, Marseille" / "…, 1050 Bruxelles, Belgique"
+        tail = t.rsplit(",", 1)[-1].strip()
+        tail = re.sub(r"^\d{4,5}\s+", "", tail)
+        if tail and _FAR_RE.fullmatch(tail):
+            return True
+    return False
+
+
 def in_service_zone(lat, lng) -> bool:
     try:
         lat, lng = float(lat), float(lng)
@@ -144,6 +223,13 @@ _AMOUNT_AFTER_RE = re.compile(rf"{_AMOUNT}\s*{_CUR}")
 _CONDITIONAL_FREE_RE = re.compile(
     r"gratuit\w*\s+(pour|pr|aux|moins|-|jusqu|le|les|sur|avec|sous|enfants?|etudiant|chomeur|adherent)"
 )
+
+
+MAX_PLAUSIBLE_PRICE = 100_000  # 1 000 € in centimes: anything above is a parse error
+
+
+def _is_year(raw: str) -> bool:
+    return bool(re.fullmatch(r"20[2-3]\d", raw.strip()))
 
 
 def to_centimes(value) -> Optional[int]:
@@ -190,6 +276,8 @@ def parse_price_fr(raw: Optional[str]) -> dict:
 
     amounts = []
     for m in _RANGE_RE.finditer(text):
+        if _is_year(m.group(1)):  # "jusqu'au 3 mars 2026 - 12 €": the year is not a price
+            continue
         a, b = to_centimes(m.group(1)), to_centimes(m.group(2))
         if a is not None and b is not None:
             amounts += [a, b]
@@ -205,6 +293,7 @@ def parse_price_fr(raw: Optional[str]) -> dict:
                 amounts.append(v)
 
     has_free = bool(_FREE_RE.search(text))
+    amounts = [a for a in amounts if a <= MAX_PLAUSIBLE_PRICE]
     positive = [a for a in amounts if a > 0]
 
     if positive:
@@ -282,14 +371,15 @@ def price_from_offers(offers) -> dict:
 VALID_CATEGORIES = (
     "concerts", "expos", "theatre", "cinema", "festivals",
     "conferences", "danse", "spectacles", "ateliers", "visites",
+    "soirees", "sport",  # packages/db/sql/0007_categories.sql
 )
 
 # Whole-word keywords, accent-insensitive (compared after unidecode/lower).
 CATEGORY_KEYWORDS = {
     "concerts": [
-        "concert", "concerts", "musique live", "live music", "dj set", "dj", "jazz", "rock",
+        "concert", "concerts", "musique live", "live music", "jazz", "rock",
         "rap", "hip-hop", "hip hop", "chanson", "recital", "orchestre", "symphonique",
-        "opera", "electro", "techno", "showcase", "chorale", "quatuor", "philharmonie",
+        "opera", "electro", "showcase", "chorale", "quatuor", "philharmonie",
     ],
     "expos": [
         "exposition", "expositions", "expo", "expos", "vernissage", "retrospective",
@@ -305,8 +395,9 @@ CATEGORY_KEYWORDS = {
     ],
     "festivals": ["festival", "festivals"],
     "conferences": [
-        "conference", "conferences", "debat", "table ronde", "masterclass", "colloque",
+        "conference", "conferences", "debat", "debats", "table ronde", "masterclass", "colloque",
         "rencontre-debat", "lecture", "dedicace", "seminaire",
+        "causerie", "conference-debat",
     ],
     "danse": ["danse", "ballet", "choregraphie", "choregraphique", "bal", "hip-hop danse"],
     "spectacles": [
@@ -315,12 +406,25 @@ CATEGORY_KEYWORDS = {
         "marionnettes", "comedie musicale", "conte", "contes",
     ],
     "ateliers": [
-        "atelier", "ateliers", "workshop", "stage", "cours", "initiation", "yoga",
-        "fitness", "pilates", "meditation", "brunch", "degustation", "jeu", "jeux",
+        "atelier", "ateliers", "workshop", "stage", "cours", "initiation",
+        "brunch", "degustation", "jeu de piste", "chasse au tresor", "escape game",
     ],
     "visites": [
         "visite", "visites", "visite guidee", "balade", "promenade", "patrimoine",
-        "journees du patrimoine", "randonnee", "circuit",
+        "journees du patrimoine", "circuit",
+    ],
+    "soirees": [
+        "clubbing", "club night", "soiree club", "party", "dj set", "dj sets", "dj", "djs",
+        "karaoke", "afterwork", "after work", "after-work", "boum", "blind test", "blind-test",
+        "soiree jeux", "soiree jeu", "jeux de societe", "quiz", "rave", "techno", "house music",
+        "soiree dansante", "dancefloor", "silent disco", "apero", "aperitif", "teuf", "bingo",
+    ],
+    "sport": [
+        "sport", "sports", "sportif", "sportive", "yoga", "fitness", "pilates", "zumba",
+        "course", "course a pied", "running", "marathon", "semi-marathon", "trail", "randonnee",
+        "randonnees", "equitation", "gym", "gymnastique", "natation", "escalade", "boxe",
+        "tai chi", "qi gong", "meditation", "renforcement musculaire", "marche nordique",
+        "triathlon", "sport proximite",
     ],
 }
 
@@ -341,16 +445,58 @@ RAW_CATEGORY_MAP = {
     "one-man-show-humour": "spectacles", "cirque": "spectacles", "spectacle-enfant": "spectacles",
     "jeune public": "spectacles", "magie": "spectacles", "cabaret": "spectacles",
     "atelier": "ateliers", "ateliers": "ateliers", "stage": "ateliers", "cours": "ateliers",
-    "sport": "ateliers", "loisirs": "ateliers", "bien-etre": "ateliers",
+    "loisirs": "ateliers",
+    "sport": "sport", "sports": "sport", "bien-etre": "sport", "sport et bien-etre": "sport",
+    "paris sport proximite": "sport", "sport proximite": "sport", "yoga": "sport",
+    "soiree": "soirees", "soirees": "soirees", "clubbing": "soirees", "club": "soirees",
+    "nightlife": "soirees", "party": "soirees", "fete": "soirees", "karaoke": "soirees",
     "visite": "visites", "visites": "visites", "balade": "visites", "patrimoine": "visites",
     "visite guidee": "visites", "promenade": "visites",
 }
 
 # Tie-break priority (first wins)
 _PRIORITY = [
-    "festivals", "cinema", "expos", "danse", "theatre", "concerts", "spectacles",
-    "conferences", "visites", "ateliers",
+    "festivals", "cinema", "soirees", "expos", "danse", "theatre", "concerts", "spectacles",
+    "conferences", "sport", "visites", "ateliers",
 ]
+
+# A title that STARTS with one of these words says what the event is, whatever the
+# source category ("Atelier gravure" listed under Expositions, "Blind test" under Concerts).
+_TITLE_LEAD = [
+    (re.compile(r"^(atelier|ateliers|workshop|stage|cours|initiation|masterclass)\b"), "ateliers"),
+    (re.compile(r"^(conference|conferences|conference-debat|rencontre|rencontres|debat|table ronde|"
+                r"causerie|colloque|lecture|dedicace|seminaire)\b"), "conferences"),
+    (re.compile(r"^(visite|visites|balade|promenade)\b"), "visites"),
+    (re.compile(r"^(projection|cine-club|avant-premiere)\b"), "cinema"),
+    (re.compile(r"^(yoga|fitness|pilates|zumba|randonnee|course a pied|marche nordique|"
+                r"equitation|tai chi|qi gong)\b"), "sport"),
+]
+# Party formats: override a concert / theatre / expo / show label from the source.
+_SOIREE_RE = re.compile(
+    r"(?<![a-z0-9])(clubbing|club night|soiree club|party|dj set|dj sets|karaoke|afterwork|after work|"
+    r"after-work|boum|blind test|blind-test|soiree jeux|soiree jeu|silent disco|rave|teuf)(?![a-z0-9])"
+)
+_OVERRIDABLE = {None, "concerts", "theatre", "expos", "spectacles", "danse"}
+
+
+def title_category_override(title: Optional[str], current: Optional[str]) -> Optional[str]:
+    """Category imposed by the title itself, or None to keep `current`.
+
+    - a leading format word (Atelier…, Conférence…, Visite…, Projection…, Yoga…) always wins
+      over a generic label (concerts/theatre/expos/spectacles/danse) or no label;
+    - party formats (DJ set, karaoké, afterwork, boum, blind test, soirée jeux…) →
+      soirees, unless the source said festival/cinema."""
+    t = _fold(title)
+    if not t:
+        return None
+    t = re.sub(r"^[^a-z0-9]+", "", t)
+    for rx, slug in _TITLE_LEAD:
+        if rx.match(t):
+            return None if current in (slug, "festivals") else slug
+    if _SOIREE_RE.search(t) and current in _OVERRIDABLE:
+        return "soirees"
+    return None
+
 
 _KW_RES = {
     slug: re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(k) for k in sorted(kws, key=len, reverse=True)) + r")(?![a-z0-9])")
@@ -406,11 +552,15 @@ def detect_category(
 ) -> Optional[str]:
     """Detect category slug.
 
-    Priority: explicit per-source map > generic raw-label map > title keywords >
+    Priority: title format word / party format (title_category_override) >
+    explicit per-source map > generic raw-label map > title keywords >
     raw-category keywords > description keywords. Whole words only, so
     "Manifestation" ≠ festival, "exposé" ≠ expo, "parcours" ≠ visite.
     Returns None when nothing matches (allowed; soft penalty in validation).
     """
+    lead = title_category_override(title, None)
+    if lead:
+        return lead
     if raw_category and source_map:
         key = _fold(raw_category)
         for k, v in source_map.items():

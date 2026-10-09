@@ -6,7 +6,10 @@ import { ARCHETYPES } from '@/lib/taste-quiz-data'
 import { requireUser } from '@/app/club/_lib/api'
 import { getMemberOverview } from '@/app/club/_lib/member'
 import { BadgeGrid, LevelMeter, StatTiles } from '@/app/club/_components/member-ui'
+import { getFollowFeed } from '@/app/club/_lib/follows'
+import { bucketNow } from '@/lib/events/query'
 import { LogoutButton } from './_components/logout-button'
+import { FollowsSection } from './_components/follows-section'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +22,8 @@ const dateFmt = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', mon
 
 export default async function ComptePage() {
   const user = await requireUser('/compte')
-  const overview = await getMemberOverview(user.id)
+  const [overview, feed] = await Promise.all([getMemberOverview(user.id), getFollowFeed(user.id)])
+  const now = bucketNow()
   const name = overview?.name ?? user.email?.split('@')[0] ?? 'Membre'
   const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
 
@@ -89,6 +93,8 @@ export default async function ComptePage() {
           })}
         </ul>
       </nav>
+
+      <FollowsSection feed={feed} now={now} />
 
       {overview && (
         <section aria-labelledby="badges-title" className="mt-10">

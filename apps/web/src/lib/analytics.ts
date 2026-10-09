@@ -21,6 +21,7 @@ export type AnalyticsEvent =
   | 'map_locate'
   | 'surprise'
   | 'save'
+  | 'follow'
   | 'newsletter_signup'
   | 'collection_open'
   | 'match_swipe'

@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import { PageIntro } from '@/components/events/listing'
 import { DataUnavailable, EmptyState, EventGrid } from '@/components/events/blocks'
 import { LoadMore } from '@/components/events/load-more'
+import { FollowButton } from '@/components/follow/follow-button'
 import { getVenueBySlug } from '@/lib/venues'
 import { bucketNow, safeQueryEvents } from '@/lib/events/query'
 import { safeJsonLd } from '@/lib/json-ld'
@@ -93,6 +94,7 @@ export default async function VenuePage({ params }: Props) {
             </a>
           )}
         </div>
+        <FollowButton target={{ kind: 'venue', venueId: venue.id }} label="Suivre ce lieu" className="mt-3 items-start" />
       </PageIntro>
 
       {hasGeo && mapToken && (

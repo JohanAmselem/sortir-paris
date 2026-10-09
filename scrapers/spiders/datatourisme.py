@@ -46,6 +46,7 @@ import os
 import re
 import tempfile
 import zipfile
+from collections import Counter
 from datetime import date, datetime, time, timezone
 from typing import Any, Generator, Iterable, Iterator, List, Optional, Tuple
 
@@ -58,6 +59,7 @@ from utils.http import DEFAULT_HEADERS, USER_AGENT, PoliteClient, current_budget
 from utils.normalize import UNKNOWN_PRICE, in_service_zone, parse_price_fr, price_from_numbers
 
 SOURCE = "datatourisme"
+DROPS: Counter = Counter()
 API_BASE = "https://api.datatourisme.fr/v1"
 ZONE_DEPARTMENTS = ("75", "92", "93", "94")
 MAX_PERIODS = 12          # more future periods than this → one event for the whole run
@@ -380,19 +382,24 @@ def _category(types: set) -> Optional[str]:
 def parse_object(obj: dict, now: Optional[datetime] = None) -> List[dict]:
     """One DATAtourisme POI (JSON-LD flux file or API object) → 0..n event dicts."""
     if not isinstance(obj, dict):
+        DROPS["not_dict"] += 1
         return []
     now = now or datetime.now(timezone.utc)
     types = _types(obj)
     if not types & EVENT_CLASSES:
+        DROPS["not_event_class"] += 1
         return []
     if types & EXCLUDED_CLASSES and not types & _CATEGORY_CLASSES:
+        DROPS["excluded_class"] += 1
         return []
     uri = obj.get("@id") or _text(_get(obj, "uri")) or _text(_get(obj, "uuid"))
     title = _text(_get(obj, "label"))
     if not uri or not title:
+        DROPS["no_uri_or_title"] += 1
         return []
     loc = _location(obj)
     if zone_of(loc) != "in":
+        DROPS["out_of_zone"] += 1
         return []
 
     periods = [(s, e) for s, e in _periods(obj) if not _is_placeholder_year(s, e)]
@@ -401,12 +408,14 @@ def parse_object(obj: dict, now: Optional[datetime] = None) -> List[dict]:
         key=lambda p: _aware(p[0], False),
     )
     if not future:
+        DROPS["no_future_date"] += 1
         return []
     if len(future) > MAX_PERIODS:
         # many dates: one event for the run (or the next date if scattered)
         occ = [(_aware(s, False), _aware(e, True) if e is not None else None) for s, e in future]
         picked = select_occurrence(occ, now=now)
         if picked is None:
+            DROPS["no_pick"] += 1
             return []
         first = next(p for p in future if _aware(p[0], False) == picked[0])
         future = [(first[0], picked[1])]
@@ -549,6 +558,14 @@ def fetch_api(api_key: str, now: Optional[datetime] = None, max_pages: int = 100
                 print(f"  [datatourisme] API HTTP {resp.status_code}: {resp.text[:200]}")
                 return
             data = resp.json()
+            objs = data.get("objects") or []
+            if pages == 1:
+                print(f"  [datatourisme] page 1: {len(objs)} objects, keys={sorted(data)[:8]}, meta={ {k: v for k, v in (data.get('meta') or {}).items() if k != 'next'} }")
+                if objs:
+                    o = objs[0]
+                    print(f"  [datatourisme] sample type={o.get('type')} keys={sorted(o)[:20]}")
+                    print(f"  [datatourisme] sample takesPlaceAt={str(o.get('takesPlaceAt'))[:300]}")
+                    print(f"  [datatourisme] sample isLocatedAt={str(o.get('isLocatedAt'))[:400]}")
             for obj in data.get("objects") or []:
                 try:
                     events = parse_object(obj, now=now)
@@ -564,7 +581,7 @@ def fetch_api(api_key: str, now: Optional[datetime] = None, max_pages: int = 100
             if nxt and nxt.startswith("/"):
                 nxt = "https://api.datatourisme.fr" + nxt
             url, params = nxt, None  # `next` already carries every parameter
-        print(f"  [datatourisme] API: {pages} pages, {len(seen)} events")
+        print(f"  [datatourisme] API: {pages} pages, {len(seen)} events, dropped {dict(DROPS)}")
     finally:
         if own:
             client.close()

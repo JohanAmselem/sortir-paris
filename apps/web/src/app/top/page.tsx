@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default async function TopPage() {
   const now = bucketNow()
   const [top, loved, popular] = await Promise.all([
-    getMembersTopThisWeek(now.getTime()).catch((err): RankedEvent[] | null => {
+    getMembersTopThisWeek().catch((err): RankedEvent[] | null => {
       console.error('[top] week failed', err)
       return null
     }),

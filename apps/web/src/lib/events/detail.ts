@@ -1,7 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db, events, venues, categories, withStatementTimeout } from '@sortir/db'
+import { events, venues, categories, withStatementTimeout } from '@sortir/db'
 import { and, eq, sql } from 'drizzle-orm'
 import { STATEMENT_TIMEOUT_MS, withTimeout } from './query'
 
@@ -45,21 +45,24 @@ export interface EventDetail {
 const iso = (d: Date | string | null) => (d == null ? null : d instanceof Date ? d.toISOString() : String(d))
 
 async function load(slug: string): Promise<EventDetail | null> {
-  const rows = await db
-    .select({ event: events, venue: venues, category: categories })
-    .from(events)
-    .leftJoin(venues, eq(events.venueId, venues.id))
-    .leftJoin(categories, eq(events.categoryId, categories.id))
-    .where(eq(events.slug, slug))
-    .limit(1)
-  if (!rows.length) return null
-  const { event: e, venue: v, category: c } = rows[0]
-
-  let canonicalSlug: string | null = null
-  if (e.canonicalEventId) {
-    const canon = await db.select({ slug: events.slug }).from(events).where(eq(events.id, e.canonicalEventId)).limit(1)
-    canonicalSlug = canon[0]?.slug ?? null
-  }
+  const found = await withStatementTimeout(STATEMENT_TIMEOUT_MS, async (tx) => {
+    const rows = await tx
+      .select({ event: events, venue: venues, category: categories })
+      .from(events)
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(categories, eq(events.categoryId, categories.id))
+      .where(eq(events.slug, slug))
+      .limit(1)
+    if (!rows.length) return null
+    let canonicalSlug: string | null = null
+    if (rows[0].event.canonicalEventId) {
+      const canon = await tx.select({ slug: events.slug }).from(events).where(eq(events.id, rows[0].event.canonicalEventId)).limit(1)
+      canonicalSlug = canon[0]?.slug ?? null
+    }
+    return { ...rows[0], canonicalSlug }
+  })
+  if (!found) return null
+  const { event: e, venue: v, category: c, canonicalSlug } = found
 
   return {
     id: e.id,

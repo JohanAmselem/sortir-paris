@@ -6,8 +6,8 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import { categories, db, eventReviews, events, tasteProfiles, userSaves, userSwipes, users, venues } from '@sortir/db'
-import { effectiveEndSql, liveCondition, toCard, windowCondition, withTimeout } from '@/lib/events/query'
+import { categories, db, eventReviews, events, tasteProfiles, userSaves, userSwipes, users, venues, withStatementTimeout } from '@sortir/db'
+import { STATEMENT_TIMEOUT_MS, bucketNow, effectiveEndSql, liveCondition, toCard, windowCondition, withTimeout } from '@/lib/events/query'
 import { getWindow } from '@/lib/paris-time'
 import {
   computeGamification,
@@ -53,13 +53,15 @@ const VISIBLE = sql`${events.status} not in ('draft', 'rejected')`
 export async function getCardsByIds(ids: string[]): Promise<CardEvent[]> {
   if (!ids.length) return []
   const rows = await withTimeout(
-    db
-      .select(cardColumns)
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(inArray(events.id, ids), VISIBLE)),
-    8000,
+    withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select(cardColumns)
+        .from(events)
+        .leftJoin(venues, eq(events.venueId, venues.id))
+        .leftJoin(categories, eq(events.categoryId, categories.id))
+        .where(and(inArray(events.id, ids), VISIBLE))
+    ),
+    STATEMENT_TIMEOUT_MS + 1500,
     'getCardsByIds'
   )
   const byId = new Map(rows.map((r) => [String(r.id), toCard(r)]))
@@ -229,20 +231,23 @@ export interface RankedEvent {
 
 /** Upcoming events of the next 7 days the members saved / plan to attend the most. */
 export const getMembersTopThisWeek = unstable_cache(
-  async (nowMs: number): Promise<RankedEvent[]> => {
-    const now = new Date(nowMs)
+  // Keyed without time (see lib/events/query.ts): "now" is read inside.
+  async (): Promise<RankedEvent[]> => {
+    const now = bucketNow()
     const w = getWindow('week', now)
-    const rows = await db
-      .select({ ...cardColumns, attendanceCount: events.attendanceCount })
-      .from(events)
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(liveCondition(now), windowCondition(w, now), sql`(${events.saveCount} + ${events.attendanceCount}) > 0`))
-      .orderBy(desc(sql`${events.saveCount} + ${events.attendanceCount} * 2`), asc(events.startDate), asc(events.id))
-      .limit(12)
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select({ ...cardColumns, attendanceCount: events.attendanceCount })
+        .from(events)
+        .leftJoin(venues, eq(events.venueId, venues.id))
+        .leftJoin(categories, eq(events.categoryId, categories.id))
+        .where(and(liveCondition(now), windowCondition(w, now), sql`(${events.saveCount} + ${events.attendanceCount}) > 0`))
+        .orderBy(desc(sql`${events.saveCount} + ${events.attendanceCount} * 2`), asc(events.startDate), asc(events.id))
+        .limit(12)
+    )
     return rows.map((r) => ({ event: toCard(r), saves: Number(r.saveCount ?? 0), attendances: Number(r.attendanceCount ?? 0) }))
   },
-  ['club-top-week-v1'],
+  ['club-top-week-v2'],
   { revalidate: 600, tags: ['events', 'club'] }
 )
 
@@ -267,15 +272,17 @@ export const getMembersLovedPast = unstable_cache(
       .groupBy(eventReviews.eventId)
       .having(sql`count(*) >= ${MIN_REVIEWS_FOR_TOP}`)
       .as('agg')
-    const rows = await db
-      .select({ ...cardColumns, avg: agg.avg, n: agg.n })
-      .from(agg)
-      .innerJoin(events, eq(events.id, agg.eventId))
-      .leftJoin(venues, eq(events.venueId, venues.id))
-      .leftJoin(categories, eq(events.categoryId, categories.id))
-      .where(and(sql`${events.startDate} < now()`, VISIBLE))
-      .orderBy(desc(agg.avg), desc(agg.n), asc(events.id))
-      .limit(8)
+    const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+      tx
+        .select({ ...cardColumns, avg: agg.avg, n: agg.n })
+        .from(agg)
+        .innerJoin(events, eq(events.id, agg.eventId))
+        .leftJoin(venues, eq(events.venueId, venues.id))
+        .leftJoin(categories, eq(events.categoryId, categories.id))
+        .where(and(sql`${events.startDate} < now()`, VISIBLE))
+        .orderBy(desc(agg.avg), desc(agg.n), asc(events.id))
+        .limit(8)
+    )
     return rows.map((r) => ({
       event: toCard(r),
       avgRating: Math.round(Number(r.avg) * 10) / 10,

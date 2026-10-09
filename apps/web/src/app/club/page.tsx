@@ -97,7 +97,7 @@ export default async function ClubPage() {
       console.error('[club] drop failed', err)
       return null
     }),
-    getMembersTopThisWeek(now.getTime()).catch(() => []),
+    getMembersTopThisWeek().catch(() => []),
   ])
   const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
   const firstName = overview?.name?.split(/\s+/)[0] ?? null

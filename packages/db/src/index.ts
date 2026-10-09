@@ -71,7 +71,12 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
  */
 export function withStatementTimeout<T>(ms: number, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql.raw(`set local statement_timeout = ${Math.max(100, Math.round(ms))}`))
+    const t = Math.max(100, Math.round(ms))
+    // idle_in_transaction: if the app gives up (page timeout, frozen function) the
+    // transaction would otherwise stay open on a pooled connection for minutes.
+    // Two statements: the extended protocol refuses several commands in one query.
+    await tx.execute(sql.raw(`set local statement_timeout = ${t}`))
+    await tx.execute(sql.raw(`set local idle_in_transaction_session_timeout = ${t + 4000}`))
     return fn(tx)
   })
 }

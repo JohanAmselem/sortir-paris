@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
 import { HeaderNav } from './header-nav'
@@ -13,10 +14,19 @@ export const PRIMARY_NAV = [
 ]
 
 export function Logo({ className = '' }: { className?: string }) {
+  // Brand files: public/brand (vectorised from the official logo).
   return (
-    <Link href="/" aria-label="Paname Club, accueil" className={`flex items-baseline gap-[0.2em] ${className}`}>
-      <span className="font-display text-[1.35rem] tracking-tight text-ink">PANAME</span>
-      <span className="font-display text-[1.35rem] font-light tracking-tight text-accent">CLUB</span>
+    <Link href="/" aria-label="Paname Club, accueil" className={`flex items-center gap-2 ${className}`}>
+      <Image src="/brand/logo-mark.svg" alt="" width={29} height={30} priority unoptimized className="h-[30px] w-auto" />
+      <Image
+        src="/brand/logo-wordmark.svg"
+        alt=""
+        width={146}
+        height={15}
+        priority
+        unoptimized
+        className="h-[13px] w-auto md:h-[15px]"
+      />
     </Link>
   )
 }

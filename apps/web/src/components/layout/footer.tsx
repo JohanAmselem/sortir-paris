@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
 
@@ -26,8 +27,9 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 pb-10 pt-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <p className="font-display text-[2rem] text-paper">
-              PANAME<span className="font-light text-accent-glow">CLUB</span>
+            <p className="flex items-center gap-3">
+              <Image src="/brand/logo-mark-light.svg" alt="" width={48} height={50} unoptimized className="h-[50px] w-auto" />
+              <Image src="/brand/logo-wordmark-light.svg" alt="Paname Club" width={204} height={21} unoptimized className="h-[21px] w-auto" />
             </p>
             <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-paper/75">
               Les meilleures idées de sortie à Paris, choisies chaque jour parmi des milliers d’événements.

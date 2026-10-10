@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og'
 import { getEventBySlug } from '@/lib/events/detail'
 import { formatWhen } from '@/lib/paris-time'
 import { formatPrice } from '@/lib/format'
+import { SITE_URL } from '@/lib/site'
 
 export const alt = 'Paname Club : fiche de sortie'
 export const size = { width: 1200, height: 630 }
@@ -28,8 +29,9 @@ export default async function OGImage({ params }: { params: Promise<{ slug: stri
           <img src={e.imageUrl} alt="" width={460} height={630} style={{ width: 460, height: 630, objectFit: 'cover' }} />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 56 }}>
-          <div style={{ display: 'flex', fontSize: 30, fontWeight: 800 }}>
-            PANAME<span style={{ color: VIOLET, fontWeight: 300 }}>CLUB</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <img src={`${SITE_URL}/brand/logo-mark-light.svg`} alt="" width={58} height={60} />
+            <img src={`${SITE_URL}/brand/logo-wordmark-light.svg`} alt="" width={262} height={27} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {when && <div style={{ fontSize: 30, color: VIOLET, fontWeight: 700 }}>{when}</div>}

@@ -42,7 +42,8 @@ export function parseEventParams(p: Params): EventQuery {
   if (q && get(p, 'raw') !== '1') {
     const found = extractSearchFilters(q)
     q = found.q
-    categories.push(...found.categories)
+    // Categories chosen in the filters win over those guessed from the text.
+    if (!categories.length) categories.push(...found.categories)
     intents.push(...found.intents)
     topics.push(...found.topics)
     free ||= found.free

@@ -21,7 +21,7 @@ describe('extractSearchFilters', () => {
 
   it('leaves venue names and plain words alone', () => {
     expect(extractSearchFilters('théâtre de la ville de paris')).toMatchObject({ categories: [], q: 'théâtre de la ville de paris' })
-    expect(extractSearchFilters('jazz')).toEqual({ q: 'jazz', categories: [], intents: [], topics: [], free: false })
+    expect(extractSearchFilters('jazz')).toEqual({ q: 'jazz', categories: ['concerts', 'festivals', 'soirees'], intents: [], topics: [], free: false })
     // "exposition" inside another word is not a match.
     expect(extractSearchFilters('superconcerts').categories).toEqual([])
   })
@@ -47,5 +47,11 @@ describe('filmSlug', () => {
     expect(filmSlug("L'invitation")).toBe('l-invitation')
     expect(filmSlug('  Ni vue, ni connue ')).toBe('ni-vue-ni-connue')
     expect(filmSlug('Été 85')).toBe('ete-85')
+  })
+
+  it('music genres search among musical outings only, keeping the word as text', () => {
+    expect(extractSearchFilters('metal')).toMatchObject({ categories: ['concerts', 'festivals', 'soirees'], q: 'metal' })
+    expect(extractSearchFilters('concert metal')).toMatchObject({ categories: ['concerts'], q: 'metal' })
+    expect(extractSearchFilters('hard rock')).toMatchObject({ q: 'hard rock' })
   })
 })

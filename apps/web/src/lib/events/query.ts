@@ -82,6 +82,12 @@ const STOP_WORDS = new Set(
   )
 )
 
+/** Search words matched as whole words (music genres; see search-synonyms.ts). */
+const WHOLE_WORD_TOKENS = new Set([
+  'metal', 'metalcore', 'rock', 'punk', 'hardcore', 'jazz', 'blues', 'rap', 'techno', 'electro', 'house',
+  'reggae', 'ska', 'soul', 'funk', 'folk', 'rnb', 'disco', 'salsa', 'grunge', 'emo', 'indie',
+])
+
 export function searchTokens(q: string): string[] {
   return foldText(q)
     .replace(/[^a-z0-9\s-]/g, ' ')
@@ -313,7 +319,10 @@ export function buildConditions(
   }
   if (query.q) {
     const tokens = searchTokens(query.q)
-    for (const t of tokens) conds.push(textMatch('like', '%' + t + '%'))
+    for (const t of tokens) {
+      // Genre words match whole words only ("metal" must not find "Métallos").
+      conds.push(WHOLE_WORD_TOKENS.has(t) ? textMatch('~', `\\m${t}\\M`) : textMatch('like', '%' + t + '%'))
+    }
   }
   if (query.near) {
     const radius = query.near.radiusKm ?? 3

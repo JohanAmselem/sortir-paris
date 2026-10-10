@@ -208,7 +208,8 @@ def event_from_tm(e: dict) -> Optional[dict]:
     cls0 = next((c for c in e.get("classifications") or [] if isinstance(c, dict)), {})
     STATS[f"type:{(cls0.get('segment') or {}).get('name')}/{(cls0.get('genre') or {}).get('name')}"] += 1
     STATS[f"venue:{venue0.get('name')}"] += 1
-    category, skip = category_for(e.get("classifications"))
+    category, skip = category_for(e.get("classifications") or [
+        c for a in (e.get("_embedded") or {}).get("attractions") or [] for c in (a.get("classifications") or [])])
     if skip:
         return None
     dates = e.get("dates") or {}
@@ -227,7 +228,10 @@ def event_from_tm(e: dict) -> Optional[dict]:
         return None
     status = ((dates.get("status") or {}).get("code") or "").lower()
     genre_tags = []
-    for c in e.get("classifications") or []:
+    # Genre of the event, else of its artists (some FR listings only classify the attraction).
+    attraction_cls = [c for a in (e.get("_embedded") or {}).get("attractions") or []
+                      for c in (a.get("classifications") or [])]
+    for c in (e.get("classifications") or []) + attraction_cls:
         for k in ("segment", "genre", "subGenre"):
             n = ((c or {}).get(k) or {}).get("name")
             if n and n.lower() != "undefined" and n not in genre_tags:
@@ -267,6 +271,11 @@ def parse_api(data) -> Tuple[List[dict], dict]:
         return [], {}
     out = []
     for e in (data.get("_embedded") or {}).get("events") or []:
+        if not STATS["diag_printed"] and isinstance(e, dict):
+            STATS["diag_printed"] += 1
+            a0 = ((e.get("_embedded") or {}).get("attractions") or [{}])[0]
+            print(f"  [{SOURCE}] diag event keys={sorted(e)[:25]} classifications={str(e.get('classifications'))[:300]}"
+                  f" attraction_cls={str(a0.get('classifications'))[:300]}")
         if not isinstance(e, dict):
             continue
         try:

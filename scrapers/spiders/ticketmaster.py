@@ -43,7 +43,10 @@ BASE_PARAMS = {
     "latlong": "48.8566,2.3522",
     "radius": "18",  # Paris + petite couronne (Nanterre 11 km, Créteil 12 km, Orly 14 km)
     "unit": "km",
-    "locale": "fr-fr",
+    # fr-fr alone returns classifications as bare ids (no segment/genre names): every
+    # event was "None/None", so no genre ("Metal", "Rock"…) and no category from the
+    # source. Fall back to English, then any locale, for names.
+    "locale": "fr-fr,en-us,*",
     "size": str(PAGE_SIZE),
     "sort": "date,asc",
 }

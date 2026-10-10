@@ -204,7 +204,8 @@ def plan_event(cur, raw: dict, ctx: "IngestContext"):
         "venue_id": venue_id,
         "keywords": keywords_to_search_string(
             extract_keywords(ev.title, ev.description, ev.short_desc, ev.category_slug,
-                             ev.venue_name, is_free=ev.price_status == "free")
+                             ev.venue_name, is_free=ev.price_status == "free",
+                             tags=getattr(ev, "tags_raw", None))
         ) or None,
         "source": ev.source,
         "source_id": ev.source_id,

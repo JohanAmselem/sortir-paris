@@ -34,7 +34,9 @@ GENRE_MUSIC = {
     "electro": ["electro", "techno", "house", "deep house", "drum and bass", "trance", "ambient", "dubstep", "minimal"],
     "hip-hop": ["hip-hop", "hip hop", "rap", "trap", "drill", "boom bap", "freestyle", "slam", "spoken word"],
     "classique": ["classique", "orchestre", "symphonique", "symphonie", "chambre", "quatuor", "sonate", "concerto", "baroque", "opera", "opéra", "lyrique", "choeur", "chorale"],
-    "metal": ["metal", "heavy metal", "death metal", "black metal", "doom", "hardcore", "metalcore"],
+    # "hardcore" alone is ambiguous (hardcore rap, hardcore techno): only explicit forms.
+    "metal": ["metal", "heavy metal", "death metal", "black metal", "thrash metal", "doom metal", "metalcore",
+              "hardcore punk", "nu metal", "stoner", "sludge", "grindcore", "deathcore", "post-metal"],
     "soul": ["soul", "funk", "r&b", "rnb", "neo-soul", "motown", "disco", "groove"],
     "reggae": ["reggae", "dub", "dancehall", "ska", "ragga"],
     "blues": ["blues", "delta blues", "chicago blues"],
@@ -56,7 +58,7 @@ GENRE_THEATRE = {
     "comedie": ["comédie", "comique", "humour", "drôle", "rire", "burlesque", "vaudeville"],
     "drame": ["drame", "dramatique", "tragédie", "tragique"],
     "impro": ["improvisation", "impro", "match impro"],
-    "stand-up": ["stand-up", "stand up", "one man show", "one woman show", "seul en scène", "solo", "sketch"],
+    "stand-up": ["stand-up", "stand up", "one man show", "one woman show", "seul en scène", "sketch"],
     "jeune": ["jeune public", "enfants", "familial", "conte", "conteur"],
     "musical": ["comédie musicale", "musical", "opérette", "cabaret"],
 }
@@ -100,10 +102,17 @@ def extract_keywords(
     category_slug: Optional[str] = None,
     venue_name: Optional[str] = None,
     is_free: bool = False,
+    tags: Optional[list] = None,
 ) -> list[str]:
-    """Extract rich keywords from event data for Meilisearch."""
+    """Keywords for search: the genres/terms actually found in the event text and
+    in the source's own genre tags (e.g. Ticketmaster "Rock, Metal").
+
+    Only the matched term and its genre name are added. Adding every sibling term of
+    a family (the old behaviour) tagged a hip-hop night "black metal, death metal…" as
+    soon as "hardcore" appeared, and a "metal" search returned mostly non-metal events.
+    """
     keywords = set()
-    text = _fold(f"{title} {short_desc or ''} {description or ''}")
+    text = _fold(f"{title} {short_desc or ''} {description or ''} {' '.join(tags or [])}")
     full_text = f"{text} {_fold(venue_name or '')}"
 
     # 1. Genre-specific keywords
@@ -117,19 +126,14 @@ def extract_keywords(
         for term in terms:
             if _has(term, full_text):
                 keywords.add(genre)
-                for related in terms:
-                    if len(related) >= 3:
-                        keywords.add(related)
-                break
+                keywords.add(term)
 
-    # 2. Ambiance keywords
+    # 2. Ambiance keywords (same rule: what was found + the ambiance name)
     for ambiance, terms in AMBIANCE_KEYWORDS.items():
         for term in terms:
             if _has(term, full_text):
                 keywords.add(ambiance)
-                for related in terms:
-                    keywords.add(related)
-                break
+                keywords.add(term)
 
     # 3. Category enrichment
     if category_slug and category_slug in CATEGORY_ENRICHMENT:

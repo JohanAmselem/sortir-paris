@@ -104,3 +104,12 @@ jobs:
           MEILISEARCH_WRITE_KEY: ${{ secrets.MEILISEARCH_WRITE_KEY }}
           MEILISEARCH_API_KEY: ${{ secrets.MEILISEARCH_API_KEY }}
         run: python cron.py --post
+      - name: Artist alerts (new dates, ticket openings, reminders)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET not set: artist alerts skipped"
+            exit 0
+          fi
+          curl -fsS --max-time 320 -X POST -H "Authorization: Bearer $CRON_SECRET" https://www.panameclub.fr/api/cron/alerts

@@ -1,0 +1,31 @@
+name: Artist alerts — reminders
+
+# Every morning at 08:00 UTC (10:00 Paris in summer, 09:00 in winter): reminder
+# for the events members marked « J'y vais » that start tomorrow.
+# New dates and ticket openings are sent after each scrape (daily-scrape.yml).
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artist-alerts-reminder
+  cancel-in-progress: false
+
+jobs:
+  reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Send reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET not set: reminders skipped"
+            exit 0
+          fi
+          curl -fsS --max-time 320 -X POST -H "Authorization: Bearer $CRON_SECRET" "https://www.panameclub.fr/api/cron/alerts?only=reminder"

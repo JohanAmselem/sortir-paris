@@ -100,6 +100,8 @@ class EventIn(BaseModel):
     slug: str = ""
     event_status: str = "scheduled"
     is_online: bool = False
+    artists: List[str] = Field(default_factory=list)
+    on_sale_at: Optional[datetime] = None
 
     @field_validator("price_min", "price_max", mode="before")
     @classmethod
@@ -113,7 +115,7 @@ class EventIn(BaseModel):
     def _price_status(cls, v):
         return v if v in ("free", "paid", "unknown") else "unknown"
 
-    @field_validator("start_date", "end_date", mode="after")
+    @field_validator("start_date", "end_date", "on_sale_at", mode="after")
     @classmethod
     def _aware(cls, v):
         if v is not None and v.tzinfo is None:
@@ -128,7 +130,7 @@ class EventIn(BaseModel):
     def _zip(cls, v):
         return normalize_zip(v)  # 5 digits or None ("à venir", "75 018" → "75018")
 
-    @field_validator("tags_raw", mode="before")
+    @field_validator("tags_raw", "artists", mode="before")
     @classmethod
     def _tags(cls, v):
         return [str(x) for x in (v or []) if x]

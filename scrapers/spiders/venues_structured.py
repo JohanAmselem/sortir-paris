@@ -258,6 +258,10 @@ def _finalize(evs: Iterable[dict], venue: VenueSource, now: Optional[datetime]) 
         if not ev.get("category_slug") and venue.fallback_category:
             ev["category_slug"] = venue.fallback_category
         ev["tags_raw"] = [t for t in ev.get("tags_raw") or [] if t.lower() not in ("no information", "n/a")]
+        # JSON-LD performer → artists; a performer named like the venue is the venue itself
+        ev["artists"] = [a for a in ev.get("artists") or []
+                         if a.lower() not in ("no information", "n/a")
+                         and a.strip().lower() != (ev.get("venue_name") or "").strip().lower()]
         ev["venue_website"] = ev.get("venue_website") or _site_root(venue)
         out.append(ev)
     return out

@@ -154,8 +154,9 @@ def run_sources(specs, dry_run: bool = False) -> list:
 
 
 def run_post() -> list:
-    """Geocode → link venues → promote → series → dedup → categories → expire → purge
+    """Geocode → link venues → promote → series → dedup → categories → artists → expire → purge
     (→ Meilisearch if MEILI_SYNC=1). Each step isolated; failures reported."""
+    from pipelines.artists_backfill import backfill_artists
     from pipelines.dedup import run_dedup
     from pipelines.ingest import get_db_connection
     from pipelines.maintenance import (
@@ -177,6 +178,7 @@ def run_post() -> list:
         ("series", lambda: reject_collapsed_series(conn)),
         ("dedup", lambda: run_dedup(conn)),
         ("categories", lambda: reclassify_categories(conn)),
+        ("artists", lambda: backfill_artists(conn)),
         ("expire", lambda: expire_events(conn)),
         ("purge", lambda: purge_old_events(conn)),
     ]

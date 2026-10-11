@@ -8,6 +8,8 @@ Ingestion pipeline: validated, idempotent upserts into Postgres.
 - Every upsert sets last_seen_at = now().
 - Meilisearch is NOT touched here: one full sync runs at the end (pipelines/meili.py).
 - Cross-source dedup runs after all sources (pipelines/dedup.py).
+- Artists (event_artists) are written per batch in two statements after the events
+  (utils/artists.extract_artists); a failure there never loses the events.
 """
 
 from __future__ import annotations
@@ -16,8 +18,9 @@ import json
 import os
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
+from utils.artists import artist_key, extract_artists
 from utils.event import stable_id
 from utils.keywords import extract_keywords, keywords_to_search_string
 from utils.matching import dedup_title
@@ -115,6 +118,7 @@ _UPDATE_SETS = [
     ("status", "%(status)s"),
     ("quality_score", "%(quality_score)s"),
     ("quality_reasons", "%(quality_reasons)s::jsonb"),
+    ("on_sale_at", "COALESCE(%(on_sale_at)s::timestamptz, on_sale_at)"),
 ]
 
 UPDATE_SQL = (
@@ -141,18 +145,92 @@ INSERT INTO events (
     price_min, price_max, is_free, price_status,
     booking_url, category_id, venue_id, keywords,
     source, source_url, source_id,
-    status, quality_score, quality_reasons, last_seen_at
+    status, quality_score, quality_reasons, on_sale_at, last_seen_at
 ) VALUES (
     %(title)s, %(slug)s, %(description)s, %(short_desc)s, %(image_url)s,
     %(start_date)s, %(end_date)s, %(time_known)s,
     %(price_min)s, %(price_max)s, %(is_free)s, %(price_status)s,
     %(booking_url)s, %(category_id)s, %(venue_id)s, %(keywords)s,
     %(source)s, %(source_url)s, %(source_id)s,
-    %(status)s, %(quality_score)s, %(quality_reasons)s::jsonb, now()
+    %(status)s, %(quality_score)s, %(quality_reasons)s::jsonb, %(on_sale_at)s, now()
 )
 ON CONFLICT (slug) DO NOTHING
 RETURNING id
 """
+
+# Artists of the batch, matched to their event by (source, source_id) — the ids of new
+# rows are not known (execute_batch returns nothing). Replace semantics for updated
+# events, without churn: only the rows that disappeared are deleted, and only the rows
+# that are new or changed are written (the same artists twice a day write nothing).
+ARTISTS_DELETE_SQL = """
+DELETE FROM event_artists ea
+WHERE ea.event_id = ANY(%(ids)s::uuid[])
+  AND (ea.event_id, ea.artist_key) NOT IN (
+      SELECT k.event_id, k.artist_key
+      FROM unnest(%(keep_ids)s::uuid[], %(keep_keys)s::text[]) AS k(event_id, artist_key))
+"""
+
+ARTISTS_UPSERT_SQL = """
+INSERT INTO event_artists (event_id, artist_key, name, origin)
+SELECT e.id, d.artist_key, d.name, d.origin
+FROM unnest(%(sources)s::text[], %(source_ids)s::text[], %(keys)s::text[], %(names)s::text[],
+            %(origins)s::text[]) AS d(source, source_id, artist_key, name, origin)
+JOIN events e ON e.source = d.source AND e.source_id = d.source_id
+ON CONFLICT (event_id, artist_key) DO UPDATE SET name = EXCLUDED.name, origin = EXCLUDED.origin
+WHERE (event_artists.name, event_artists.origin) IS DISTINCT FROM (EXCLUDED.name, EXCLUDED.origin)
+"""
+
+
+def artists_params(planned: List[dict]) -> Optional[Tuple[dict, dict]]:
+    """Planned rows (params with "artists" = [(name, origin)]) → (delete params, upsert params).
+    Updated rows ("id" known) get replace semantics; new rows only get inserts."""
+    ids, keep_ids, keep_keys = [], [], []
+    up = {"sources": [], "source_ids": [], "keys": [], "names": [], "origins": []}
+    seen = set()
+    for p in planned:
+        eid = p.get("id")
+        if eid == "pending":
+            continue
+        if eid:
+            ids.append(eid)
+        for name, origin in p.get("artists") or []:
+            key = artist_key(name)
+            if not key or (p["source"], p["source_id"], key) in seen:
+                continue
+            seen.add((p["source"], p["source_id"], key))
+            if eid:
+                keep_ids.append(eid)
+                keep_keys.append(key)
+            up["sources"].append(p["source"])
+            up["source_ids"].append(p["source_id"])
+            up["keys"].append(key)
+            up["names"].append(name[:120])
+            up["origins"].append(origin)
+    if not ids and not up["keys"]:
+        return None
+    return {"ids": ids, "keep_ids": keep_ids, "keep_keys": keep_keys}, up
+
+
+def _write_artists(cur, planned: List[dict], stats: dict) -> None:
+    """Two statements per batch, in their own savepoint (the events are already written)."""
+    prepared = artists_params(planned)
+    if not prepared:
+        return
+    delete_p, upsert_p = prepared
+    cur.execute("SAVEPOINT artists")
+    try:
+        if delete_p["ids"]:
+            cur.execute(ARTISTS_DELETE_SQL, delete_p)
+        if upsert_p["keys"]:
+            cur.execute(ARTISTS_UPSERT_SQL, upsert_p)
+        cur.execute("RELEASE SAVEPOINT artists")
+    except Exception as e:
+        cur.execute("ROLLBACK TO SAVEPOINT artists")
+        stats["errors"] += 1
+        if len(stats["error_list"]) < MAX_LOGGED_ERRORS:
+            stats["error_list"].append(f"event_artists: {str(e)[:200]}")
+        print(f"  Error writing event_artists: {e}")
+
 
 # Hard reasons that mean "not worth a new row" (existing rows are still updated).
 # Out-of-zone / online / junk rows are not stored at all (they used to be inserted as
@@ -212,6 +290,9 @@ def plan_event(cur, raw: dict, ctx: "IngestContext"):
         "status": status,
         "quality_score": score,
         "quality_reasons": json.dumps(hard + soft),
+        "on_sale_at": ev.on_sale_at,
+        # not a column: written to event_artists after the batch (see _write_artists)
+        "artists": extract_artists(ev.title, ev.category_slug, ev.artists, ev.venue_name),
     }
     if params["price_status"] == "free":
         params["price_min"] = params["price_max"] = 0
@@ -265,6 +346,7 @@ def _flush(cur, pending: List[tuple], stats: dict, slugs: SlugRegistry) -> None:
             if kind == "update" and p["id"] == "pending":
                 continue
             stats[action] += 1
+        _write_artists(cur, updates + inserts, stats)
         return
     except Exception:
         cur.execute("ROLLBACK TO SAVEPOINT batch")
@@ -293,6 +375,9 @@ def _flush(cur, pending: List[tuple], stats: dict, slugs: SlugRegistry) -> None:
                 stats["error_list"].append(f"{(raw.get('title') or '?')[:80]}: {str(e)[:200]}")
             if stats["errors"] <= 5:
                 print(f"  Error processing '{raw.get('title', '?')}': {e}")
+    # rows that failed above are simply not matched by the (source, source_id) join
+    _write_artists(cur, [p for _, kind, p, _ in pending if not (kind == "update" and p["id"] == "pending")],
+                   stats)
 
 
 def run_pipeline(events: List[dict], source_name: str, conn=None) -> dict:

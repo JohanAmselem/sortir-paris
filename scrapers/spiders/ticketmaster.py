@@ -17,6 +17,9 @@ Mapping:
 - priceRanges min/max (EUR) → centimes; no priceRanges → price unknown.
 - classifications segment/genre → category (Sports → skipped).
 - _embedded.venues[0] → venue; widest 16_9 image; dates.status.code cancelled → cancelled.
+- _embedded.attractions[].name → artists (event_artists, origin 'source'); genres stay tags.
+- sales.public.startDateTime → on_sale_at when still to come or opened in the last
+  ON_SALE_RECENT (artist alerts "billetterie ouverte").
 """
 
 from __future__ import annotations
@@ -196,6 +199,26 @@ NOT_AN_EVENT = re.compile(
 
 STATS: Counter = Counter()
 
+ON_SALE_RECENT = timedelta(days=7)
+
+
+def on_sale_at(e: dict, now: Optional[datetime] = None) -> Optional[str]:
+    """sales.public.startDateTime (UTC) → ISO string, when in the future or recent."""
+    public = ((e.get("sales") or {}).get("public") or {})
+    raw = public.get("startDateTime")
+    if not isinstance(raw, str) or public.get("startTBD") or public.get("startTBA"):
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    if dt < now - ON_SALE_RECENT:
+        return None
+    return dt.astimezone(timezone.utc).isoformat()
+
 
 def event_from_tm(e: dict) -> Optional[dict]:
     if not e.get("id") or not e.get("name"):
@@ -260,6 +283,8 @@ def event_from_tm(e: dict) -> Optional[dict]:
         category_slug=category,
         category_raw=", ".join(genre_tags) or None,
         tags=attractions + genre_tags,
+        artists=attractions,
+        on_sale_at=on_sale_at(e),
         event_status="cancelled" if status == "cancelled" else "scheduled",
         is_online=False,
     )

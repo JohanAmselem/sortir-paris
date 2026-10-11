@@ -7,7 +7,9 @@ Keys produced (all spiders must go through make_event):
   price_min, price_max (centimes), is_free, price_status ('free'|'paid'|'unknown'),
   booking_url, venue_name, venue_address, venue_city, venue_zip, venue_lat, venue_lng,
   venue_website, venue_arrondissement, category_slug, tags_raw, slug,
-  event_status ('scheduled'|'cancelled'), is_online, quality_score (legacy hint).
+  event_status ('scheduled'|'cancelled'), is_online, quality_score (legacy hint),
+  artists (performer names given by the source, never genres; [] when unknown),
+  on_sale_at (ISO-8601 UTC ticket on-sale time, or None).
 
 Validation (scrapers/validation.py) decides what is published; spiders must never
 invent a date, a time or a price: pass None and let the builder flag it unknown.
@@ -77,6 +79,8 @@ def make_event(
     tags: Optional[Iterable[str]] = None,
     event_status: str = "scheduled",
     is_online: Optional[bool] = None,
+    artists: Optional[Iterable[str]] = None,
+    on_sale_at=None,
 ) -> dict:
     title_c = clean_text(title) or ""
     desc_c = clean_text(description)
@@ -136,6 +140,8 @@ def make_event(
         "slug": generate_slug(title_c, start_iso),
         "event_status": event_status,
         "is_online": bool(is_online),
+        "artists": list(dict.fromkeys(a for a in (clean_text(x) for x in (artists or [])) if a))[:20],
+        "on_sale_at": normalize_when(on_sale_at)[0] if on_sale_at else None,
         "quality_score": compute_quality_score(
             title_c, desc_c, image_url, start_iso,
             None if (price.get("price_status") == "unknown") else "x", booking_url or source_url,

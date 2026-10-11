@@ -155,6 +155,26 @@ def location_from(loc) -> dict:
     return out
 
 
+def performer_names(performer) -> List[str]:
+    """schema.org performer (object, list, or list of lists) → names. Placeholders such as
+    "No Information" are dropped later (utils/artists.extract_artists)."""
+    out: List[str] = []
+
+    def walk(p, depth=0):
+        if depth > 3:
+            return
+        if isinstance(p, list):
+            for x in p:
+                walk(x, depth + 1)
+        elif isinstance(p, dict) and isinstance(p.get("name"), str):
+            name = clean_text(p["name"])
+            if name and name not in out:
+                out.append(name)
+
+    walk(performer)
+    return out
+
+
 def event_from_jsonld(
     obj: dict,
     *,
@@ -210,11 +230,7 @@ def event_from_jsonld(
     if isinstance(genre, list):
         genre = ", ".join(str(g) for g in genre)
 
-    performer = obj.get("performer")
-    tags = []
-    for p in performer if isinstance(performer, list) else [performer]:
-        if isinstance(p, dict) and p.get("name"):
-            tags.append(p["name"])
+    tags = performer_names(obj.get("performer"))
 
     sid = source_id or url or obj.get("@id")
     image = image_from(obj.get("image"))
@@ -240,6 +256,7 @@ def event_from_jsonld(
         category_raw=genre if isinstance(genre, str) else None,
         category_map=category_map,
         tags=tags,
+        artists=tags,
         event_status=event_status,
         is_online=is_online,
     )

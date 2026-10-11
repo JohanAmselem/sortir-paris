@@ -9,12 +9,16 @@ SERIES_MIN or more live sessions is replaced by one event:
   - source_id = "<prefix>-series-<hash(title key, venue key)>", stable across runs.
 Cinema sources keep one row per séance (the website groups films itself).
 
+The series row keeps the artists of every session and the earliest on-sale time still
+to come (else the latest one).
+
 cron.py applies it to every source before ingestion; maintenance.reject_collapsed_series
 hides the per-date rows stored before the series row existed.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from utils.dates import paris_local
@@ -42,6 +46,15 @@ def is_series_id(source_id: Optional[str]) -> bool:
 def _local_hhmm(ev: dict) -> Optional[str]:
     dt = paris_local(ev.get("start_date"))
     return dt.strftime("%H:%M") if dt else None
+
+
+def _series_on_sale(sessions: List[dict], now: Optional[datetime] = None) -> Optional[str]:
+    values = sorted(v for v in (e.get("on_sale_at") for e in sessions) if v)
+    if not values:
+        return None
+    now_iso = (now or datetime.now(timezone.utc)).isoformat()
+    future = [v for v in values if v > now_iso]  # same ISO-8601 UTC format → comparable
+    return future[0] if future else values[-1]
 
 
 def collapse_series(
@@ -81,6 +94,10 @@ def collapse_series(
         prefix = id_prefix or source or first.get("source") or "src"
         first["source_id"] = f"{prefix}{SERIES_MARK}{stable_id(tkey, vkey)[:16]}"
         first["series_sessions"] = len(sessions)
+        if any(e.get("artists") for e in sessions):
+            first["artists"] = list(dict.fromkeys(a for e in sessions for a in (e.get("artists") or [])))[:20]
+        if any(e.get("on_sale_at") for e in sessions):
+            first["on_sale_at"] = _series_on_sale(sessions)
         replace[live[0]] = first
         drop.update(idxs)  # cancelled sessions of a collapsed series go too
     if not replace:

@@ -58,6 +58,7 @@ def event_from_api(e: dict, artist: Optional[str] = None) -> Optional[dict]:
         venue_lng=lng,
         category_slug="concerts",
         tags=lineup,
+        artists=lineup or ([artist] if artist else []),
     )
 
 

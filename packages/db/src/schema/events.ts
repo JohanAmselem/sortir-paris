@@ -55,6 +55,8 @@ export const events = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     // Set on cross-source duplicates: points to the event that is displayed
     canonicalEventId: uuid('canonical_event_id'),
+    // Ticket sales opening (Ticketmaster sales.public.startDateTime), see sql/0010
+    onSaleAt: timestamp('on_sale_at', { withTimezone: true }),
 
     // Denormalized counters
     saveCount: integer('save_count').default(0).notNull(),

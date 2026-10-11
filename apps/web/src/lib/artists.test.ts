@@ -21,8 +21,8 @@ describe('artistKey', () => {
     expect(artistKey('Łona')).toBe('lona')
   })
 
-  it('keeps non-latin letters and digits', () => {
-    expect(artistKey('BTS 방탄소년단')).toBe('bts 방탄소년단')
+  it('keeps digits; other scripts are dropped (ASCII keys, like the Python side)', () => {
+    expect(artistKey('BTS 방탄소년단')).toBe('bts')
     expect(artistKey('2Pac')).toBe('2pac')
   })
 

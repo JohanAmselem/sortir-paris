@@ -30,7 +30,10 @@ export function artistKey(name: string): string {
     // Recompose what is left (Hangul syllables, …).
     .normalize('NFC')
     .replace(/[œæøßđðłþı]/g, (c) => SPECIAL[c] ?? c)
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    // ASCII only, exactly like the Python key (unidecode + [^a-z0-9]): a name in
+    // another script yields no key here (Python would transliterate it), so such
+    // follows are refused rather than silently never matching.
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }
 

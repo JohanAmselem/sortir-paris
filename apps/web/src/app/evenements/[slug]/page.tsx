@@ -12,6 +12,7 @@ import { EventReviews } from '@/components/events/event-reviews'
 import { AttendButton } from '@/components/events/attend-button'
 import { FollowButton } from '@/components/follow/follow-button'
 import { followableFromTitle } from '@/lib/follows'
+import { safeGetEventArtists } from '@/app/club/_lib/artists'
 import { EventActionBar } from '@/components/events/sticky-booking-cta'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
@@ -150,7 +151,7 @@ export default async function EventPage({ params }: Props) {
   const price = formatPrice(event)
   const action = cta(event)
   const badge = past ? null : urgencyBadge(event, now)
-  // Artist / work to follow: the title (sources do not store Ticketmaster attractions separately).
+  // Artist / work to follow from the title, when the event has no artists (event_artists) listed.
   const followable = followableFromTitle(event.title)
 
   // "Tu aimeras aussi": same category, near the venue, around the same time,
@@ -175,13 +176,14 @@ export default async function EventPage({ params }: Props) {
   const work = workSlug(event.title)
   const hasWork =
     !past && !!event.category && (WORK_CATEGORIES as readonly string[]).includes(event.category.slug) && !isGenericWorkSlug(work)
-  const [nearby, sameVenue, runEnd, workDates] = await Promise.all([
+  const [nearby, sameVenue, runEnd, workDates, eventArtists] = await Promise.all([
     event.category && venueGeo ? safeQueryEvents({ ...similarBase, near: venueGeo }) : Promise.resolve({ events: [], total: 0, hasMore: false }),
     event.venue
       ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], excludeTitle: event.title, sort: 'soon', limit: 6 })
       : Promise.resolve({ events: [], total: 0, hasMore: false }),
     runEndPromise,
     hasWork ? safeGetWorkDates(work) : Promise.resolve([]),
+    safeGetEventArtists(event.id),
   ])
   const otherDates = workDates.filter((d) => d.id !== event.id)
   const otherVenues = [...new Map(otherDates.filter((d) => d.venue && d.venue.slug !== event.venue?.slug).map((d) => [d.venue!.slug, d.venue!.name])).values()]
@@ -360,7 +362,25 @@ export default async function EventPage({ params }: Props) {
               </p>
             )}
 
-            {followable && (
+            {eventArtists.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[13px] font-semibold uppercase tracking-wide text-text-muted">
+                  Artiste{eventArtists.length > 1 ? 's' : ''} :{' '}
+                  <span className="normal-case tracking-normal">{eventArtists.map((a) => a.name).join(', ')}</span>
+                </p>
+                <p className="mt-1 text-[13px] text-text-secondary">Suis-les : on te prévient de leurs prochaines dates à Paris.</p>
+                <ul className="mt-2 flex flex-wrap gap-2" aria-label="Suivre les artistes">
+                  {eventArtists.map((a) => (
+                    <li key={a.key} className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pl-3 pr-1">
+                      <span className="max-w-[12rem] truncate text-[14px] font-semibold text-ink">{a.name}</span>
+                      <FollowButton compact target={{ kind: 'artist', term: a.key, label: a.name }} label={`Suivre ${a.name}`} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {followable && eventArtists.length === 0 && (
               <FollowButton
                 target={{ kind: 'artist', term: followable.term, label: followable.label }}
                 label={`Suivre « ${followable.label} »`}

@@ -95,10 +95,16 @@ export function NewForYouTeaser({ groups, followCount }: { groups: FollowGroup[]
               </ul>
             </>
           )}
-          <Link href="/compte#nouveautes" className="mt-3 inline-flex h-10 items-center gap-1 text-[14px] font-semibold text-accent hover:text-accent-hover">
-            {followCount === 0 ? 'Mon compte' : 'Voir les nouveautés'}
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </Link>
+          <div className="mt-3 flex flex-wrap gap-x-5">
+            <Link href="/compte#nouveautes" className="inline-flex h-10 items-center gap-1 text-[14px] font-semibold text-accent hover:text-accent-hover">
+              {followCount === 0 ? 'Mon compte' : 'Voir les nouveautés'}
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link href="/compte/artistes" className="inline-flex h-10 items-center gap-1 text-[14px] font-semibold text-accent hover:text-accent-hover">
+              Mes artistes et alertes
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
         </div>
       </div>
     </div>

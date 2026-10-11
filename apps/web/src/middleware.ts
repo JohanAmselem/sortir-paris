@@ -18,6 +18,7 @@ export const config = {
     '/drop',
     '/quiz',
     '/club',
-    '/api/(saves|attendance|reviews|swipe|drop|preferences|taste-quiz|profile|auth|me|views|newsletter)/:path*',
+    '/api/(saves|attendance|reviews|swipe|drop|preferences|taste-quiz|profile|auth|me|views|newsletter|push|spotify)/:path*',
+    '/api/alerts/settings',
   ],
 }

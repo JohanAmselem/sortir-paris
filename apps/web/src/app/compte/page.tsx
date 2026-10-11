@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Bookmark, ChevronRight, Dna, Settings, Sparkles } from 'lucide-react'
+import { Bookmark, ChevronRight, Dna, Music, Settings, Sparkles } from 'lucide-react'
 import { DataUnavailable } from '@/components/events/blocks'
 import { ARCHETYPES } from '@/lib/taste-quiz-data'
 import { requireUser } from '@/app/club/_lib/api'
@@ -35,6 +35,7 @@ export default async function ComptePage() {
       desc: overview ? `${overview.upcomingSaved} à venir` : 'Tes événements gardés',
     },
     { href: '/compte/adn', icon: Dna, label: 'Mon ADN culturel', desc: archetype ? archetype.name : 'Ce que tu aimes vraiment' },
+    { href: '/compte/artistes', icon: Music, label: 'Mes artistes', desc: 'Nouvelles dates, billetteries, rappels' },
     { href: '/club', icon: Sparkles, label: 'Le Club', desc: 'Match, quiz, Drop du lundi' },
     { href: '/compte/parametres', icon: Settings, label: 'Préférences', desc: 'Catégories, ambiances, quartiers' },
   ]

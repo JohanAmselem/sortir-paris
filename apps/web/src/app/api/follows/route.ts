@@ -5,6 +5,7 @@ import { db, userFollows, venues } from '@sortir/db'
 import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
 import { listFollows } from '@/app/club/_lib/follows'
 import { MAX_FOLLOWS, TERM_MAX, isValidTerm, normalizeTerm } from '@/lib/follows'
+import { isValidArtistKey } from '@/lib/artists'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +58,7 @@ const postSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('venue'), venueId: idSchema }),
   z.object({
     kind: z.literal('artist'),
-    term: z.string().trim().min(3, 'Nom trop court.').max(200, 'Nom trop long.'),
+    term: z.string().trim().min(2, 'Nom trop court.').max(200, 'Nom trop long.'),
     label: z.string().trim().min(1).max(160).optional(),
   }),
 ])
@@ -89,7 +90,8 @@ export async function POST(request: NextRequest) {
       values = { userId: user.id, kind: 'venue', venueId: target.id, term: null, label: target.name.slice(0, 160) }
     } else {
       const term = normalizeTerm(body.data.term).slice(0, TERM_MAX).trim()
-      if (!isValidTerm(term)) return errors.badRequest('Ce nom est trop court pour être suivi.')
+      // Artist keys (lib/artists.ts) may be 2 characters long ("MØ" → "mo").
+      if (!isValidTerm(term) && !isValidArtistKey(term)) return errors.badRequest('Ce nom est trop court pour être suivi.')
       const label = (body.data.label ?? body.data.term).replace(/\s+/g, ' ').slice(0, 160)
       values = { userId: user.id, kind: 'artist', venueId: null, term, label }
     }

@@ -12,6 +12,8 @@ interface FollowButtonProps {
   /** Shown in the button: "Suivre ce lieu", "Suivre « Cyrano »". */
   label: string
   className?: string
+  /** Small pill showing only « Suivre » / « Suivi » (the full label stays for screen readers). */
+  compact?: boolean
 }
 
 function query(t: FollowTarget): string {
@@ -22,7 +24,7 @@ function query(t: FollowTarget): string {
  * Follow a venue or an artist / work: its new dates show up in « Nouveautés
  * pour toi » (compte, Club). Optimistic toggle; visitors go to the login page.
  */
-export function FollowButton({ target, label, className }: FollowButtonProps) {
+export function FollowButton({ target, label, className, compact = false }: FollowButtonProps) {
   const [following, setFollowing] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +75,7 @@ export function FollowButton({ target, label, className }: FollowButtonProps) {
     })
   }
 
-  if (!loaded) return <div className={cn('h-11', className)} aria-hidden />
+  if (!loaded) return <div className={cn(compact ? 'h-9 w-20' : 'h-11', className)} aria-hidden />
 
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
@@ -83,15 +85,20 @@ export function FollowButton({ target, label, className }: FollowButtonProps) {
         disabled={isPending}
         aria-pressed={following}
         className={cn(
-          'inline-flex h-11 max-w-full items-center justify-center gap-2 rounded-full border px-4 text-[14px] font-semibold transition-colors',
+          'inline-flex max-w-full items-center justify-center rounded-full border font-semibold transition-colors',
+          compact ? 'h-9 gap-1.5 px-3 text-[13px]' : 'h-11 gap-2 px-4 text-[14px]',
           following ? 'border-accent bg-accent-soft text-accent' : 'border-border-strong bg-surface text-ink hover:border-ink'
         )}
       >
         {following ? <BellRing className="h-4 w-4 shrink-0" aria-hidden /> : <Bell className="h-4 w-4 shrink-0" aria-hidden />}
-        <span className="truncate">{following ? 'Suivi' : label}</span>
-        <span className="sr-only">{following ? ` : ${label.replace(/^Suivre /, '')}, cliquer pour ne plus suivre` : ''}</span>
+        <span className="truncate" aria-hidden={compact || undefined}>
+          {following ? 'Suivi' : compact ? 'Suivre' : label}
+        </span>
+        <span className="sr-only">
+          {following ? `${compact ? 'Suivi' : ''} : ${label.replace(/^Suivre /, '')}, cliquer pour ne plus suivre` : compact ? label : ''}
+        </span>
       </button>
-      {following && !error && <p className="text-[13px] text-text-secondary">Les nouvelles dates arrivent dans ton compte.</p>}
+      {following && !error && !compact && <p className="text-[13px] text-text-secondary">Les nouvelles dates arrivent dans ton compte.</p>}
       {error && (
         <p className="text-[13px] font-medium text-error" role="alert">
           {error}

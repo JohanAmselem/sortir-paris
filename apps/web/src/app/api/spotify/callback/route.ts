@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { ensureUserRow, getSessionUser, limit } from '@/app/club/_lib/api'
 import { followArtists } from '@/app/club/_lib/artists'
+import { scheduleWelcomeEmail } from '@/lib/follow-server'
 import { SPOTIFY_STATE_COOKIE, spotifyArtistNames, spotifyConfigured, spotifyRedirectUri } from '@/lib/spotify'
 
 export const dynamic = 'force-dynamic'
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
       user.id,
       names.map((name) => ({ name }))
     )
+    if (r.added > 0) scheduleWelcomeEmail(user)
     return done({ spotify: String(r.added), deja: String(r.already), ignores: String(r.skipped) })
   } catch (err) {
     console.error('[spotify] import failed', err)

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { notFound, permanentRedirect } from 'next/navigation'
@@ -97,7 +98,15 @@ export default async function VenuePage({ params }: Props) {
             </a>
           )}
         </div>
-        <FollowButton target={{ kind: 'venue', venueId: venue.id }} label="Suivre ce lieu" className="mt-3 items-start" />
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <FollowButton target={{ kind: 'venue', venueId: venue.id, name: venue.name }} label="Suivre ce lieu" className="items-start" />
+          <p className="text-[14px] text-text-secondary">
+            Reçois une alerte dès qu’une nouvelle date est annoncée.{' '}
+            <Link href="/alertes-concerts" className="font-semibold text-accent underline underline-offset-2">
+              Alertes concerts
+            </Link>
+          </p>
+        </div>
       </PageIntro>
 
       {hasGeo && mapToken && (

@@ -27,6 +27,14 @@ export type AnalyticsEvent =
   | 'match_swipe'
   | 'ai_search'
   | 'quiz_complete'
+  // « Alertes concerts » funnel: landing → search → CTA → (pending follow → login) → activated.
+  | 'alerts_landing_view'
+  | 'alerts_search'
+  | 'alerts_cta_click'
+  | 'alerts_pending_follow_created'
+  | 'alerts_follow_activated'
+  | 'alerts_push_enabled'
+  | 'alerts_spotify_import'
 
 type Props = Record<string, string | number | boolean | null | undefined>
 

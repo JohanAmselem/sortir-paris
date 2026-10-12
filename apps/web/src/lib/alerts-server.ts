@@ -310,7 +310,8 @@ async function ensureTokens(members: Map<string, MemberInfo>, userIds: string[])
   }
 }
 
-async function sendEmail(to: string, subject: string, html: string, text: string, unsubscribeUrl: string): Promise<boolean> {
+/** One e-mail through Resend (fetch, no SDK). False when not configured or failed; never throws. */
+export async function sendEmail(to: string, subject: string, html: string, text: string, unsubscribeUrl: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY
   if (!key) return false
   const from = process.env.ALERTS_FROM || `${SITE_NAME} <alertes@panameclub.fr>`
@@ -348,8 +349,8 @@ async function sendEmail(to: string, subject: string, html: string, text: string
   return false
 }
 
-const unsubscribePageUrl = (token: string) => absoluteUrl(`/alertes/desinscription?token=${encodeURIComponent(token)}`)
-const unsubscribeApiUrl = (token: string) => absoluteUrl(`/api/alerts/unsubscribe?token=${encodeURIComponent(token)}`)
+export const unsubscribePageUrl = (token: string) => absoluteUrl(`/alertes/desinscription?token=${encodeURIComponent(token)}`)
+export const unsubscribeApiUrl = (token: string) => absoluteUrl(`/api/alerts/unsubscribe?token=${encodeURIComponent(token)}`)
 
 export async function runAlerts(opts: RunOptions): Promise<RunStats> {
   const started = Date.now()

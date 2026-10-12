@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
 import { bucketNow, diversify, safeQueryEvents } from '@/lib/events/query'
+import { AlertsPromoCard } from '@/components/follow/alerts-promo-card'
 import { NewsletterForm } from './newsletter-form'
 
 export const revalidate = 3600
@@ -52,6 +53,12 @@ export default async function NewsletterPage({
         )}
         <NewsletterForm className="mx-auto mt-8 max-w-lg text-left" />
         <p className="mt-3 text-[13px] text-text-muted">Ton adresse ne sert qu’à t’envoyer la lettre.</p>
+        <AlertsPromoCard
+          member={false}
+          className="mx-auto mt-10 max-w-lg text-left"
+          title="Et pour tes artistes ?"
+          text="Les alertes concerts te préviennent dès qu’ils annoncent une date à Paris. Gratuit, en plus de la lettre."
+        />
       </section>
 
       {!preview.error && preview.events.length > 0 && (

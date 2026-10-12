@@ -7,7 +7,9 @@ import { listFollows } from '@/app/club/_lib/follows'
 import { getAlertSettings, getArtistDates } from '@/app/club/_lib/artists'
 import { DEFAULT_ALERT_SETTINGS } from '@/lib/alerts'
 import { artistKey } from '@/lib/artists'
-import { spotifyConfigured } from '@/lib/spotify'
+import { spotifyImportEnabled } from '@/lib/spotify'
+import { TrackOnMount } from '@/components/ui/track-on-mount'
+import Link from 'next/link'
 import { BackLink } from '../_components/back-link'
 
 export const dynamic = 'force-dynamic'
@@ -64,9 +66,13 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
       <BackLink />
       <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.6rem]">Mes artistes</h1>
       <p className="mt-1 text-[15px] text-text-secondary">
-        Suis tes artistes : on te prévient quand ils annoncent une date à Paris et quand la billetterie ouvre.
+        Suis tes artistes : on te prévient quand ils annoncent une date à Paris et quand la billetterie ouvre.{' '}
+        <Link href="/alertes-concerts" className="font-semibold text-accent underline underline-offset-2">
+          Comment ça marche
+        </Link>
       </p>
 
+      {spotify?.tone === 'ok' && <TrackOnMount event="alerts_spotify_import" props={{ added: Number(first(sp.spotify)) || 0 }} />}
       {spotify && (
         <p
           role="status"
@@ -84,7 +90,7 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
         <DataUnavailable className="mt-8" />
       ) : (
         <>
-          {spotifyConfigured() && (
+          {spotifyImportEnabled() && (
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4">
               <p className="min-w-0 flex-1 text-[14px] text-text-secondary">
                 <span className="block text-[15px] font-semibold text-ink">Importer depuis Spotify</span>
@@ -101,7 +107,7 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
           )}
 
           <section aria-label="Artistes suivis" className="mt-8">
-            <ArtistsManager initial={artists} />
+            <ArtistsManager initial={artists} spotifyImport={spotifyImportEnabled()} />
           </section>
 
           <section aria-labelledby="alertes-title" id="alertes" className="mt-12 scroll-mt-20">

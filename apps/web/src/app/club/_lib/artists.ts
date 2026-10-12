@@ -5,7 +5,7 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { and, asc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
-import { alertSettings, db, eventArtists, events, userFollows, venues, withStatementTimeout } from '@sortir/db'
+import { alertSettings, db, eventArtists, eventTags, events, tags, userFollows, venues, withStatementTimeout } from '@sortir/db'
 import { STATEMENT_TIMEOUT_MS, withTimeout } from '@/lib/events/query'
 import { DEFAULT_ALERT_SETTINGS, type AlertSettingsValue } from '@/lib/alerts'
 import { ARTIST_KEY_MAX, artistDisplayName, artistKey, isValidArtistKey } from '@/lib/artists'
@@ -112,6 +112,45 @@ export async function getArtistDates(keys: string[]): Promise<Map<string, Artist
   return out
 }
 
+export const ARTIST_PAGE_DATES = 10
+
+/** Next Paris dates of one artist (« Alertes concerts » demo), at most 10. */
+async function loadUpcomingArtistDates(key: string): Promise<ArtistDate[]> {
+  const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+    tx
+      .select({
+        key: eventArtists.artistKey,
+        slug: events.slug,
+        title: events.title,
+        startDate: events.startDate,
+        timeKnown: events.timeKnown,
+        venueName: venues.name,
+      })
+      .from(eventArtists)
+      .innerJoin(events, eq(events.id, eventArtists.eventId))
+      .leftJoin(venues, eq(venues.id, events.venueId))
+      .where(and(eq(eventArtists.artistKey, key), eq(events.status, 'active'), isNull(events.canonicalEventId), gte(events.startDate, sql`now()`)))
+      .orderBy(asc(events.startDate))
+      .limit(ARTIST_PAGE_DATES)
+  )
+  return rows.map((r) => ({
+    key: r.key,
+    slug: r.slug,
+    title: r.title,
+    startDate: r.startDate instanceof Date ? r.startDate.toISOString() : String(r.startDate),
+    timeKnown: r.timeKnown,
+    venueName: r.venueName,
+  }))
+}
+
+const cachedUpcomingArtistDates = unstable_cache(loadUpcomingArtistDates, ['artist-dates-v1'], { revalidate: 1800, tags: ['events'] })
+
+/** Empty for an invalid key; throws on database errors (the API answers with an empty list). */
+export async function getUpcomingArtistDates(key: string): Promise<ArtistDate[]> {
+  if (!isValidArtistKey(key)) return []
+  return withTimeout(cachedUpcomingArtistDates(key), STATEMENT_TIMEOUT_MS + 1500, 'artistDates')
+}
+
 /** Artists of one event (event pages), cached with the page data. */
 async function loadEventArtists(eventId: string): Promise<Array<{ key: string; name: string }>> {
   const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
@@ -136,6 +175,31 @@ export async function safeGetEventArtists(eventId: string): Promise<Array<{ key:
   } catch (err) {
     console.error('[event artists]', err)
     return []
+  }
+}
+
+/** Sold out: the scrapers tag such events "complet" (event_tags, primary key lookup). */
+async function loadEventSoldOut(eventId: string): Promise<boolean> {
+  const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+    tx
+      .select({ one: sql<number>`1` })
+      .from(eventTags)
+      .innerJoin(tags, eq(tags.id, eventTags.tagId))
+      .where(and(eq(eventTags.eventId, eventId), eq(tags.slug, 'complet')))
+      .limit(1)
+  )
+  return rows.length > 0
+}
+
+const cachedEventSoldOut = unstable_cache(loadEventSoldOut, ['event-sold-out-v1'], { revalidate: 3600, tags: ['events'] })
+
+/** Never throws: only changes the wording of the alerts block. */
+export async function safeEventSoldOut(eventId: string): Promise<boolean> {
+  try {
+    return await withTimeout(cachedEventSoldOut(eventId), STATEMENT_TIMEOUT_MS + 1500, 'eventSoldOut')
+  } catch (err) {
+    console.error('[event sold out]', err)
+    return false
   }
 }
 

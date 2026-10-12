@@ -14,11 +14,17 @@ const DISCOVER = [
 
 const CLUB = [
   { href: '/club', label: 'Le Club' },
+  { href: '/alertes-concerts', label: 'Alertes concerts' },
   { href: '/surprise', label: 'Surprends-moi' },
   { href: '/match', label: 'Match culturel' },
   { href: '/quiz', label: 'Quiz « Tu préfères »' },
   { href: '/news', label: 'Le journal' },
   { href: '/newsletter', label: 'Newsletter' },
+]
+
+const LEGAL = [
+  { href: '/mentions-legales', label: 'Mentions légales' },
+  { href: '/confidentialite', label: 'Confidentialité' },
 ]
 
 export function Footer() {
@@ -60,10 +66,21 @@ export function Footer() {
           </ul>
         </div>
 
-        <p className="mt-12 border-t border-paper/10 pt-6 text-[13px] text-paper/60">
-          © {new Date().getFullYear()} Paname Club. Informations issues des agendas officiels et des sites des lieux :
-          vérifie toujours horaires et tarifs auprès de l’organisateur.
-        </p>
+        <div className="mt-12 flex flex-col gap-3 border-t border-paper/10 pt-6 text-[13px] text-paper/60 md:flex-row md:items-start md:justify-between">
+          <p className="max-w-3xl">
+            © {new Date().getFullYear()} Paname Club. Informations issues des agendas officiels et des sites des lieux :
+            vérifie toujours horaires et tarifs auprès de l’organisateur.
+          </p>
+          <ul className="flex shrink-0 flex-wrap gap-x-5">
+            {LEGAL.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="inline-flex min-h-10 items-center text-paper/75 underline-offset-2 transition-colors hover:text-paper hover:underline">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </footer>
   )

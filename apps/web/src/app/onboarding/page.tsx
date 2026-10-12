@@ -4,6 +4,7 @@ import { safeNext } from '@/app/club/_lib/safe-next'
 import { LocalSync } from '@/app/club/_components/local-sync'
 import { OnboardingFlow } from './onboarding-flow'
 import { loadPreferences } from './load-preferences'
+import { spotifyImportEnabled } from '@/lib/spotify'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
       <h1 className="font-display mt-2 text-[2.8rem] text-ink sm:text-[3.4rem]">Trois questions, et on te connaît mieux.</h1>
       <p className="mt-2 text-[15px] text-text-secondary">Tu pourras tout changer plus tard dans ton compte.</p>
       <div className="mt-8">
-        <OnboardingFlow initial={initial} next={next} />
+        <OnboardingFlow initial={initial} next={next} spotifyImport={spotifyImportEnabled()} />
       </div>
     </div>
   )

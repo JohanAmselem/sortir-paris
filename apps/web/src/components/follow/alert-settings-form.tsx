@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { BellRing, Loader2 } from 'lucide-react'
 import type { AlertSettingsValue } from '@/lib/alerts'
 import { cn } from '@/lib/utils'
+import { track } from '@/lib/analytics'
 
 type Key = keyof AlertSettingsValue
 
@@ -96,6 +97,7 @@ export function AlertSettingsForm({
       if (!res.ok) throw new Error(String(res.status))
       setDevice('on')
       setSettings((s) => ({ ...s, pushEnabled: true }))
+      track('alerts_push_enabled')
     } catch {
       setError('Impossible d’activer les notifications sur cet appareil, réessaie.')
     } finally {

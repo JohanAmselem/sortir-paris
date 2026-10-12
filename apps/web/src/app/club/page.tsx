@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { AlertsPromoCard } from '@/components/follow/alerts-promo-card'
 import { ArrowRight, Dices, Flame, Layers, Sparkles, Trophy } from 'lucide-react'
 import { DataUnavailable, EventRail, SectionHeader } from '@/components/events/blocks'
 import { bucketNow } from '@/lib/events/query'
@@ -188,6 +189,9 @@ export default async function ClubPage() {
           <LocalProgress />
         )}
       </header>
+
+      {/* Alertes concerts */}
+      <AlertsPromoCard member={Boolean(user)} className="mt-10" />
 
       {/* Follows */}
       {feed && !feed.error && (

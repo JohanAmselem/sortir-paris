@@ -3,7 +3,7 @@ import type { EventQuery } from '@/lib/events/types'
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound, permanentRedirect } from 'next/navigation'
-import { CalendarPlus, ExternalLink, MapPin } from 'lucide-react'
+import { BellRing, CalendarPlus, ExternalLink, MapPin } from 'lucide-react'
 import { EventImage } from '@/components/ui/event-image'
 import { SaveButton } from '@/components/events/save-button'
 import { ShareButton } from '@/components/ui/share-button'
@@ -12,7 +12,7 @@ import { EventReviews } from '@/components/events/event-reviews'
 import { AttendButton } from '@/components/events/attend-button'
 import { FollowButton } from '@/components/follow/follow-button'
 import { followableFromTitle } from '@/lib/follows'
-import { safeGetEventArtists } from '@/app/club/_lib/artists'
+import { safeEventSoldOut, safeGetEventArtists } from '@/app/club/_lib/artists'
 import { EventActionBar } from '@/components/events/sticky-booking-cta'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { EventRail, SectionHeader } from '@/components/events/blocks'
@@ -37,6 +37,17 @@ export function generateStaticParams() {
 }
 
 const HIDDEN = new Set(['rejected', 'draft'])
+/** Categories where the « Alertes concerts » block is shown. */
+const MUSIC_CATEGORIES = ['concerts', 'festivals', 'soirees'] as const
+
+/** "A", "A et B", "A, B et C". */
+function namesList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  const shown = names.slice(0, 3)
+  const rest = names.length - shown.length
+  if (rest > 0) return `${shown.join(', ')} et ${rest} autre${rest > 1 ? 's' : ''}`
+  return `${shown.slice(0, -1).join(', ')} et ${shown[shown.length - 1]}`
+}
 
 function cta(e: EventDetail): { href: string | null; label: string } {
   const booking = safeUrl(e.bookingUrl)
@@ -176,7 +187,8 @@ export default async function EventPage({ params }: Props) {
   const work = workSlug(event.title)
   const hasWork =
     !past && !!event.category && (WORK_CATEGORIES as readonly string[]).includes(event.category.slug) && !isGenericWorkSlug(work)
-  const [nearby, sameVenue, runEnd, workDates, eventArtists] = await Promise.all([
+  const isMusic = !!event.category && (MUSIC_CATEGORIES as readonly string[]).includes(event.category.slug)
+  const [nearby, sameVenue, runEnd, workDates, eventArtists, soldOut] = await Promise.all([
     event.category && venueGeo ? safeQueryEvents({ ...similarBase, near: venueGeo }) : Promise.resolve({ events: [], total: 0, hasMore: false }),
     event.venue
       ? safeQueryEvents({ venueSlug: event.venue.slug, excludeIds: [event.id], excludeTitle: event.title, sort: 'soon', limit: 6 })
@@ -184,7 +196,16 @@ export default async function EventPage({ params }: Props) {
     runEndPromise,
     hasWork ? safeGetWorkDates(work) : Promise.resolve([]),
     safeGetEventArtists(event.id),
+    isMusic && !past ? safeEventSoldOut(event.id) : Promise.resolve(false),
   ])
+  // « Alertes concerts » block (music): listed artists, else the title as a follow.
+  const alertTargets = isMusic
+    ? eventArtists.length
+      ? eventArtists.slice(0, 6)
+      : followable
+        ? [{ key: followable.term, name: followable.label }]
+        : []
+    : []
   const otherDates = workDates.filter((d) => d.id !== event.id)
   const otherVenues = [...new Map(otherDates.filter((d) => d.venue && d.venue.slug !== event.venue?.slug).map((d) => [d.venue!.slug, d.venue!.name])).values()]
   // Not enough nearby: the same category anywhere in Paris.
@@ -362,7 +383,32 @@ export default async function EventPage({ params }: Props) {
               </p>
             )}
 
-            {eventArtists.length > 0 && (
+            {alertTargets.length > 0 ? (
+              <section aria-labelledby="alert-title" className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft p-4">
+                <h2 id="alert-title" className="flex items-start gap-2 text-[16px] font-semibold text-ink">
+                  <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
+                  {past
+                    ? `${event.category?.slug === 'concerts' ? 'Concert passé' : 'C’est passé'} — sois prévenu de la prochaine date`
+                    : soldOut
+                      ? 'Complet — sois prévenu de la prochaine date'
+                      : `Sois prévenu des prochaines dates de ${namesList(alertTargets.map((a) => a.name))}`}
+                </h2>
+                <p className="mt-1 text-[14px] text-text-secondary">
+                  Une alerte gratuite dès qu’une nouvelle date est annoncée à Paris.{' '}
+                  <Link href="/alertes-concerts" className="font-semibold text-accent underline underline-offset-2">
+                    Comment ça marche
+                  </Link>
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-2" aria-label="Suivre les artistes">
+                  {alertTargets.map((a) => (
+                    <li key={a.key} className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pl-3 pr-1">
+                      <span className="max-w-[12rem] truncate text-[14px] font-semibold text-ink">{a.name}</span>
+                      <FollowButton compact target={{ kind: 'artist', term: a.key, label: a.name }} label={`Suivre ${a.name}`} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : eventArtists.length > 0 ? (
               <div className="mt-4">
                 <p className="text-[13px] font-semibold uppercase tracking-wide text-text-muted">
                   Artiste{eventArtists.length > 1 ? 's' : ''} :{' '}
@@ -378,14 +424,14 @@ export default async function EventPage({ params }: Props) {
                   ))}
                 </ul>
               </div>
-            )}
-
-            {followable && eventArtists.length === 0 && (
-              <FollowButton
-                target={{ kind: 'artist', term: followable.term, label: followable.label }}
-                label={`Suivre « ${followable.label} »`}
-                className="mt-4 items-start"
-              />
+            ) : (
+              followable && (
+                <FollowButton
+                  target={{ kind: 'artist', term: followable.term, label: followable.label }}
+                  label={`Suivre « ${followable.label} »`}
+                  className="mt-4 items-start"
+                />
+              )
             )}
 
             {(event.saveCount > 1 || event.attendanceCount > 1) && (

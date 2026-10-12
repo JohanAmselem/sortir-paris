@@ -6,6 +6,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Header } from '@/components/layout/header'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { Footer } from '@/components/layout/footer'
+import { AlertActivatedBanner } from '@/components/follow/alert-activated-banner'
 import { SITE_URL } from '@/lib/site'
 import '@/styles/globals.css'
 
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         <Footer />
         <BottomNav />
+        <AlertActivatedBanner />
         {/* Enable Web Analytics / Speed Insights in the Vercel dashboard, then set these flags. */}
         {process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === '1' && <Analytics />}
         {process.env.NEXT_PUBLIC_VERCEL_SPEED_INSIGHTS === '1' && <SpeedInsights />}

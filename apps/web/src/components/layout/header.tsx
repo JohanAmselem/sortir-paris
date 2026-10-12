@@ -10,6 +10,8 @@ export const PRIMARY_NAV = [
   { href: '/gratuit', label: 'Gratuit' },
   { href: '/carte', label: 'Carte' },
   { href: '/evenements', label: 'Explorer' },
+  // From lg only: the md header has no room for a 7th link.
+  { href: '/alertes-concerts', label: 'Alertes', lgOnly: true },
   { href: '/club', label: 'Le Club' },
 ]
 

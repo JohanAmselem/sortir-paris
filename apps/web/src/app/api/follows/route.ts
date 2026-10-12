@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { and, count, eq, sql } from 'drizzle-orm'
-import { db, userFollows, venues } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
+import { and, eq, sql } from 'drizzle-orm'
+import { db, userFollows } from '@sortir/db'
+import { errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
 import { listFollows } from '@/app/club/_lib/follows'
-import { MAX_FOLLOWS, TERM_MAX, isValidTerm, normalizeTerm } from '@/lib/follows'
-import { isValidArtistKey } from '@/lib/artists'
+import { TERM_MAX, normalizeTerm } from '@/lib/follows'
+import { createFollow } from '@/lib/follow-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,48 +73,12 @@ export async function POST(request: NextRequest) {
   if (!body.ok) return body.response
 
   try {
-    let values: typeof userFollows.$inferInsert
-    if (body.data.kind === 'venue') {
-      const [v] = await db
-        .select({ id: venues.id, name: venues.name, canonicalId: venues.canonicalVenueId })
-        .from(venues)
-        .where(eq(venues.id, body.data.venueId))
-        .limit(1)
-      if (!v) return errors.notFound('Lieu introuvable.')
-      let target = { id: v.id, name: v.name }
-      // Merged venues: always follow the canonical one.
-      if (v.canonicalId) {
-        const [c] = await db.select({ id: venues.id, name: venues.name }).from(venues).where(eq(venues.id, v.canonicalId)).limit(1)
-        if (c) target = c
-      }
-      values = { userId: user.id, kind: 'venue', venueId: target.id, term: null, label: target.name.slice(0, 160) }
-    } else {
-      const term = normalizeTerm(body.data.term).slice(0, TERM_MAX).trim()
-      // Artist keys (lib/artists.ts) may be 2 characters long ("MØ" → "mo").
-      if (!isValidTerm(term) && !isValidArtistKey(term)) return errors.badRequest('Ce nom est trop court pour être suivi.')
-      const label = (body.data.label ?? body.data.term).replace(/\s+/g, ' ').slice(0, 160)
-      values = { userId: user.id, kind: 'artist', venueId: null, term, label }
-    }
-
-    const [{ n }] = await db.select({ n: count() }).from(userFollows).where(eq(userFollows.userId, user.id))
-    await ensureUserRow(user)
-    const existing = await db
-      .select({ id: userFollows.id })
-      .from(userFollows)
-      .where(
-        and(
-          eq(userFollows.userId, user.id),
-          eq(userFollows.kind, values.kind),
-          values.kind === 'venue' ? eq(userFollows.venueId, values.venueId!) : eq(userFollows.term, values.term!)
-        )
-      )
-      .limit(1)
-    if (existing[0]) return NextResponse.json({ following: true, id: existing[0].id }, { headers: noStore })
-    if (Number(n) >= MAX_FOLLOWS) {
-      return errors.badRequest(`Tu suis déjà ${MAX_FOLLOWS} lieux et artistes : retire-en un depuis ton compte.`)
-    }
-    const inserted = await db.insert(userFollows).values(values).onConflictDoNothing().returning({ id: userFollows.id })
-    return NextResponse.json({ following: true, id: inserted[0]?.id ?? null }, { status: 201, headers: noStore })
+    const r = await createFollow(
+      user,
+      body.data.kind === 'venue' ? { kind: 'venue', venueId: body.data.venueId } : { kind: 'artist', term: body.data.term, label: body.data.label }
+    )
+    if (!r.ok) return r.status === 404 ? errors.notFound(r.error) : errors.badRequest(r.error)
+    return NextResponse.json({ following: true, id: r.id, label: r.label }, { status: r.created ? 201 : 200, headers: noStore })
   } catch (err) {
     console.error('[api/follows] POST failed', err)
     return errors.server()

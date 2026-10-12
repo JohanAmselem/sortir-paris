@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ArrowRight, Dices, MapPinned } from 'lucide-react'
+import { ArrowRight, BellRing, Dices, MapPinned } from 'lucide-react'
+import { ArtistAlertSearch } from '@/components/follow/artist-alert-search'
 import { Discover } from '@/components/home/discover'
 import { PourToiClient } from '@/components/home/pour-toi-client'
 import { WeekendProgram, type ProgramDay } from '@/components/home/weekend-program'
@@ -112,6 +113,32 @@ export default async function HomePage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Alertes concerts: no server query here, the search calls the cached APIs from the browser. */}
+      <section aria-labelledby="alerts-title" className="px-4 pt-12">
+        <div className="grid gap-6 rounded-2xl border border-border bg-paper-deep p-5 sm:p-8 md:grid-cols-[1fr_1.1fr] md:items-start">
+          <div>
+            <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">
+              <BellRing className="h-4 w-4" aria-hidden /> Alertes concerts
+            </p>
+            <h2 id="alerts-title" className="font-display mt-1 text-[2rem] text-ink sm:text-[2.6rem]">
+              Ne rate plus tes artistes
+            </h2>
+            <p className="mt-2 max-w-md text-[15px] leading-relaxed text-text-secondary">
+              Suis-les et reçois une alerte dès qu’ils annoncent une date à Paris, quand la billetterie ouvre et la veille du
+              concert. Gratuit.
+            </p>
+            <Link
+              href="/alertes-concerts"
+              className="mt-4 inline-flex h-11 items-center gap-1.5 text-[14px] font-semibold text-accent hover:text-accent-hover"
+            >
+              En savoir plus
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+          <ArtistAlertSearch source="home" compact />
+        </div>
       </section>
 
       <PourToiClient excludeIds={[...shown]} />

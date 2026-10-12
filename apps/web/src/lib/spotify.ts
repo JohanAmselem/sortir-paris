@@ -11,6 +11,15 @@ export function spotifyConfigured(): boolean {
   return Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)
 }
 
+/**
+ * Show the « Importer depuis Spotify » buttons. The Spotify app is in
+ * development mode (25 allow-listed users) until Extended Quota is granted
+ * (docs/SPOTIFY_EXTENDED_QUOTA.md): hidden unless NEXT_PUBLIC_SPOTIFY_IMPORT=1.
+ */
+export function spotifyImportEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_SPOTIFY_IMPORT === '1' && spotifyConfigured()
+}
+
 export const spotifyRedirectUri = () => absoluteUrl('/api/spotify/callback')
 
 export function spotifyAuthorizeUrl(clientId: string, state: string, redirectUri: string): string {

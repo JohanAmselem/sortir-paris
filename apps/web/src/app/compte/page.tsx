@@ -10,6 +10,7 @@ import { getFollowFeed } from '@/app/club/_lib/follows'
 import { bucketNow } from '@/lib/events/query'
 import { LogoutButton } from './_components/logout-button'
 import { FollowsSection } from './_components/follows-section'
+import { AlertsPromoCard } from '@/components/follow/alerts-promo-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,7 @@ export default async function ComptePage() {
   const now = bucketNow()
   const name = overview?.name ?? user.email?.split('@')[0] ?? 'Membre'
   const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
+  const artistCount = feed.follows.filter((f) => f.kind === 'artist').length
 
   const links = [
     {
@@ -57,6 +59,18 @@ export default async function ComptePage() {
           </p>
         </div>
       </header>
+
+      <AlertsPromoCard
+        member
+        className="mt-8"
+        text={
+          feed.error
+            ? undefined
+            : artistCount > 0
+              ? `${artistCount} artiste${artistCount > 1 ? 's' : ''} suivi${artistCount > 1 ? 's' : ''} : nouvelles dates à Paris, billetteries, rappel la veille.`
+              : 'Ajoute tes artistes : on te prévient dès qu’ils annoncent une date à Paris.'
+        }
+      />
 
       {overview ? (
         <>

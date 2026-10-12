@@ -4,8 +4,9 @@ import { useEffect, useState, useTransition } from 'react'
 import { Bell, BellRing } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
+import { startPendingFollow } from '@/lib/pending-follow'
 
-export type FollowTarget = { kind: 'venue'; venueId: string } | { kind: 'artist'; term: string; label: string }
+export type FollowTarget = { kind: 'venue'; venueId: string; name?: string } | { kind: 'artist'; term: string; label: string }
 
 interface FollowButtonProps {
   target: FollowTarget
@@ -22,7 +23,9 @@ function query(t: FollowTarget): string {
 
 /**
  * Follow a venue or an artist / work: its new dates show up in « Nouveautés
- * pour toi » (compte, Club). Optimistic toggle; visitors go to the login page.
+ * pour toi » (compte, Club) and in the « Alertes concerts ». Optimistic toggle.
+ * Visitors: the follow is kept (pending-follow cookie) while they log in, and
+ * created on their return (lib/pending-follow.ts).
  */
 export function FollowButton({ target, label, className, compact = false }: FollowButtonProps) {
   const [following, setFollowing] = useState(false)
@@ -57,7 +60,12 @@ export function FollowButton({ target, label, className, compact = false }: Foll
         })
         if (res.status === 401) {
           setFollowing(previous)
-          window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname)
+          if (previous) return
+          const name = target.kind === 'venue' ? (target.name ?? label.replace(/^Suivre\s+/, '')) : target.label
+          track('alerts_pending_follow_created', { kind: target.kind, from: 'follow_button' })
+          startPendingFollow(
+            target.kind === 'venue' ? { kind: 'venue', venueId: target.venueId, label: name } : { kind: 'artist', term: target.term, label: target.label }
+          )
           return
         }
         const data = (await res.json().catch(() => ({}))) as { following?: boolean; error?: string }

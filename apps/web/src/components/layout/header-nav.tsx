@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-export function HeaderNav({ items }: { items: Array<{ href: string; label: string }> }) {
+export function HeaderNav({ items }: { items: Array<{ href: string; label: string; lgOnly?: boolean }> }) {
   const pathname = usePathname()
   return (
     <nav aria-label="Navigation principale" className="hidden items-center gap-0.5 md:flex">
@@ -17,6 +17,7 @@ export function HeaderNav({ items }: { items: Array<{ href: string; label: strin
             aria-current={active ? 'page' : undefined}
             className={cn(
               'relative rounded-md px-3 py-2 text-[14px] font-medium transition-colors',
+              link.lgOnly && 'hidden lg:block',
               active ? 'text-ink' : 'text-text-secondary hover:text-ink'
             )}
           >

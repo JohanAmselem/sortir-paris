@@ -27,7 +27,7 @@ const toLogin = () => {
 }
 
 /** « Mes artistes »: search (suggestions + free typing) and the followed list. */
-export function ArtistsManager({ initial }: { initial: FollowedArtist[] }) {
+export function ArtistsManager({ initial, spotifyImport = false }: { initial: FollowedArtist[]; spotifyImport?: boolean }) {
   const router = useRouter()
   const [artists, setArtists] = useState(initial)
   const [query, setQuery] = useState('')
@@ -198,7 +198,7 @@ export function ArtistsManager({ initial }: { initial: FollowedArtist[] }) {
       </h2>
       {artists.length === 0 ? (
         <p className="mt-3 text-[15px] text-text-secondary">
-          Tu ne suis encore aucun artiste. Cherche-les ci-dessus, importe-les depuis Spotify ou appuie sur « Suivre » sur la page d’un concert.
+          Tu ne suis encore aucun artiste. Cherche-les ci-dessus{spotifyImport ? ', importe-les depuis Spotify' : ''} ou appuie sur « Suivre » sur la page d’un concert.
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">

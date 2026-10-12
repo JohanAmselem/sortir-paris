@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/events/blocks'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { SignatureBadge } from '@/components/events/signature-badge'
 import { EventImage } from '@/components/ui/event-image'
+import { FollowButton } from '@/components/follow/follow-button'
+import { followableFromTitle } from '@/lib/follows'
 import { bucketNow } from '@/lib/events/query'
 import { getWorkDates, WORK_DATES_LIMIT, type WorkRow } from '@/lib/events/works'
 import { bestWorkImage, bestWorkText, bestWorkTitle, groupWorkByVenue, WORK_SLUG_RE } from '@/lib/events/works-utils'
@@ -137,6 +139,7 @@ export default async function WorkPage({ params }: Props) {
   const groups = groupWorkByVenue(rows)
   const category = rows.find((r) => r.category)?.category ?? null
   const mapToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  const followable = followableFromTitle(title)
   const pinned = groups.filter((g) => g.venue?.lat != null && g.venue?.lng != null).slice(0, MAX_PINS)
   const pinIndex = new Map(pinned.map((g, i) => [g.key, i + 1]))
   const total = rows.length >= WORK_DATES_LIMIT ? `Plus de ${WORK_DATES_LIMIT}` : String(rows.length)
@@ -186,6 +189,16 @@ export default async function WorkPage({ params }: Props) {
           <p className="mt-2 text-[16px] text-text-secondary">
             {total} date{rows.length > 1 ? 's' : ''} à venir dans {groups.length} lieu{groups.length > 1 ? 'x' : ''}.
           </p>
+          {followable && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <FollowButton
+                target={{ kind: 'artist', term: followable.term, label: followable.label }}
+                label={`Suivre « ${followable.label} »`}
+                className="items-start"
+              />
+              <p className="text-[14px] text-text-secondary">Reçois une alerte dès qu’une nouvelle date est annoncée.</p>
+            </div>
+          )}
           {text && (
             <div className="mt-4 max-w-[68ch] whitespace-pre-line text-[16px] leading-relaxed text-ink-soft">
               {text.length > 1200 ? text.slice(0, 1200).replace(/\s+\S*$/, '') + '…' : text}

@@ -198,6 +198,8 @@ export function placeLabel(c: Candidate): string {
 
 /** « Photo : <lieu> (via <source>) ». */
 export function creditLine(c: Candidate): string {
+  // A venue's own website: the venue is the source, no « via ».
+  if (c.source.startsWith('venue_') && c.venueName) return `Photo : ${c.venueName}`
   return `Photo : ${c.venueName ?? sourceLabel(c.source)} (via ${sourceLabel(c.source)})`
 }
 

@@ -92,6 +92,8 @@ export const SOURCE_LABELS: Record<string, string> = {
 }
 
 export function sourceLabel(source: string): string {
+  // venue_* sources are the venue's own website ("Venue Lacigale" meant nothing to readers).
+  if (source.startsWith('venue_')) return SOURCE_LABELS[source] ?? 'site officiel du lieu'
   return SOURCE_LABELS[source] ?? source.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 

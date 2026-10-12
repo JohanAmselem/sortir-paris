@@ -134,7 +134,6 @@ export default function ConfidentialitePage() {
         <Section id="conservation" title="Combien de temps">
           <ul className="list-disc space-y-2 pl-5">
             <li>Compte et données associées : tant que ton compte existe, jusqu’à sa suppression.</li>
-            <li>Compte inactif : supprimé après 3 ans sans connexion.</li>
             <li>Abonnements aux notifications : supprimés dès que tu les désactives ou que ton navigateur les invalide.</li>
             <li>Newsletter : jusqu’à ta désinscription.</li>
             <li>Journaux techniques : 12 mois au maximum.</li>

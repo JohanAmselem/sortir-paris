@@ -35,6 +35,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Monorepo root (pnpm workspace) for output file tracing.
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // The Instagram slide renderer reads its fonts and the brand logos from disk at runtime.
+  outputFileTracingIncludes: {
+    '/api/instagram/media/[postId]/[index]': ['./src/lib/instagram/fonts/*.woff', './public/brand/*.svg'],
+  },
   images: {
     remotePatterns: IMAGE_HOSTS.map((hostname) => ({ protocol: 'https' as const, hostname })),
     formats: ['image/avif', 'image/webp'],

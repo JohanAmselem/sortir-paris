@@ -72,6 +72,8 @@ export function eligible(c: Candidate, ctx: SelectContext): boolean {
     if (start < ctx.timeWindow.start || start > ctx.timeWindow.end) return false
   }
   if (isStoryTheme(ctx.theme) && !STORY_THEMES[ctx.theme].match(c)) return false
+  // The feed carousel is the shop window: a photo and a real outing category.
+  if (!isStoryTheme(ctx.theme) && (!c.imageUrl || !c.categorySlug)) return false
   return true
 }
 
@@ -86,8 +88,21 @@ export function scoreCandidate(c: Candidate, signatureIds: Set<string>): number 
   if (c.priceStatus === 'unknown') s -= 5
   if (!c.venueArr) s -= 5 // petite couronne after Paris
   if (isLongRun(c)) s -= 8
+  // Shows sold by a ticketing site or a venue's own programme are the outings people
+  // look for; municipal agendas mix in civic sessions (« lieu de mémoire », ESAT…).
+  if (TICKETED_SOURCES.test(c.source)) s += 12
+  else if (c.source === 'paris_opendata' || c.source === 'openagenda') s -= 6
+  if (CIVIC_TITLE.test(c.title)) s -= 30
+  if (c.priceStatus === 'paid') s += 4
   return s
 }
+
+/** Sources whose events are shows with tickets or a venue's own programme. */
+const TICKETED_SOURCES = /^(ticketmaster|offi|theatreonline|billetreduc|dice|bandsintown|sortiraparis|cinematheque|forumdesimages|parisjazzclub|newmorning|venue_.+)$/
+
+/** Civic / social-service sessions: fine on the site, not « la sortie de demain ». */
+const CIVIC_TITLE =
+  /\b(m[ée]moire|comm[ée]mor|pand[ée]mie|covid|esat|ladapt|handicap|inauguration|ouverture du|vous accueille|accueil des|bienvenue [àa] paris|permanence|collecte|don du sang|d[ée]pistage|sant[ée] publique|conseil de quartier|visite de chantier)\b/i
 
 /**
  * Greedy pick in score order: never twice the same venue, at most

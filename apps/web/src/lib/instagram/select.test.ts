@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { eventWindow, planForDate } from './schedule'
-import { buildItems, coverItem, creditLine, eligible, inArea, isExcluded, selectEvents, slideWhen, type SelectContext } from './select'
+import { buildItems, coverItem, creditLine, eligible, inArea, isExcluded, scoreCandidate, selectEvents, slideWhen, type SelectContext } from './select'
 import type { Candidate } from './types'
 
 // Published Wednesday 14 Oct 2026 at 18:00 → events of Thursday 15 Oct.
@@ -178,5 +178,16 @@ describe('items', () => {
   it('formats the day and time in Paris', () => {
     expect(slideWhen({ startDate: '2026-10-15T18:30:00.000Z', endDate: null, timeKnown: true })).toBe('Jeu. 15 oct. · 20h30')
     expect(slideWhen({ startDate: '2026-09-01T08:00:00.000Z', endDate: '2027-01-10T18:00:00.000Z', timeKnown: false })).toBe('Jusqu’au 10 janv.')
+  })
+})
+
+describe('editorial score', () => {
+  it('ranks ticketed shows above civic sessions and requires a photo in the carousel', () => {
+    const show = ev({ source: 'ticketmaster', title: 'Autechre' })
+    const civic = ev({ source: 'paris_opendata', title: "Pandémie de Covid-19 : ouverture du premier lieu de mémoire" })
+    expect(scoreCandidate(show, new Set())).toBeGreaterThan(scoreCandidate(civic, new Set()) + 30)
+    const ctx: SelectContext = { window: 'demain', theme: 'demain', timeWindow: tw, exclusions: [], signatureIds: new Set() }
+    expect(eligible(ev({ imageUrl: null }), ctx)).toBe(false)
+    expect(eligible(ev({ categorySlug: null }), ctx)).toBe(false)
   })
 })

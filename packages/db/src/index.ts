@@ -16,6 +16,7 @@ import * as gamificationSchema from './schema/gamification'
 import * as tasteProfileSchema from './schema/taste-profile'
 import * as followsSchema from './schema/follows'
 import * as alertsSchema from './schema/alerts'
+import * as instagramSchema from './schema/instagram'
 
 // Schema exports
 export * from './schema/users'
@@ -31,6 +32,7 @@ export * from './schema/gamification'
 export * from './schema/taste-profile'
 export * from './schema/follows'
 export * from './schema/alerts'
+export * from './schema/instagram'
 
 // DB client with full schema for query builder
 const connectionString = process.env.DATABASE_URL!
@@ -49,6 +51,7 @@ const schema = {
   ...tasteProfileSchema,
   ...followsSchema,
   ...alertsSchema,
+  ...instagramSchema,
 }
 
 // Pool sizing: Vercel Fluid compute shares one instance between concurrent

@@ -29,3 +29,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Instagram publish failed' }, { status: 500 })
   }
 }
+
+// Vercel Cron calls with GET and the same Bearer CRON_SECRET.
+export const GET = POST

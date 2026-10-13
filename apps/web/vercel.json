@@ -1,7 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["cdg1"],
+  "regions": [
+    "cdg1"
+  ],
   "crons": [
-    { "path": "/api/cron/daily-articles", "schedule": "0 5 * * 1" }
+    {
+      "path": "/api/cron/daily-articles",
+      "schedule": "0 5 * * 1"
+    },
+    {
+      "path": "/api/cron/instagram/prepare",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/instagram/publish",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/alerts?only=reminder",
+      "schedule": "0 8 * * *"
+    }
   ]
 }

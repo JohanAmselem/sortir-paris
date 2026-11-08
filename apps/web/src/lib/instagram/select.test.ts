@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { eventWindow, planForDate } from './schedule'
 import {
+  addShown,
   buildItems,
-  candidateKeys,
   coverItem,
   creditLine,
   eligible,
   eventItem,
   inArea,
+  emptyShown,
   isExcluded,
-  keysToAvoid,
+  isShown,
   sameShow,
   scoreCandidate,
   selectEvents,
+  shownBefore,
   slideWhen,
-  titleKey,
   type SelectContext,
 } from './select'
 import type { Candidate, PostStatus } from './types'
@@ -177,11 +178,22 @@ describe('selectEvents', () => {
 describe('never the same event twice', () => {
   it('skips the events already shown (by id, or by title for the other dates of a show)', () => {
     const shown = ev({ title: 'Cendrillon' })
-    const avoid = new Set(candidateKeys(shown))
+    const avoid = emptyShown()
+    addShown(avoid, shown)
     expect(eligible(shown, ctx({ avoid }))).toBe(false)
     // Same show, another date or source: another id, same title.
     expect(eligible(ev({ title: 'CENDRILLON !' }), ctx({ avoid }))).toBe(false)
     expect(eligible(ev({ title: 'Casse-Noisette' }), ctx({ avoid }))).toBe(true)
+  })
+
+  it('the same show under a close title in another post (same start or same venue)', () => {
+    // 8 November 2026: « Zinée » in « Ta semaine », « Zinée — la Cigale » in the Concerts story.
+    const avoid = emptyShown()
+    addShown(avoid, ev({ title: 'Zinée', startDate: '2026-10-15T19:00:00.000Z', venueId: 'cigale' }))
+    expect(isShown(ev({ title: 'Zinée — la Cigale', startDate: '2026-10-15T19:00:00.000Z' }), avoid)).toBe(true)
+    expect(isShown(ev({ title: 'Zinée en concert', venueId: 'cigale' }), avoid)).toBe(true)
+    // A close title elsewhere at another time is another event.
+    expect(isShown(ev({ title: 'Zinée — la Cigale', startDate: '2026-10-15T20:00:00.000Z' }), avoid)).toBe(false)
   })
 
   it('spots the same show listed twice (two sources, two venue records)', () => {
@@ -210,12 +222,12 @@ describe('never the same event twice', () => {
       row('2026-11-09', 'draft', 'Brouillon refait'),
       row('2026-11-10', 'draft', 'Après'),
     ]
-    const keys = keysToAvoid(rows, '2026-11-09', '2026-11-02', false)
-    const has = (t: string) => keys.has(`t:${titleKey(t)}`)
+    const shown = shownBefore(rows, '2026-11-09', '2026-11-02', false)
+    const has = (t: string) => isShown(ev({ title: t }), shown)
     expect(['Il y a 7 jours', 'Peut-être en ligne', 'Ce soir à 18 h', 'Déjà parti ce jour'].every(has)).toBe(true)
     expect(['Trop ancien', 'Jamais parti', 'Bloqué', 'Brouillon refait', 'Après'].some(has)).toBe(false)
     // insertOnly (today): every existing row of the day stays as it is.
-    expect(keysToAvoid(rows, '2026-11-09', '2026-11-02', true).has(`t:${titleKey('Brouillon refait')}`)).toBe(true)
+    expect(isShown(ev({ title: 'Brouillon refait' }), shownBefore(rows, '2026-11-09', '2026-11-02', true))).toBe(true)
   })
 })
 

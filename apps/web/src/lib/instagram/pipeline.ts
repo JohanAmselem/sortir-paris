@@ -6,7 +6,7 @@
  * claimed with a conditional UPDATE … WHERE status = 'draft' before any call,
  * and publish-flow.ts never trusts an error answer (see there).
  * Never twice the same event: one post per event and per day, and not again
- * within NO_REPEAT_DAYS (select.ts, keysToAvoid).
+ * within NO_REPEAT_DAYS, even under a close title (select.ts, shownBefore).
  */
 import 'server-only'
 import { getSignatureVenueIds } from '@/lib/events/query'
@@ -40,7 +40,7 @@ import { slideUrl } from './media-url'
 import { checkPhoto } from './photo'
 import { PublishLaterError, PublishUncertainError, captionHeader, findByHeader, publishToInstagram, publishableIndexes } from './publish-flow'
 import { addDays, eventWindow, planForDate, windowDateLabel, type PlannedPost } from './schedule'
-import { NO_REPEAT_DAYS, buildItems, candidateKeys, coverItem, isExcluded, keysToAvoid, selectEvents } from './select'
+import { NO_REPEAT_DAYS, addShown, buildItems, coverItem, isExcluded, selectEvents, shownBefore, type Shown } from './select'
 import { CAROUSEL_THEMES, STORY_THEMES, hashtagsFor, isCarouselTheme, isStoryTheme } from './themes'
 import type { Candidate, Exclusion, PostItem } from './types'
 
@@ -105,7 +105,9 @@ async function prepareOne(
     candidates: Map<string, Promise<Candidate[]>>
     photos: Map<string, Promise<boolean>>
     /** Events already shown or planned: grows with each post written. */
-    avoid: Set<string>
+    avoid: Shown
+    /** Events picked by this run for the day (they count for the following days). */
+    reserved: Candidate[]
   }
 ): Promise<PreparedSummary> {
   const base = { kind: plan.kind, theme: plan.theme, forDate: plan.forDate, scheduledAt: plan.scheduledAt.toISOString() }
@@ -121,7 +123,11 @@ async function prepareOne(
     { window: plan.window, theme: plan.theme, timeWindow: tw, exclusions: ctx.exclusions, signatureIds: new Set(ctx.signatureIds), avoid: ctx.avoid },
     plan.kind
   )
-  const reserve = () => picked.forEach((c) => candidateKeys(c).forEach((k) => ctx.avoid.add(k)))
+  const reserve = () =>
+    picked.forEach((c) => {
+      addShown(ctx.avoid, c)
+      ctx.reserved.push(c)
+    })
   if (!picked.length) {
     const reason = 'Pas assez de sorties fiables'
     if (!ctx.dryRun && !ctx.insertOnly) await skipDraft(plan.kind, plan.theme, plan.forDate, reason)
@@ -176,23 +182,23 @@ export async function prepare(now: Date, opts: { dryRun?: boolean; date?: string
   const ctx = { now, dryRun, exclusions, signatureIds, candidates: new Map<string, Promise<Candidate[]>>(), photos: new Map<string, Promise<boolean>>() }
   const posts: PreparedSummary[] = []
   // Events of the posts written by this run, by day (today's new posts count for tomorrow).
-  const written = new Map<string, Set<string>>()
+  const written = new Map<string, Candidate[]>()
   for (const day of days) {
     const fromDate = addDays(day.date, -NO_REPEAT_DAYS)
-    const avoid = keysToAvoid(recent, day.date, fromDate, day.insertOnly)
-    for (const [date, keys] of written) if (date >= fromDate && date < day.date) keys.forEach((k) => avoid.add(k))
-    const before = new Set(avoid)
+    const avoid = shownBefore(recent, day.date, fromDate, day.insertOnly)
+    for (const [date, picks] of written) if (date >= fromDate && date < day.date) picks.forEach((c) => addShown(avoid, c))
+    const reserved: Candidate[] = []
     // Today: only what is still ahead (at least 30 minutes, time to look at it).
     const plans = planForDate(day.date).filter((p) => p.scheduledAt.getTime() > now.getTime() + 30 * 60_000)
     for (const plan of plans) {
       try {
-        posts.push(await prepareOne(plan, { ...ctx, insertOnly: day.insertOnly, avoid }))
+        posts.push(await prepareOne(plan, { ...ctx, insertOnly: day.insertOnly, avoid, reserved }))
       } catch (err) {
         console.error('[instagram] prepare failed', plan.kind, plan.theme, err)
         posts.push({ kind: plan.kind, theme: plan.theme, forDate: plan.forDate, scheduledAt: plan.scheduledAt.toISOString(), result: 'skipped', events: 0, reason: 'Erreur de préparation' })
       }
     }
-    written.set(day.date, new Set([...avoid].filter((k) => !before.has(k))))
+    written.set(day.date, reserved)
   }
   return { ok: true, dryRun, posts }
 }

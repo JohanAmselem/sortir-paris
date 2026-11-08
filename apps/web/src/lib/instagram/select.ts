@@ -45,30 +45,71 @@ export function itemKeys(it: PostItem): string[] {
   return it.type === 'event' ? keysOf(it.event_id, it.title) : []
 }
 
+/** One title inside the other, word for word (« Zinée » and « Zinée — la Cigale »). */
+const titlesOverlap = (a: string, b: string) => {
+  const ka = ` ${a} `
+  const kb = ` ${b} `
+  return a.length > 0 && b.length > 0 && (ka.includes(kb) || kb.includes(ka))
+}
+
+/**
+ * The same show listed twice (two sources, two venue records): one title inside
+ * the other, and the same start or the same venue.
+ */
+export function sameShow(a: Pick<Candidate, 'startDate' | 'title' | 'venueId'>, b: Pick<Candidate, 'startDate' | 'title' | 'venueId'>): boolean {
+  if (a.startDate !== b.startDate && (!a.venueId || a.venueId !== b.venueId)) return false
+  return titlesOverlap(titleKey(a.title), titleKey(b.title))
+}
+
+/** Events already shown or planned: exact keys (id, title) and shows to compare (close titles). */
+export interface Shown {
+  keys: Set<string>
+  shows: { title: string; venueId: string | null; startDate: string | null }[]
+}
+
+export function emptyShown(): Shown {
+  return { keys: new Set(), shows: [] }
+}
+
+/** Add an event picked for a post (its start is known). */
+export function addShown(s: Shown, c: Pick<Candidate, 'id' | 'title' | 'venueId' | 'startDate'>): void {
+  candidateKeys(c).forEach((k) => s.keys.add(k))
+  s.shows.push({ title: titleKey(c.title), venueId: c.venueId, startDate: c.startDate })
+}
+
+/** Add the event slides of a stored post (no start date in the slides: compared by venue). */
+export function addShownItems(s: Shown, items: PostItem[]): void {
+  for (const it of items) {
+    if (it.type !== 'event') continue
+    itemKeys(it).forEach((k) => s.keys.add(k))
+    s.shows.push({ title: titleKey(it.title), venueId: it.venue_id ?? null, startDate: null })
+  }
+}
+
+/** Already shown: same id, same title, or the same show under a close title (same start or venue). */
+export function isShown(c: Candidate, s: Shown): boolean {
+  if (candidateKeys(c).some((k) => s.keys.has(k))) return true
+  const t = titleKey(c.title)
+  return s.shows.some(
+    (x) => ((x.startDate != null && x.startDate === c.startDate) || (x.venueId != null && x.venueId === c.venueId)) && titlesOverlap(t, x.title)
+  )
+}
+
 /**
  * Events not to pick again when preparing `forDate`: those of the posts of the
  * previous NO_REPEAT_DAYS days that are or will be on the account, and those
  * of the same day's posts that this preparation does not rewrite (all of them
  * when `insertOnly`, otherwise everything but drafts).
  */
-export function keysToAvoid(rows: { forDate: string; status: PostStatus; items: PostItem[] }[], forDate: string, fromDate: string, insertOnly: boolean): Set<string> {
-  const out = new Set<string>()
+export function shownBefore(rows: { forDate: string; status: PostStatus; items: PostItem[] }[], forDate: string, fromDate: string, insertOnly: boolean): Shown {
+  const out = emptyShown()
   for (const r of rows) {
     if (r.status === 'skipped' || r.status === 'blocked') continue
     const before = r.forDate >= fromDate && r.forDate < forDate
     const sameDayKept = r.forDate === forDate && (insertOnly || r.status !== 'draft')
-    if (!before && !sameDayKept) continue
-    for (const it of r.items) for (const k of itemKeys(it)) out.add(k)
+    if (before || sameDayKept) addShownItems(out, r.items)
   }
   return out
-}
-
-/** The same show listed twice (two sources, two venue records): same start, one title inside the other. */
-export function sameShow(a: Pick<Candidate, 'startDate' | 'title'>, b: Pick<Candidate, 'startDate' | 'title'>): boolean {
-  if (a.startDate !== b.startDate) return false
-  const ka = ` ${titleKey(a.title)} `
-  const kb = ` ${titleKey(b.title)} `
-  return ka.includes(kb) || kb.includes(ka)
 }
 
 const PETITE_COURONNE = /^(92|93|94)\d{3}$/
@@ -100,8 +141,8 @@ export interface SelectContext {
   timeWindow: TimeWindow
   exclusions: Exclusion[]
   signatureIds: Set<string>
-  /** Event keys already shown (same day, previous days): see keysToAvoid. */
-  avoid?: Set<string>
+  /** Events already shown or planned (same day, previous days): see shownBefore. */
+  avoid?: Shown
 }
 
 /** Can this event appear in this post at all? */
@@ -112,7 +153,7 @@ export function eligible(c: Candidate, ctx: SelectContext): boolean {
   if (c.qualityScore < MIN_QUALITY) return false
   if (institutional(c.title)) return false
   if (isExcluded(c, ctx.exclusions)) return false
-  if (ctx.avoid?.size && candidateKeys(c).some((k) => ctx.avoid!.has(k))) return false
+  if (ctx.avoid && isShown(c, ctx.avoid)) return false
 
   const start = new Date(c.startDate)
   const longRun = isLongRun(c)

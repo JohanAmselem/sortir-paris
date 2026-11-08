@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { eventWindow, planForDate } from './schedule'
-import { buildItems, coverItem, creditLine, eligible, inArea, isExcluded, scoreCandidate, selectEvents, slideWhen, type SelectContext } from './select'
-import type { Candidate } from './types'
+import {
+  buildItems,
+  candidateKeys,
+  coverItem,
+  creditLine,
+  eligible,
+  eventItem,
+  inArea,
+  isExcluded,
+  keysToAvoid,
+  sameShow,
+  scoreCandidate,
+  selectEvents,
+  slideWhen,
+  titleKey,
+  type SelectContext,
+} from './select'
+import type { Candidate, PostStatus } from './types'
 
 // Published Wednesday 14 Oct 2026 at 18:00 → events of Thursday 15 Oct.
 const at = planForDate('2026-10-14').find((p) => p.theme === 'demain')!.scheduledAt
@@ -155,6 +171,51 @@ describe('selectEvents', () => {
     const list = days.map((d, i) => ev({ startDate: `${d}T18:00:00.000Z`, categorySlug: ['concerts', 'theatre', 'expos', 'soirees', 'danse', 'spectacles'][i] }))
     const picked = selectEvents(list, ctx({ window: 'semaine', theme: 'semaine', timeWindow: week }), 'carousel')
     expect(picked.map((p) => p.startDate.slice(0, 10))).toEqual([...days].sort())
+  })
+})
+
+describe('never the same event twice', () => {
+  it('skips the events already shown (by id, or by title for the other dates of a show)', () => {
+    const shown = ev({ title: 'Cendrillon' })
+    const avoid = new Set(candidateKeys(shown))
+    expect(eligible(shown, ctx({ avoid }))).toBe(false)
+    // Same show, another date or source: another id, same title.
+    expect(eligible(ev({ title: 'CENDRILLON !' }), ctx({ avoid }))).toBe(false)
+    expect(eligible(ev({ title: 'Casse-Noisette' }), ctx({ avoid }))).toBe(true)
+  })
+
+  it('spots the same show listed twice (two sources, two venue records)', () => {
+    // Seen in a story on 3 November 2026.
+    const a = ev({ title: 'Biréli Lagrène', startDate: '2026-10-15T19:30:00.000Z', venueId: 'seine-musicale-auditorium' })
+    const b = ev({ title: 'Biréli Lagrène dans Elegant People', startDate: '2026-10-15T19:30:00.000Z', venueId: 'seine-musicale' })
+    expect(sameShow(a, b)).toBe(true)
+    expect(sameShow(a, { ...b, startDate: '2026-10-15T18:00:00.000Z' })).toBe(false)
+    // A word inside another word does not count.
+    expect(sameShow(ev({ title: 'Swing' }), ev({ title: 'Swingers Party' }))).toBe(false)
+    const picked = selectEvents([a, b, ev(), ev(), ev()], ctx({ theme: 'concerts' }), 'story')
+    expect(picked.filter((p) => p.title.startsWith('Biréli'))).toHaveLength(1)
+  })
+
+  it('avoids the previous 7 days and the same day’s posts that stay as they are', () => {
+    const item = (title: string) => eventItem(ev({ title }))
+    const row = (forDate: string, status: PostStatus, title: string) => ({ forDate, status, items: [item(title)] })
+    const rows = [
+      row('2026-11-01', 'published', 'Trop ancien'), // 8 days before: may come back
+      row('2026-11-02', 'published', 'Il y a 7 jours'),
+      row('2026-11-08', 'failed', 'Peut-être en ligne'),
+      row('2026-11-08', 'skipped', 'Jamais parti'),
+      row('2026-11-08', 'blocked', 'Bloqué'),
+      row('2026-11-08', 'draft', 'Ce soir à 18 h'),
+      row('2026-11-09', 'published', 'Déjà parti ce jour'),
+      row('2026-11-09', 'draft', 'Brouillon refait'),
+      row('2026-11-10', 'draft', 'Après'),
+    ]
+    const keys = keysToAvoid(rows, '2026-11-09', '2026-11-02', false)
+    const has = (t: string) => keys.has(`t:${titleKey(t)}`)
+    expect(['Il y a 7 jours', 'Peut-être en ligne', 'Ce soir à 18 h', 'Déjà parti ce jour'].every(has)).toBe(true)
+    expect(['Trop ancien', 'Jamais parti', 'Bloqué', 'Brouillon refait', 'Après'].some(has)).toBe(false)
+    // insertOnly (today): every existing row of the day stays as it is.
+    expect(keysToAvoid(rows, '2026-11-09', '2026-11-02', true).has(`t:${titleKey('Brouillon refait')}`)).toBe(true)
   })
 })
 

@@ -11,7 +11,7 @@ import { formatDayLabel, formatShortDay, formatTime, isLongRun, parisISODate, ty
 import { foldText } from '@/lib/events/fold'
 import { CATEGORY_BY_SLUG, INSTITUTIONAL_TERMS, OUTING_CATEGORIES } from '@/lib/events/taxonomy'
 import { STORY_THEMES, isStoryTheme, type ThemeKey } from './themes'
-import type { Candidate, Exclusion, PostItem, WindowKind } from './types'
+import type { Candidate, Exclusion, PostItem, PostStatus, WindowKind } from './types'
 
 export const MIN_QUALITY = 70
 export const CAROUSEL_EVENTS = 8
@@ -20,6 +20,56 @@ export const STORY_MAX_EVENTS = 5
 export const STORY_MIN_EVENTS = 3
 /** Long runs (exhibitions) allowed in a week / weekend carousel. */
 const MAX_LONG_RUNS = 2
+/** An event shown in a post is not shown again in the following 7 days (any post). */
+export const NO_REPEAT_DAYS = 7
+
+// ── Never the same event twice ───────────────────────────────────────────────
+
+/** Normalized title: the same show under several ids (one per date, per source). */
+export function titleKey(title: string): string {
+  return foldText(title).replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+const keysOf = (id: string | undefined, title: string): string[] => {
+  const t = titleKey(title)
+  return [...(id ? [`id:${id}`] : []), ...(t.length >= 4 ? [`t:${t}`] : [])]
+}
+
+/** Keys of a candidate: its id and its title. */
+export function candidateKeys(c: Pick<Candidate, 'id' | 'title'>): string[] {
+  return keysOf(c.id, c.title)
+}
+
+/** Keys of a slide already planned or published (events only). */
+export function itemKeys(it: PostItem): string[] {
+  return it.type === 'event' ? keysOf(it.event_id, it.title) : []
+}
+
+/**
+ * Events not to pick again when preparing `forDate`: those of the posts of the
+ * previous NO_REPEAT_DAYS days that are or will be on the account, and those
+ * of the same day's posts that this preparation does not rewrite (all of them
+ * when `insertOnly`, otherwise everything but drafts).
+ */
+export function keysToAvoid(rows: { forDate: string; status: PostStatus; items: PostItem[] }[], forDate: string, fromDate: string, insertOnly: boolean): Set<string> {
+  const out = new Set<string>()
+  for (const r of rows) {
+    if (r.status === 'skipped' || r.status === 'blocked') continue
+    const before = r.forDate >= fromDate && r.forDate < forDate
+    const sameDayKept = r.forDate === forDate && (insertOnly || r.status !== 'draft')
+    if (!before && !sameDayKept) continue
+    for (const it of r.items) for (const k of itemKeys(it)) out.add(k)
+  }
+  return out
+}
+
+/** The same show listed twice (two sources, two venue records): same start, one title inside the other. */
+export function sameShow(a: Pick<Candidate, 'startDate' | 'title'>, b: Pick<Candidate, 'startDate' | 'title'>): boolean {
+  if (a.startDate !== b.startDate) return false
+  const ka = ` ${titleKey(a.title)} `
+  const kb = ` ${titleKey(b.title)} `
+  return ka.includes(kb) || kb.includes(ka)
+}
 
 const PETITE_COURONNE = /^(92|93|94)\d{3}$/
 
@@ -50,6 +100,8 @@ export interface SelectContext {
   timeWindow: TimeWindow
   exclusions: Exclusion[]
   signatureIds: Set<string>
+  /** Event keys already shown (same day, previous days): see keysToAvoid. */
+  avoid?: Set<string>
 }
 
 /** Can this event appear in this post at all? */
@@ -60,6 +112,7 @@ export function eligible(c: Candidate, ctx: SelectContext): boolean {
   if (c.qualityScore < MIN_QUALITY) return false
   if (institutional(c.title)) return false
   if (isExcluded(c, ctx.exclusions)) return false
+  if (ctx.avoid?.size && candidateKeys(c).some((k) => ctx.avoid!.has(k))) return false
 
   const start = new Date(c.startDate)
   const longRun = isLongRun(c)
@@ -125,8 +178,9 @@ export function pickDiverse(
       if (out.length >= max) return
       if (out.includes(c)) continue
       const venue = c.venueId ?? c.id
-      const title = foldText(c.title).replace(/[^a-z0-9]+/g, ' ').trim()
+      const title = titleKey(c.title)
       if (venues.has(venue) || titles.has(title)) continue
+      if (out.some((p) => sameShow(p, c))) continue
       const long = isLongRun(c)
       if (long && opts.maxLongRuns != null && longRuns >= opts.maxLongRuns) continue
       const cat = c.categorySlug ?? 'autre'

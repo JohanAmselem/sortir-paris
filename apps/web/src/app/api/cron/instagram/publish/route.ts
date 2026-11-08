@@ -8,10 +8,12 @@ export const maxDuration = 300
 
 /**
  * POST /api/cron/instagram/publish — publishes the drafts whose time has come
- * (blocked posts are never published) and renews the access token when it
- * expires within 10 days. Bearer CRON_SECRET.
+ * (blocked posts are never published), marks published the uncertain carousels
+ * found on the account, and renews the access token when it expires within
+ * 10 days. Bearer CRON_SECRET.
  *   ?dry=1   what would be published, without calling Instagram or writing
- * Called every 30 minutes by GitHub Actions (.github/workflows/instagram.yml).
+ * Called every 15 minutes by Vercel Cron (vercel.json, GET); manual runs from
+ * GitHub Actions (.github/workflows/instagram.yml, POST).
  */
 export async function POST(request: NextRequest) {
   if (!cronAuthorized(request.headers.get('authorization'), process.env.CRON_SECRET)) {
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
     const result = await publishDue(new Date(), { dryRun })
     console.warn('[cron/instagram/publish]', JSON.stringify(result))
     // The link-in-bio page (/instagram) lists the published posts.
-    if (result.ok && result.posts.some((p) => p.result === 'published')) revalidateTag('instagram')
+    if (result.ok && (result.reconciled || result.posts.some((p) => p.result === 'published' || p.result === 'already'))) revalidateTag('instagram')
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     console.error('[cron/instagram/publish] failed', err)

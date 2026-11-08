@@ -283,8 +283,9 @@ export async function claimPost(id: string, from: 'draft' | 'failed', maxAttempt
   return rows.length === 1
 }
 
-export async function markPublished(id: string, r: { mediaIds: string[]; permalink: string | null; items?: PostItem[] }): Promise<void> {
-  await db
+/** `from`: 'failed' when an uncertain post turns out to be on the account. */
+export async function markPublished(id: string, r: { mediaIds: string[]; permalink: string | null; items?: PostItem[] }, from: 'publishing' | 'failed' = 'publishing'): Promise<boolean> {
+  const rows = await db
     .update(instagramPosts)
     .set({
       status: 'published',
@@ -295,20 +296,45 @@ export async function markPublished(id: string, r: { mediaIds: string[]; permali
       updatedAt: new Date(),
       ...(r.items ? { items: r.items } : {}),
     })
+    .where(and(eq(instagramPosts.id, id), eq(instagramPosts.status, from)))
+    .returning({ id: instagramPosts.id })
+  return rows.length === 1
+}
+
+/**
+ * `noRetryAfter`: attempts raised to this value, so the post is not retried automatically.
+ * `refund`: nothing went out (quota, time budget): the attempt is given back.
+ */
+export async function markFailed(id: string, error: string, opts: { noRetryAfter?: number; refund?: boolean } = {}): Promise<void> {
+  const attempts = opts.noRetryAfter
+    ? { attempts: sql`greatest(${instagramPosts.attempts}, ${opts.noRetryAfter})` }
+    : opts.refund
+      ? { attempts: sql`greatest(${instagramPosts.attempts} - 1, 0)` }
+      : {}
+  await db
+    .update(instagramPosts)
+    .set({ status: 'failed', error: error.slice(0, 1000), updatedAt: new Date(), ...attempts })
     .where(and(eq(instagramPosts.id, id), eq(instagramPosts.status, 'publishing')))
 }
 
-/** `noRetryAfter`: attempts raised to this value, so the post is not retried automatically. */
-export async function markFailed(id: string, error: string, noRetryAfter?: number): Promise<void> {
-  await db
-    .update(instagramPosts)
-    .set({
-      status: 'failed',
-      error: error.slice(0, 1000),
-      updatedAt: new Date(),
-      ...(noRetryAfter ? { attempts: sql`greatest(${instagramPosts.attempts}, ${noRetryAfter})` } : {}),
-    })
-    .where(and(eq(instagramPosts.id, id), eq(instagramPosts.status, 'publishing')))
+/** Carousels left uncertain (error answer, interrupted run, no automatic retry) since `since`. */
+export async function loadUncertainCarousels(since: Date, maxAttempts: number, limit = 10): Promise<PostRow[]> {
+  const rows = await withStatementTimeout(STATEMENT_TIMEOUT_MS, (tx) =>
+    tx
+      .select(postColumns)
+      .from(instagramPosts)
+      .where(
+        and(
+          eq(instagramPosts.status, 'failed'),
+          eq(instagramPosts.kind, 'carousel'),
+          sql`${instagramPosts.attempts} >= ${maxAttempts}`,
+          sql`${instagramPosts.scheduledAt} >= ${since.toISOString()}::timestamptz`
+        )
+      )
+      .orderBy(desc(instagramPosts.scheduledAt))
+      .limit(limit)
+  )
+  return rows.map(toPost)
 }
 
 /** Story slides are saved as soon as each one is live (never published twice). */
@@ -325,12 +351,20 @@ export async function setStatus(id: string, from: PostStatus[], to: PostStatus, 
   return rows.length === 1
 }
 
-/** Drafts whose time passed long ago (cron down, quota): never published late. */
-export async function skipStaleDrafts(before: Date): Promise<number> {
+/**
+ * Drafts (and retryable failures) whose time passed long ago (cron down, quota):
+ * never published late. Uncertain failures (attempts ≥ max) keep their message.
+ */
+export async function skipStaleDrafts(before: Date, maxAttempts: number): Promise<number> {
   const rows = await db
     .update(instagramPosts)
     .set({ status: 'skipped', error: 'Heure de publication dépassée', updatedAt: new Date() })
-    .where(and(inArray(instagramPosts.status, ['draft', 'failed']), sql`${instagramPosts.scheduledAt} < ${before.toISOString()}::timestamptz`))
+    .where(
+      and(
+        sql`(${instagramPosts.status} = 'draft' or (${instagramPosts.status} = 'failed' and ${instagramPosts.attempts} < ${maxAttempts}))`,
+        sql`${instagramPosts.scheduledAt} < ${before.toISOString()}::timestamptz`
+      )
+    )
     .returning({ id: instagramPosts.id })
   return rows.length
 }

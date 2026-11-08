@@ -6,6 +6,7 @@
  *   GET  /{container-id}?fields=status_code   FINISHED | IN_PROGRESS | ERROR | EXPIRED | PUBLISHED
  *   POST /{ig-user-id}/media_publish          creation_id
  *   GET  /{media-id}?fields=permalink
+ *   GET  /{ig-user-id}/media?fields=id,caption,timestamp,permalink   (recent feed posts, newest first)
  *   GET  /{ig-user-id}/content_publishing_limit?fields=quota_usage,config
  *   GET  /me?fields=user_id,username
  *   GET  https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token (unversioned)
@@ -30,6 +31,29 @@ export class InstagramApiError extends Error {
   }
 }
 
+/**
+ * The only media_publish errors after which we KNOW nothing went live (checked
+ * on the account, November 2026). Any other error may hide a publication:
+ * « Nous restreignons certaines activités… » (4 / 2207051) published the post
+ * anyway, three times in a row. Messages are localized: matched as a fallback.
+ */
+export function isNotReady(err: unknown): boolean {
+  if (!(err instanceof InstagramApiError)) return false
+  return err.code === 9007 || err.subcode === 2207027 || /pas prêt|not ready/i.test(err.message)
+}
+
+export function isQuotaReached(err: unknown): boolean {
+  if (!(err instanceof InstagramApiError)) return false
+  return err.subcode === 2207042 || /nombre maximal de publications|maximum number of posts/i.test(err.message)
+}
+
+export interface RecentMedia {
+  id: string
+  caption: string | null
+  timestamp: string | null
+  permalink: string | null
+}
+
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export interface GraphOptions {
@@ -44,7 +68,8 @@ export interface GraphOptions {
 export class InstagramGraph {
   private readonly base: string
   private readonly f: FetchLike
-  private readonly pollMs: number
+  /** Wait between status checks (and before publishing a container again). */
+  readonly pollMs: number
   private readonly pollTimeoutMs: number
 
   constructor(private readonly opts: GraphOptions) {
@@ -76,10 +101,14 @@ export class InstagramGraph {
     } catch {
       // empty or non-JSON body
     }
-    const err = json.error as { message?: string; code?: number; error_subcode?: number; error_user_msg?: string } | undefined
+    const err = json.error as { message?: string; code?: number; error_subcode?: number; error_user_msg?: string; fbtrace_id?: string } | undefined
     if (!res.ok || err) {
       const msg = err?.error_user_msg || err?.message || `HTTP ${res.status}`
-      throw new InstagramApiError(redact(msg, this.opts.token), res.status, err?.code, err?.error_subcode)
+      // Codes kept in the message (stored in instagram_posts.error) for diagnosis.
+      const codes = [err?.code != null ? `code ${err.code}${err.error_subcode ? '/' + err.error_subcode : ''}` : null, err?.fbtrace_id ? `trace ${err.fbtrace_id}` : null]
+        .filter(Boolean)
+        .join(', ')
+      throw new InstagramApiError(redact(codes ? `${msg} (${codes})` : msg, this.opts.token), res.status, err?.code, err?.error_subcode)
     }
     return json as T
   }
@@ -128,6 +157,28 @@ export class InstagramGraph {
     return r.id
   }
 
+  /** True once the container has gone live (checked a few times: publication can lag behind the answer). */
+  async isPublished(containerId: string, checks = 3): Promise<boolean> {
+    for (let i = 0; i < checks; i++) {
+      if (i > 0) await sleep(this.pollMs)
+      try {
+        if ((await this.containerStatus(containerId)) === 'PUBLISHED') return true
+      } catch {
+        // status unknown: check again, then give up (the caller treats it as uncertain)
+      }
+    }
+    return false
+  }
+
+  /** The account's latest feed posts (carousels, photos), newest first. Stories are not listed. */
+  async recentMedia(igUserId: string, limit = 25): Promise<RecentMedia[]> {
+    const r = await this.call<{ data?: { id: string; caption?: string; timestamp?: string; permalink?: string }[] }>('GET', `/${igUserId}/media`, {
+      fields: 'id,caption,timestamp,permalink',
+      limit: String(limit),
+    })
+    return (r.data ?? []).map((m) => ({ id: String(m.id), caption: m.caption ?? null, timestamp: m.timestamp ?? null, permalink: m.permalink ?? null }))
+  }
+
   async permalink(mediaId: string): Promise<string | null> {
     try {
       const r = await this.call<{ permalink?: string }>('GET', `/${mediaId}`, { fields: 'permalink' })
@@ -162,7 +213,7 @@ export class InstagramGraph {
   }
 }
 
-const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve())
+export const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve())
 
 /** Never let the token end up in an error message stored in the database. */
 export function redact(message: string, token: string): string {

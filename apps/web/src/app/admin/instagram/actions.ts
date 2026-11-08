@@ -55,6 +55,7 @@ export async function publishNow(f: FormData) {
   const r = run.posts[0]
   revalidateTag('instagram')
   if (r?.result === 'published') done('Publié sur Instagram.')
+  if (r?.result === 'already') done('Déjà en ligne sur Instagram : marquée comme publiée, rien n’a été renvoyé.')
   done(r?.error ? `Échec : ${r.error}` : `Non publiée (${r?.result ?? 'rien à publier'}).`, 'error')
 }
 

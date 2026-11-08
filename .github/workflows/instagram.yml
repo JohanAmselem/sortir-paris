@@ -1,14 +1,10 @@
-name: Instagram — prepare & publish
+name: Instagram — prepare & publish (manual)
 
-# Publication times are in Paris time (18:00 every day, Monday 08:00, Thursday
-# 12:00) and stored on each post (scheduled_at). GitHub cron is UTC and has no
-# DST, so the publish job simply runs every 30 minutes from 05:00 to 18:30 UTC
-# and publishes whatever is due. Preparation (tomorrow's drafts, previewed in
-# /admin/instagram) runs at 13:00 UTC, i.e. 14:00 or 15:00 in Paris.
+# The schedule runs on Vercel Cron (apps/web/vercel.json): preparation at 13:00
+# UTC, publication every 15 minutes. GitHub ran its schedules hours late, so
+# this workflow is only kept for manual runs (Actions → Run workflow), with an
+# optional dry run.
 on:
-  schedule:
-    - cron: '0 13 * * *'
-    - cron: '0,30 5-18 * * *'
   workflow_dispatch:
     inputs:
       step:
@@ -27,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: instagram-${{ github.event.schedule == '0 13 * * *' && 'prepare' || inputs.step || 'publish' }}
+  group: instagram-${{ inputs.step }}
   cancel-in-progress: false
 
 jobs:
@@ -38,7 +34,7 @@ jobs:
       - name: Call the endpoint
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          STEP: ${{ github.event.schedule == '0 13 * * *' && 'prepare' || inputs.step || 'publish' }}
+          STEP: ${{ inputs.step }}
           DRY: ${{ inputs.dry && '1' || '0' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then

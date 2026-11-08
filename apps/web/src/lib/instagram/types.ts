@@ -63,6 +63,13 @@ export interface PostItem {
   credit?: string
   /** Story items are published one by one: set once this one is live (never republished). */
   media_id?: string
+  /**
+   * Story items: the STORIES container, saved before media_publish. A later run
+   * checks it instead of creating a new one (PUBLISHED: live, FINISHED: publish it).
+   */
+  container_id?: string
+  /** Story item live on Instagram although its media id is unknown (error answer, then PUBLISHED). */
+  live?: boolean
 }
 
 export interface Exclusion {

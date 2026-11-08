@@ -13,7 +13,8 @@ export const maxDuration = 300
  * « Ton week-end » on Thursdays), previewed in /admin/instagram. Bearer CRON_SECRET.
  *   ?dry=1             what would be prepared, without writing (no photo check, no AI)
  *   ?date=YYYY-MM-DD   prepare that publication day only
- * Called every day by GitHub Actions (.github/workflows/instagram.yml).
+ * Called every day at 13:00 UTC by Vercel Cron (vercel.json, GET); manual runs
+ * from GitHub Actions (.github/workflows/instagram.yml, POST).
  */
 export async function POST(request: NextRequest) {
   if (!cronAuthorized(request.headers.get('authorization'), process.env.CRON_SECRET)) {

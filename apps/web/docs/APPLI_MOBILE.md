@@ -52,6 +52,17 @@ Routes existantes appelées telles quelles : `/api/events`, `/api/map`, `/api/su
 | `ANDROID_SHA256_FINGERPRINTS` | Empreinte SHA-256 du certificat de signature Google Play (Play Console → Intégrité de l'application) |
 | `EXPO_ACCESS_TOKEN` | Facultatif |
 
+Les deux fichiers `.well-known` sont **générés au build** : après avoir ajouté ou changé
+`APPLE_TEAM_ID`, `IOS_BUNDLE_ID` ou `ANDROID_SHA256_FINGERPRINTS`, **redéployer** le site.
+Apple ne suit pas les redirections : seul `www.panameclub.fr` est déclaré dans l'appli
+(`panameclub.fr` redirige vers www).
+
+## Mise en ligne du 21/11/2026
+
+Faite : migration `0012` jouée en production, puis `main` = `89cf338` déployé par Vercel.
+Suppression de compte essayée en production dans une transaction annulée (toutes les
+données partent, compteurs décomptés).
+
 ## Ordre de mise en ligne
 
 1. Jouer `packages/db/sql/0012_appli_mobile.sql` (additive, rejouable).

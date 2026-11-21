@@ -17,6 +17,7 @@ import { CONTACT_EMAIL } from '@/lib/config'
 import { EventCard } from '@/components/EventCard'
 import { Button, Card, Chip, EmptyState, Notice, T } from '@/components/ui'
 import { colors, fonts, GUTTER, radius } from '@/theme'
+import { StatusBarBackdrop } from '@/components/StatusBarBackdrop'
 
 function Row({ icon, label, hint, onPress, badge }: { icon: React.ReactNode; label: string; hint?: string; onPress: () => void; badge?: number }) {
   return (
@@ -59,6 +60,7 @@ export default function Moi() {
   const localList = useMemo(() => byDate(Object.values(localSaves).map((s) => s.event)), [localSaves])
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.paper }}>
     <ScrollView
       contentInsetAdjustmentBehavior="never"
       style={{ flex: 1, backgroundColor: colors.paper }}
@@ -131,6 +133,8 @@ export default function Moi() {
         <Row icon={<Users size={20} color={colors.accent} />} label="Nous écrire" hint={CONTACT_EMAIL} onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)} />
       </View>
     </ScrollView>
+    <StatusBarBackdrop color={colors.paper} />
+    </View>
   )
 }
 

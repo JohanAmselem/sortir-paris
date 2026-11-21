@@ -86,7 +86,14 @@ Pas de demande ATT (aucun pistage entre applis).
 
 12+ (iOS) / 12 ans (IARC) : références à l'alcool possibles dans les descriptions de soirées, aucun contenu généré non modéré visible hors avis courts, pas de jeux d'argent, pas de navigateur libre (le navigateur intégré n'ouvre que les liens des fiches).
 
-## Captures d'écran à produire
+## Captures d'écran
+
+Faites le 21/11 (simulateur iPhone 17 Pro Max, 1320 × 2868, heure 9:41) : `captures/ios-6.9/`.
+Android (émulateur Pixel, 1080 × 2400) : `captures/android/`, et `captures/android-play/` en 1200 × 2400
+(Google Play refuse un grand côté de plus de 2 fois le petit). Tout est en JPEG, sans transparence.
+L'ordre ci-dessous est celui des fichiers.
+
+### Liste
 
 iPhone 6,9" (1320 × 2868) et 6,5" (1284 × 2778) ; Android téléphone (1080 × 1920 minimum) :
 

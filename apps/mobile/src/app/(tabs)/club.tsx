@@ -18,6 +18,7 @@ import { Button, Card, ErrorState, Loading, SectionHeader, T } from '@/component
 import { EventCard } from '@/components/EventCard'
 import { EntryRow, EventRail, ProgressBar } from '@/components/club/parts'
 import { colors, fonts, GUTTER, radius } from '@/theme'
+import { StatusBarBackdrop } from '@/components/StatusBarBackdrop'
 
 export default function ClubScreen() {
   const insets = useSafeAreaInsets()
@@ -36,6 +37,7 @@ export default function ClubScreen() {
   const data = club.data!
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.paper }}>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.paper }}
       contentInsetAdjustmentBehavior="never"
@@ -130,6 +132,8 @@ export default function ClubScreen() {
         </View>
       ) : null}
     </ScrollView>
+    <StatusBarBackdrop color={colors.paper} />
+    </View>
   )
 }
 

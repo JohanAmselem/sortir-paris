@@ -27,7 +27,7 @@ export function EventImage({
     const cat = categorySlug ? CATEGORY_BY_SLUG[categorySlug] : null
     return (
       <View style={[styles.poster, style]} accessible={!!label} accessibilityLabel={label} importantForAccessibility={label ? 'yes' : 'no-hide-descendants'}>
-        <Text style={styles.posterText} numberOfLines={2}>
+        <Text style={styles.posterText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.35}>
           {cat?.plural ?? 'Paris'}
         </Text>
       </View>

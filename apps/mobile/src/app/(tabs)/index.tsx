@@ -18,6 +18,7 @@ import { WeekendProgram } from '@/components/home/WeekendProgram'
 import { EventCard } from '@/components/EventCard'
 import { ErrorState, Loading, Notice, SectionHeader, T } from '@/components/ui'
 import { colors, GUTTER, radius } from '@/theme'
+import { StatusBarBackdrop } from '@/components/StatusBarBackdrop'
 
 function Rail({ events, variant, origin }: { events: CardEvent[]; variant: 'poster' | 'tile'; origin: string }) {
   return (
@@ -152,6 +153,7 @@ export default function CeSoir() {
           </>
         ) : null}
       </ScrollView>
+      <StatusBarBackdrop color={colors.night} />
     </View>
   )
 }

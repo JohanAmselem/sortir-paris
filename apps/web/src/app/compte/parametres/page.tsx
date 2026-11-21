@@ -36,10 +36,10 @@ export default async function ParametresPage() {
           <Link href="/newsletter" className="font-semibold text-accent underline underline-offset-2">
             page newsletter
           </Link>
-          . Pour supprimer ton compte et tes données, écris-nous à{' '}
-          <a href="mailto:contact@panameclub.fr" className="font-semibold text-accent underline underline-offset-2">
-            contact@panameclub.fr
-          </a>
+          . Pour supprimer ton compte et tes données, c’est{' '}
+          <Link href="/suppression-compte" className="font-semibold text-accent underline underline-offset-2">
+            ici
+          </Link>
           .
         </p>
         <div className="mt-5">

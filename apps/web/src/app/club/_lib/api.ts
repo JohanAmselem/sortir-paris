@@ -4,7 +4,9 @@
  */
 import 'server-only'
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { bearerToken, getBearerUser } from '@/lib/supabase/bearer'
 import { z } from 'zod'
 import type { User } from '@supabase/supabase-js'
 import { db, users } from '@sortir/db'
@@ -30,9 +32,15 @@ export const errors = {
   server: () => jsonError(500, 'Une erreur est survenue, réessaie dans un instant.'),
 }
 
-/** Current Supabase user (validated with the auth server via getUser), or null. */
+/**
+ * Current Supabase user (validated with the auth server via getUser), or null.
+ * The mobile app authenticates with `Authorization: Bearer <access token>`;
+ * the site with its session cookies. A bearer header, when present, wins.
+ */
 export async function getSessionUser(): Promise<User | null> {
   try {
+    const token = bearerToken(await headers())
+    if (token) return await getBearerUser(token)
     const supabase = await createClient()
     const {
       data: { user },

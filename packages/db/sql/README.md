@@ -28,6 +28,15 @@ géocodage par nom, séries, dédoublonnage, reclassement des catégories).
 
 À appliquer **avant** de déployer le code du lot 4B : sans la table, les pages `/compte` et `/club` affichent « données indisponibles » pour les suivis et les boutons « Suivre » échouent.
 
+### Appli mobile (21 novembre 2026)
+
+| Fichier | Quoi | Risque |
+|---|---|---|
+| `0012_appli_mobile.sql` | `push_subscriptions` accueille les jetons de l'appli : colonnes `kind` (`web` par défaut, `expo`), `platform`, `last_seen_at` ; `p256dh` / `auth` deviennent facultatives (toujours exigées pour `kind = 'web'`, par contrainte). `alert_settings` : `notify_drop` (vrai par défaut) et `drop_notified_week`. Additive, rejouable, aucune donnée modifiée. | Faible : ALTER sur deux petites tables |
+
+À appliquer **avant** de déployer `feat/appli-mobile` : le code lit ces colonnes (envoi des alertes, réglages).
+Retour arrière : `0012_appli_mobile_RETOUR_ARRIERE.sql`, après avoir redéployé un code qui ne les lit plus.
+
 ## Appliquer
 
 Supabase, SQL Editor : coller le contenu de chaque fichier dans l’ordre, puis *Run*. Ou en ligne de commande :

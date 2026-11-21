@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/confidentialite' },
 }
 
-const LAST_UPDATE = '13 octobre 2026'
+const LAST_UPDATE = '21 novembre 2026'
 
 const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} className="font-semibold text-accent underline underline-offset-2" rel="noopener noreferrer">
@@ -38,17 +38,17 @@ const DATA = [
   { what: 'Activité sur le site', detail: 'Tes sorties gardées, tes « J’y vais », tes avis, tes réponses aux jeux du Club (swipes, quiz).' },
   {
     what: 'Notifications sur l’appareil',
-    detail: 'Si tu les actives : l’abonnement technique fourni par ton navigateur (adresse d’envoi et clés de chiffrement), sans autre information sur l’appareil.',
+    detail: 'Si tu les actives : l’abonnement technique fourni par ton navigateur (adresse d’envoi et clés de chiffrement) ou, dans l’appli, le jeton de notification de ton téléphone et son système (iOS ou Android), sans autre information sur l’appareil.',
   },
   { what: 'Newsletter', detail: 'Ton adresse e-mail, si tu t’inscris à la lettre hebdo.' },
   {
     what: 'Position',
-    detail: 'Utilisée uniquement dans ton navigateur pour « Autour de moi » et la carte, si tu l’autorises. Elle n’est jamais enregistrée par Paname Club.',
+    detail: 'Utilisée uniquement sur ton appareil (navigateur ou appli) pour « Autour de moi » et la carte, si tu l’autorises. Elle sert à la recherche du moment et n’est jamais enregistrée par Paname Club.',
   },
   { what: 'Journaux techniques', detail: 'Adresse IP, pages demandées, erreurs : nécessaires au fonctionnement et à la sécurité du site.' },
   {
     what: 'Mesure d’audience',
-    detail: 'Le cas échéant, une mesure d’audience sans cookie (Plausible, Vercel Web Analytics) : des statistiques agrégées, sans profil individuel.',
+    detail: 'Sur le site, une mesure d’audience sans cookie (Vercel Web Analytics). Dans l’appli, une mesure d’usage hébergée dans l’Union européenne (PostHog), sans identifiant publicitaire ni suivi entre applications : des statistiques sur les écrans et fonctions utilisés.',
   },
 ]
 
@@ -61,7 +61,10 @@ const PROCESSORS: Array<{ name: string; role: string; where?: string }> = [
     name: 'Anthropic',
     role: 'Compréhension des recherches écrites en langage naturel : seul le texte de la recherche est transmis, sans identifiant',
   },
-  { name: 'Google', role: 'Connexion avec Google, uniquement si tu la choisis' },
+  { name: 'Google', role: 'Connexion avec Google, uniquement si tu la choisis ; envoi des notifications sur Android (Firebase Cloud Messaging)' },
+  { name: 'Apple', role: 'Connexion avec Apple, uniquement si tu la choisis ; envoi des notifications sur iPhone' },
+  { name: 'Expo (650 Industries)', role: 'Acheminement des notifications de l’appli vers Apple et Google (États-Unis) : le jeton de l’appareil et le texte de la notification' },
+  { name: 'PostHog', role: 'Mesure d’usage de l’appli', where: 'Union européenne (Francfort)' },
   {
     name: 'Spotify',
     role: 'Import de tes artistes, uniquement si tu le choisis : on lit les noms d’artistes, aucun jeton d’accès n’est conservé',
@@ -134,7 +137,7 @@ export default function ConfidentialitePage() {
         <Section id="conservation" title="Combien de temps">
           <ul className="list-disc space-y-2 pl-5">
             <li>Compte et données associées : tant que ton compte existe, jusqu’à sa suppression.</li>
-            <li>Abonnements aux notifications : supprimés dès que tu les désactives ou que ton navigateur les invalide.</li>
+            <li>Abonnements aux notifications : supprimés dès que tu les désactives, que tu te déconnectes de l’appli, ou que ton navigateur ou ton téléphone les invalide.</li>
             <li>Newsletter : jusqu’à ta désinscription.</li>
             <li>Journaux techniques : 12 mois au maximum.</li>
           </ul>
@@ -183,9 +186,12 @@ export default function ConfidentialitePage() {
             de ton compte ; nous répondons dans un délai d’un mois.
           </p>
           <p>
-            Suppression du compte : sur simple demande à <A href="mailto:contact@panameclub.fr">contact@panameclub.fr</A>. Ton
-            compte et les données associées (suivis, sorties gardées, avis, réglages, abonnements aux notifications) sont alors
-            supprimés.
+            Suppression du compte : directement dans l’appli (Profil → Mon compte), sur la page{' '}
+            <Link href="/suppression-compte" className="font-semibold text-accent underline underline-offset-2">
+              Supprimer mon compte
+            </Link>{' '}
+            ou sur simple demande à <A href="mailto:contact@panameclub.fr">contact@panameclub.fr</A>. Ton compte et les données
+            associées (suivis, sorties gardées, avis, réglages, abonnements aux notifications) sont alors supprimés.
           </p>
           <p>
             Si tu estimes que tes droits ne sont pas respectés, tu peux adresser une réclamation à la CNIL (

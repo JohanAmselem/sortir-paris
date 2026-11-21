@@ -21,5 +21,7 @@ export const config = {
     '/club',
     '/api/(saves|attendance|reviews|swipe|drop|preferences|taste-quiz|profile|auth|me|views|newsletter|push|spotify)/:path*',
     '/api/alerts/settings',
+    '/api/v1/me',
+    '/suppression-compte',
   ],
 }

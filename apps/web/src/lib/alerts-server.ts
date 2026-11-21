@@ -40,7 +40,7 @@ import {
   type AlertSettingsValue,
 } from './alerts'
 import { deliveryKey, indexFollows, keysInTitle, maskEmail, newDateItems, onSaleItems, type ArtistFollowRow } from './alerts-collect'
-import { pushConfigured, sendPush } from './push-server'
+import { expoPushConfigured, pushConfigured, pushTargetUsable, sendPush } from './push-server'
 import { absoluteUrl, SITE_NAME } from './site'
 
 const READ_TIMEOUT_MS = 8000
@@ -243,7 +243,7 @@ interface MemberInfo {
   settings: AlertSettingsValue
   token: string | null
   email: string | null
-  subs: Array<{ id: string; endpoint: string; p256dh: string; auth: string }>
+  subs: Array<{ id: string; endpoint: string; p256dh: string | null; auth: string | null; kind: 'web' | 'expo' }>
 }
 
 async function loadMembers(userIds: string[]): Promise<Map<string, MemberInfo>> {
@@ -253,10 +253,10 @@ async function loadMembers(userIds: string[]): Promise<Map<string, MemberInfo>> 
       await tx.select().from(alertSettings).where(inArray(alertSettings.userId, chunk)).limit(chunk.length),
       await tx.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, chunk)).limit(chunk.length),
       await tx
-        .select({ id: pushSubscriptions.id, userId: pushSubscriptions.userId, endpoint: pushSubscriptions.endpoint, p256dh: pushSubscriptions.p256dh, auth: pushSubscriptions.auth })
+        .select({ id: pushSubscriptions.id, userId: pushSubscriptions.userId, endpoint: pushSubscriptions.endpoint, p256dh: pushSubscriptions.p256dh, auth: pushSubscriptions.auth, kind: pushSubscriptions.kind })
         .from(pushSubscriptions)
         .where(inArray(pushSubscriptions.userId, chunk))
-        .limit(chunk.length * 10),
+        .limit(chunk.length * 25),
     ] as const)
     for (const s of settings) {
       const m = info.get(s.userId)!
@@ -270,7 +270,8 @@ async function loadMembers(userIds: string[]): Promise<Map<string, MemberInfo>> 
       m.token = s.unsubscribeToken
     }
     for (const u of emails) info.get(u.id)!.email = u.email
-    for (const s of subs) info.get(s.userId)!.subs.push(s)
+    // Only the targets the current configuration can reach (web needs VAPID keys, the app needs nothing).
+    for (const s of subs) if (pushTargetUsable(s)) info.get(s.userId)!.subs.push(s)
   }
   return info
 }
@@ -355,7 +356,7 @@ export const unsubscribeApiUrl = (token: string) => absoluteUrl(`/api/alerts/uns
 export async function runAlerts(opts: RunOptions): Promise<RunStats> {
   const started = Date.now()
   const now = opts.now ?? new Date()
-  const configured = { email: emailConfigured(), push: pushConfigured() }
+  const configured = { email: emailConfigured(), push: pushConfigured() || expoPushConfigured() }
   const stats: RunStats = {
     ok: true,
     dryRun: opts.dryRun,

@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # L'appli Expo a son propre npm (package-lock) : hors de l'espace pnpm, le build Vercel du site ne change pas.
+  - "!apps/mobile"

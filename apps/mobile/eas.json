@@ -1,0 +1,41 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base": {
+      "node": "22.23.2",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://yshuqohvbwweppujzgtr.supabase.co"
+      }
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "ios": { "simulator": true }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "environment": "preview",
+      "channel": "preview",
+      "env": { "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr" }
+    },
+    "production": {
+      "extends": "base",
+      "autoIncrement": true,
+      "environment": "production",
+      "channel": "production",
+      "env": { "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr" }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "À_RENSEIGNER_APRÈS_CRÉATION_DANS_APP_STORE_CONNECT" },
+      "android": { "track": "internal", "releaseStatus": "draft" }
+    }
+  }
+}

@@ -131,6 +131,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     /** Expo retire `android.config` de la config lue par l'appli : on dit ici, sans la clé, si la carte Android peut s'afficher. */
     androidMaps: Boolean(process.env.GOOGLE_MAPS_ANDROID_KEY),
   },
-  updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}` },
   runtimeVersion: { policy: 'appVersion' },
 })

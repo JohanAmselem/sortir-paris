@@ -13,7 +13,9 @@
         "MEILISEARCH_HOST",
         "MEILISEARCH_API_KEY",
         "ANTHROPIC_API_KEY",
-        "NEXT_PUBLIC_MAPBOX_TOKEN"
+        "NEXT_PUBLIC_MAPBOX_TOKEN",
+        "ANDROID_SHA256_FINGERPRINTS",
+        "ANDROID_PACKAGE"
       ]
     },
     "dev": {

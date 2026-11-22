@@ -9,8 +9,10 @@ import type { ConfigContext, ExpoConfig } from 'expo/config'
  * - EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID / EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID  connexion Google
  * - EXPO_PUBLIC_POSTHOG_KEY             mesure d'usage (PostHog UE)
  * - GOOGLE_MAPS_ANDROID_KEY             carte Android (Google Maps SDK)
- * - EAS_PROJECT_ID                      projet Expo (notifications), donné par `eas init`
+ * - EAS_PROJECT_ID                      projet Expo (notifications), défaut : @johanamselem/panameclub
  */
+/** Projet Expo « panameclub » du compte johanamselem (créé par `eas init` le 22/11/2026, identifiant public). */
+const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID || 'dcb48305-b650-4ea3-bf64-c5d09050e910'
 const IOS_GOOGLE_CLIENT = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
 /** com.googleusercontent.apps.<id> : le schéma inverse de l'identifiant iOS, exigé par Google. */
 const googleUrlScheme = IOS_GOOGLE_CLIENT ? `com.googleusercontent.apps.${IOS_GOOGLE_CLIENT.replace('.apps.googleusercontent.com', '')}` : null
@@ -21,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Paname Club',
   slug: 'panameclub',
-  owner: process.env.EAS_OWNER || undefined,
+  owner: process.env.EAS_OWNER || 'johanamselem',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/brand/icon.png',
@@ -30,7 +32,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'fr.panameclub.app',
-    buildNumber: '1',
     supportsTablet: false,
     usesAppleSignIn: true,
     // www seulement : panameclub.fr redirige vers www, et Apple ne suit pas les redirections.
@@ -55,7 +56,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'fr.panameclub.app',
-    versionCode: 1,
     adaptiveIcon: {
       backgroundColor: CREAM,
       foregroundImage: './assets/brand/android-foreground.png',
@@ -126,11 +126,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     reactCompiler: true,
   },
   extra: {
-    eas: process.env.EAS_PROJECT_ID ? { projectId: process.env.EAS_PROJECT_ID } : undefined,
+    eas: { projectId: EAS_PROJECT_ID },
     router: { origin: 'https://www.panameclub.fr' },
     /** Expo retire `android.config` de la config lue par l'appli : on dit ici, sans la clé, si la carte Android peut s'afficher. */
     androidMaps: Boolean(process.env.GOOGLE_MAPS_ANDROID_KEY),
   },
-  updates: process.env.EAS_PROJECT_ID ? { url: `https://u.expo.dev/${process.env.EAS_PROJECT_ID}` } : undefined,
+  updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}` },
   runtimeVersion: { policy: 'appVersion' },
 })

@@ -35,5 +35,6 @@ export {
 } from '../../../web/src/lib/taste-quiz-data'
 export type { QuizAnswers, QuizQuestion, Archetype, TasteScores } from '../../../web/src/lib/taste-quiz-data'
 export { buildEventParams } from '../../../web/src/lib/events/params'
+export { containsBlockedWords, BLOCKED_REVIEW_MESSAGE } from '../../../web/src/lib/review-moderation'
 export type { EventQuery } from '../../../web/src/lib/events/types'
 export type * from '../../../web/src/lib/api-v1/contract'

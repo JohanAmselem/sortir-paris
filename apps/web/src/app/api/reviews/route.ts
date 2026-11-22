@@ -1,13 +1,20 @@
+import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { and, avg, count, desc, eq, sql } from 'drizzle-orm'
 import { db, eventReviews, events, users } from '@sortir/db'
 import { errors, ensureUserRow, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
 import { syncGamification } from '@/app/club/_lib/member'
+import { BLOCKED_REVIEW_MESSAGE, containsBlockedWords } from '@/lib/review-moderation'
 
 export const dynamic = 'force-dynamic'
 
 const COMMENT_MAX = 1000
+
+/** Clé d'auteur anonyme et stable : l'appli s'en sert pour « ne plus voir ce membre », sans connaître son identifiant. */
+function authorKey(userId: string): string {
+  return createHash('sha256').update(`review-author:${userId}`).digest('hex').slice(0, 16)
+}
 
 /** Reviews open once the event has started. */
 async function eventState(eventId: string) {
@@ -54,6 +61,7 @@ export async function GET(request: NextRequest) {
           comment: r.comment,
           createdAt: r.createdAt,
           userAvatar: r.userAvatar,
+          authorKey: authorKey(r.userId),
           // First name only: reviews are public.
           userName: r.userName ? r.userName.split(/\s+/)[0] : null,
         })),
@@ -92,6 +100,7 @@ export async function POST(request: NextRequest) {
   const body = await parseBody(request, bodySchema)
   if (!body.ok) return body.response
   const { eventId, rating, comment } = body.data
+  if (containsBlockedWords(comment)) return NextResponse.json({ error: BLOCKED_REVIEW_MESSAGE }, { status: 422 })
 
   try {
     const ev = await eventState(eventId)

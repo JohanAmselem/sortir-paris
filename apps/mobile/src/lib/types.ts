@@ -103,7 +103,7 @@ export interface AdnResponse {
 }
 
 export interface ReviewsResponse {
-  reviews: Array<{ id: string; rating: number; comment: string | null; createdAt: string; userAvatar: string | null; userName: string | null }>
+  reviews: Array<{ id: string; rating: number; comment: string | null; createdAt: string; userAvatar: string | null; userName: string | null; /** Clé anonyme de l'auteur (absente avant la mise à jour du site). */ authorKey?: string }>
   stats: { avgRating: number | null; totalReviews: number }
   userReview: { rating: number; comment: string | null } | null
   canReview: boolean

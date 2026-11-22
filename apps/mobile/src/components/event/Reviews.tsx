@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import { Star } from 'lucide-react-native'
 import { useReviews, useSendReview } from '@/lib/queries'
+import { blockReviewAuthor, hideReview, useLocalState } from '@/lib/local-store'
+import { CONTACT_EMAIL } from '@/lib/config'
+import { BLOCKED_REVIEW_MESSAGE, containsBlockedWords } from '@/shared'
 import { errorMessage } from '@/lib/api'
 import { Button, Notice, T } from '@/components/ui'
 import { colors, fonts, radius } from '@/theme'
@@ -19,12 +22,42 @@ function Stars({ value, onChange, size = 26 }: { value: number; onChange?: (n: n
   )
 }
 
+/**
+ * Signaler un avis (e-mail prérempli à l'équipe) ou ne plus voir son auteur
+ * (masqué sur ce téléphone). Exigence 1.2 de l'App Store pour le contenu des membres.
+ */
+function reportReview(eventId: string, review: { id: string; authorKey?: string }) {
+  const report = async () => {
+    hideReview(review.id)
+    const subject = encodeURIComponent('Signalement d’un avis Paname Club')
+    const body = encodeURIComponent(`Avis signalé : ${review.id}\nSortie : ${eventId}\n\nPourquoi ? (facultatif)\n`)
+    const url = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`
+    const ok = await Linking.canOpenURL(url).catch(() => false)
+    if (ok) await Linking.openURL(url).catch(() => {})
+    Alert.alert('Merci', `L’avis est masqué pour toi. Nous examinons chaque signalement sous 24 heures${ok ? '' : ` : écris-nous à ${CONTACT_EMAIL} si tu veux en dire plus`}.`)
+  }
+  Alert.alert('Cet avis pose problème ?', undefined, [
+    { text: 'Signaler cet avis', onPress: report },
+    {
+      text: 'Ne plus voir ce membre',
+      onPress: () => {
+        if (review.authorKey) blockReviewAuthor(review.authorKey)
+        hideReview(review.id)
+      },
+    },
+    { text: 'Annuler', style: 'cancel' },
+  ])
+}
+
 /** Avis des membres : seulement une fois la sortie commencée (comme sur le site). */
 export function Reviews({ eventId }: { eventId: string }) {
   const q = useReviews(eventId)
   const send = useSendReview(eventId)
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
+  const [blockedWords, setBlockedWords] = useState(false)
+  const hidden = useLocalState((s) => s.hiddenReviews)
+  const blocked = useLocalState((s) => s.blockedAuthors)
   const data = q.data
   if (!data || (!data.canReview && data.stats.totalReviews === 0)) return null
   const mine = data.userReview
@@ -54,24 +87,36 @@ export function Reviews({ eventId }: { eventId: string }) {
               style={styles.input}
               accessibilityLabel="Commentaire"
             />
-            {send.isError ? <Notice text={errorMessage(send.error)} tone="error" /> : null}
+            {blockedWords ? <Notice text={BLOCKED_REVIEW_MESSAGE} tone="error" /> : null}
+            {send.isError && !blockedWords ? <Notice text={errorMessage(send.error)} tone="error" /> : null}
             <Button
               label={mine ? 'Mettre à jour' : 'Publier'}
               compact
               disabled={!(rating || mine?.rating)}
               loading={send.isPending}
-              onPress={() => send.mutate({ rating: rating || mine!.rating, comment: comment || mine?.comment || null })}
+              onPress={() => {
+                const text = comment || mine?.comment || null
+                if (containsBlockedWords(text)) return setBlockedWords(true)
+                setBlockedWords(false)
+                send.mutate({ rating: rating || mine!.rating, comment: text })
+              }}
             />
           </View>
         ) : (
           <Button label="Me connecter pour noter" kind="secondary" compact onPress={() => router.push('/connexion')} style={{ alignSelf: 'flex-start', marginTop: 8 }} />
         )
       ) : null}
-      {data.reviews.slice(0, 10).map((r) => (
+      {data.reviews
+        .filter((r) => !hidden.includes(r.id) && !(r.authorKey && blocked.includes(r.authorKey)))
+        .slice(0, 10)
+        .map((r) => (
         <View key={r.id} style={styles.review}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Stars value={r.rating} size={14} />
-            <T v="caption">{r.userName ?? 'Un membre'}</T>
+            <T v="caption" style={{ flex: 1 }}>{r.userName ?? 'Un membre'}</T>
+            <Pressable onPress={() => reportReview(eventId, r)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Signaler cet avis ou masquer ce membre">
+              <T v="caption" style={{ color: colors.textMuted, textDecorationLine: 'underline' }}>Signaler</T>
+            </Pressable>
           </View>
           {r.comment ? <T v="small" style={{ marginTop: 4, color: colors.ink }}>{r.comment}</T> : null}
         </View>

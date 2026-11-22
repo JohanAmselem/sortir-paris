@@ -22,10 +22,14 @@ export interface LocalState {
   /** Notifications : déjà proposées (on ne redemande pas à chaque lancement). */
   pushAsked: boolean
   onboardingDone: boolean
+  /** Avis signalés ou masqués par ce membre (identifiants d'avis). */
+  hiddenReviews: string[]
+  /** Membres dont on ne veut plus voir les avis (clés anonymes d'auteur). */
+  blockedAuthors: string[]
 }
 
 const KEY = 'paname-local-v1'
-const EMPTY: LocalState = { saves: {}, swipes: [], quiz: null, pushAsked: false, onboardingDone: false }
+const EMPTY: LocalState = { saves: {}, swipes: [], quiz: null, pushAsked: false, onboardingDone: false, hiddenReviews: [], blockedAuthors: [] }
 
 let state: LocalState = EMPTY
 let loaded = false
@@ -118,4 +122,18 @@ export function markPushAsked() {
 
 export function markOnboardingDone() {
   set({ onboardingDone: true })
+}
+
+// ── Avis : signalés et membres masqués ──────────────────────────────────
+
+export function hideReview(reviewId: string) {
+  if (!state.hiddenReviews.includes(reviewId)) set({ hiddenReviews: [...state.hiddenReviews, reviewId].slice(-500) })
+}
+
+export function blockReviewAuthor(authorKey: string) {
+  if (!state.blockedAuthors.includes(authorKey)) set({ blockedAuthors: [...state.blockedAuthors, authorKey].slice(-500) })
+}
+
+export function clearHiddenReviews() {
+  set({ hiddenReviews: [], blockedAuthors: [] })
 }

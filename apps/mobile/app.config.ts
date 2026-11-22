@@ -38,6 +38,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     config: { usesNonExemptEncryption: false },
     infoPlist: {
       CFBundleDevelopmentRegion: 'fr',
+      // Nom montré par iOS dans « … souhaite utiliser accounts.google.com » (sinon « PanameClub », le nom du projet Xcode).
+      CFBundleName: 'Paname Club',
       CFBundleAllowMixedLocalizations: true,
       // La couleur de la barre d'état est pilotée par l'appli (lib/status-bar.ts), écran par écran.
       UIViewControllerBasedStatusBarAppearance: false,

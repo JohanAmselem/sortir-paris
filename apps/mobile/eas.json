@@ -7,7 +7,9 @@
     "base": {
       "node": "22.23.2",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://yshuqohvbwweppujzgtr.supabase.co"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://yshuqohvbwweppujzgtr.supabase.co",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "631827898727-7t5hcj9f40417932n99912erot1mepc5.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "631827898727-uv6pt23vff0mp2jgagi6chd6uvulmp93.apps.googleusercontent.com"
       }
     },
     "development": {
@@ -15,27 +17,39 @@
       "developmentClient": true,
       "distribution": "internal",
       "environment": "development",
-      "ios": { "simulator": true }
+      "ios": {
+        "simulator": true
+      }
     },
     "preview": {
       "extends": "base",
       "distribution": "internal",
       "environment": "preview",
       "channel": "preview",
-      "env": { "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr"
+      }
     },
     "production": {
       "extends": "base",
       "autoIncrement": true,
       "environment": "production",
       "channel": "production",
-      "env": { "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr"
+      }
     }
   },
   "submit": {
     "production": {
-      "ios": { "ascAppId": "À_RENSEIGNER_APRÈS_CRÉATION_DANS_APP_STORE_CONNECT" },
-      "android": { "track": "internal", "releaseStatus": "draft" }
+      "ios": {
+        "ascAppId": "6837965078",
+        "appleTeamId": "542CN5886Z"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
     }
   }
 }

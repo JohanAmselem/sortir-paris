@@ -1,0 +1,28 @@
+{
+  "project_info": {
+    "project_number": "631827898727",
+    "project_id": "paname-club"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:631827898727:android:d73b4250d7657fd5228fc2",
+        "android_client_info": {
+          "package_name": "fr.panameclub.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBj-quWYZcPEqlOwtm2_DmS8SkFKmbDY4Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

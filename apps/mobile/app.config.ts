@@ -73,6 +73,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         category: ['BROWSABLE', 'DEFAULT'],
       },
     ],
+    /** Projet Firebase « paname-club » : jeton FCM des notifications Android (fichier public). */
+    googleServicesFile: './google-services.json',
     config: process.env.GOOGLE_MAPS_ANDROID_KEY ? { googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_KEY } } : undefined,
   },
   plugins: [

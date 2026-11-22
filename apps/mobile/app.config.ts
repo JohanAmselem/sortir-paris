@@ -128,6 +128,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     eas: process.env.EAS_PROJECT_ID ? { projectId: process.env.EAS_PROJECT_ID } : undefined,
     router: { origin: 'https://www.panameclub.fr' },
+    /** Expo retire `android.config` de la config lue par l'appli : on dit ici, sans la clé, si la carte Android peut s'afficher. */
+    androidMaps: Boolean(process.env.GOOGLE_MAPS_ANDROID_KEY),
   },
   updates: process.env.EAS_PROJECT_ID ? { url: `https://u.expo.dev/${process.env.EAS_PROJECT_ID}` } : undefined,
   runtimeVersion: { policy: 'appVersion' },

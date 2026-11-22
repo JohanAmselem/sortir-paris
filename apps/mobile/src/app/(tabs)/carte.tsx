@@ -30,8 +30,11 @@ const WHEN: Array<{ key: When; label: string }> = [
 
 const PARIS: Region = { latitude: 48.8566, longitude: 2.3522, latitudeDelta: 0.12, longitudeDelta: 0.12 }
 
-/** Android n'affiche une carte qu'avec une clé Google Maps (app.config.ts : GOOGLE_MAPS_ANDROID_KEY). */
-const ANDROID_KEY = Boolean((Constants.expoConfig?.android?.config as { googleMaps?: { apiKey?: string } } | undefined)?.googleMaps?.apiKey)
+/**
+ * Android n'affiche une carte qu'avec une clé Google Maps (app.config.ts : GOOGLE_MAPS_ANDROID_KEY).
+ * Expo retire `android.config` de la config publique : on lit le drapeau `extra.androidMaps`.
+ */
+const ANDROID_KEY = (Constants.expoConfig?.extra as { androidMaps?: boolean } | undefined)?.androidMaps === true
 const PROVIDER = Platform.OS === 'android' && ANDROID_KEY ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
 
 function zoomOf(r: Region): number {

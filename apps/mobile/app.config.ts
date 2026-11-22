@@ -1,4 +1,21 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config'
+import { type ConfigPlugin, withAndroidManifest } from 'expo/config-plugins'
+
+/**
+ * `orientation: 'portrait'` ajoute android:screenOrientation="portrait", ce qui
+ * fait exiger par Google Play l'écran portrait (android.hardware.screen.portrait) :
+ * certaines tablettes, Chromebooks et casques ne peuvent alors pas installer
+ * l'appli. On déclare la fonctionnalité facultative : l'appli reste en portrait
+ * partout où c'est possible, et s'installe aussi ailleurs.
+ */
+const withOptionalPortraitScreen: ConfigPlugin = (expoConfig) =>
+  withAndroidManifest(expoConfig, (mod) => {
+    const manifest = mod.modResults.manifest
+    const name = 'android.hardware.screen.portrait'
+    const features = (manifest['uses-feature'] ?? []).filter((f) => f.$['android:name'] !== name)
+    manifest['uses-feature'] = [...features, { $: { 'android:name': name, 'android:required': 'false' } }]
+    return mod
+  })
 
 /**
  * Configuration de l'appli Paname Club (iOS + Android).
@@ -19,7 +36,7 @@ const googleUrlScheme = IOS_GOOGLE_CLIENT ? `com.googleusercontent.apps.${IOS_GO
 
 const CREAM = '#f7f5ef'
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+const baseConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Paname Club',
   slug: 'panameclub',
@@ -133,3 +150,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   runtimeVersion: { policy: 'appVersion' },
 })
+
+export default (ctx: ConfigContext): ExpoConfig => withOptionalPortraitScreen(baseConfig(ctx))

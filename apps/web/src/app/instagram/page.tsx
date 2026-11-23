@@ -72,9 +72,9 @@ export default async function InstagramLinksPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Vu sur Instagram</p>
-      <h1 className="font-display mt-1 text-[2.6rem] leading-tight text-ink">Les sorties de nos publications</h1>
-      <p className="mt-2 text-[15px] text-text-secondary">
+      <p className="t-micro font-semibold text-accent">Vu sur Instagram</p>
+      <h1 className="t-display mt-1 leading-tight text-ink">Les sorties de nos publications</h1>
+      <p className="t-body mt-2 text-text-secondary">
         Retrouve chaque sortie de nos carrousels et stories, avec les horaires et la billetterie. Infos à vérifier auprès de l’organisateur.
       </p>
 
@@ -83,8 +83,8 @@ export default async function InstagramLinksPage() {
           <li key={l.href}>
             <Link href={l.href} className="flex min-h-[60px] items-center gap-4 px-5 py-3 transition-colors hover:bg-surface-hover">
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-ink">{l.label}</span>
-                <span className="block truncate text-[13px] text-text-secondary">{l.desc}</span>
+                <span className="t-body block font-semibold text-ink">{l.label}</span>
+                <span className="t-small block truncate text-text-secondary">{l.desc}</span>
               </span>
               <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
             </Link>
@@ -92,11 +92,11 @@ export default async function InstagramLinksPage() {
         ))}
       </ul>
 
-      <h2 className="font-display mt-10 text-[2rem] text-ink">Publications récentes</h2>
+      <h2 className="t-title1 mt-10 text-ink">Publications récentes</h2>
       {failed ? (
-        <p className="mt-3 text-[14px] text-text-secondary">Les publications sont momentanément indisponibles. Réessaie dans un instant.</p>
+        <p className="t-small mt-3 text-text-secondary">Les publications sont momentanément indisponibles. Réessaie dans un instant.</p>
       ) : posts.length === 0 ? (
-        <p className="mt-3 text-[14px] text-text-secondary">
+        <p className="t-small mt-3 text-text-secondary">
           Pas encore de publication. En attendant, <Link href="/ce-soir" className="text-accent underline">vois ce qui se passe ce soir</Link>.
         </p>
       ) : (
@@ -106,8 +106,8 @@ export default async function InstagramLinksPage() {
               <details className="group rounded-2xl border border-border bg-surface" open={i === 0}>
                 <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4">
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-semibold text-ink">{p.label}</span>
-                    <span className="block text-[13px] text-text-secondary">
+                    <span className="t-body block font-semibold text-ink">{p.label}</span>
+                    <span className="t-small block text-text-secondary">
                       Publié le {dayFmt.format(new Date(p.publishedAt ?? `${p.forDate}T12:00:00Z`))} · {p.events.length} sorties
                     </span>
                   </span>
@@ -117,8 +117,8 @@ export default async function InstagramLinksPage() {
                   {p.events.map((e) => (
                     <li key={e.slug}>
                       <Link href={eventHref(e.slug, p.theme)} className="block px-5 py-3 transition-colors hover:bg-surface-hover">
-                        <span className="block text-[15px] font-semibold text-ink">{e.title}</span>
-                        <span className="block text-[13px] text-text-secondary">{[e.when, e.subtitle].filter(Boolean).join(' · ')}</span>
+                        <span className="t-body block font-semibold text-ink">{e.title}</span>
+                        <span className="t-small block text-text-secondary">{[e.when, e.subtitle].filter(Boolean).join(' · ')}</span>
                       </Link>
                     </li>
                   ))}

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 import { db, events, userViews } from '@sortir/db'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
-import { errors, getSessionUser, idSchema, parseBody } from '@/app/club/_lib/api'
+import { errors, getSessionUser, idSchema, parseBody } from '@/lib/member/api'
 
 export const dynamic = 'force-dynamic'
 

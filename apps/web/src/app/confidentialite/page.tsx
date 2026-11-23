@@ -21,7 +21,7 @@ const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="font-display text-[1.8rem] text-ink">
+      <h2 id={id} className="t-title2 text-ink">
         {title}
       </h2>
       <div className="mt-3 space-y-3">{children}</div>
@@ -74,12 +74,12 @@ const PROCESSORS: Array<{ name: string; role: string; where?: string }> = [
 export default function ConfidentialitePage() {
   return (
     <article className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:pt-12">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Données personnelles</p>
-      <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.6rem]">Politique de confidentialité</h1>
-      <p className="mt-2 text-[14px] text-text-muted">Dernière mise à jour : {LAST_UPDATE}</p>
+      <p className="t-micro font-semibold text-accent">Données personnelles</p>
+      <h1 className="t-display mt-2 text-ink">Politique de confidentialité</h1>
+      <p className="t-small mt-2 text-text-muted">Dernière mise à jour : {LAST_UPDATE}</p>
 
-      <div className="mt-8 space-y-10 text-[16px] leading-relaxed text-ink-soft">
-        <p className="rounded-xl border border-border bg-surface p-4 text-[15px]">
+      <div className="t-body mt-8 space-y-10 leading-relaxed text-ink-soft">
+        <p className="t-body rounded-xl border border-border bg-surface p-4">
           En bref : on collecte le minimum pour faire marcher ton compte et tes alertes, on ne revend jamais tes données, et tu
           peux te désinscrire des alertes en un clic depuis chaque e-mail.
         </p>
@@ -97,7 +97,7 @@ export default function ConfidentialitePage() {
 
         <Section id="donnees" title="Les données que nous traitons">
           <p>Tu peux consulter les sorties sans compte. Les données ci-dessous ne concernent que ce que tu choisis d’utiliser.</p>
-          <dl className="divide-y divide-border rounded-xl border border-border bg-surface text-[15px]">
+          <dl className="t-body divide-y divide-border rounded-xl border border-border bg-surface">
             {DATA.map((d) => (
               <div key={d.what} className="flex flex-col gap-0.5 px-4 py-3 sm:flex-row sm:gap-4">
                 <dt className="shrink-0 font-semibold text-ink sm:w-52">{d.what}</dt>
@@ -145,7 +145,7 @@ export default function ConfidentialitePage() {
 
         <Section id="prestataires" title="Nos prestataires">
           <p>Ils traitent les données uniquement pour notre compte et selon nos instructions.</p>
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface text-[15px]">
+          <ul className="t-body divide-y divide-border rounded-xl border border-border bg-surface">
             {PROCESSORS.map((p) => (
               <li key={p.name} className="px-4 py-3">
                 <span className="font-semibold text-ink">{p.name}</span> — {p.role}.{' '}

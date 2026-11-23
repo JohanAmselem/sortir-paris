@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUpcomingArtistDates } from '@/app/club/_lib/artists'
+import { getUpcomingArtistDates } from '@/lib/member/artists'
 import { artistKey, isValidArtistKey } from '@/lib/artists'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
 

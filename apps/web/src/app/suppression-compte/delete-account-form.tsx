@@ -34,10 +34,10 @@ export function DeleteAccountForm({ email }: { email: string | null }) {
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-6">
-      <p className="text-[15px] text-text-secondary">
+      <p className="t-body text-text-secondary">
         Compte connecté : <strong className="font-semibold text-ink">{email ?? 'ton compte'}</strong>
       </p>
-      <label className="mt-4 flex items-start gap-3 text-[15px] text-ink">
+      <label className="t-body mt-4 flex items-start gap-3 text-ink">
         <input type="checkbox" className="mt-1 h-4 w-4" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
         <span>J’ai compris : mon compte et toutes mes données seront supprimés définitivement, sans retour possible.</span>
       </label>
@@ -45,13 +45,13 @@ export function DeleteAccountForm({ email }: { email: string | null }) {
         type="button"
         onClick={remove}
         disabled={!confirmed || pending}
-        className="mt-5 inline-flex h-11 items-center gap-2 rounded-full border border-error bg-surface px-4 text-[14px] font-semibold text-error transition-colors hover:bg-error hover:text-white disabled:opacity-50"
+        className="t-small mt-5 inline-flex h-11 items-center gap-2 rounded-full border border-error bg-surface px-4 font-semibold text-error transition-colors hover:bg-error hover:text-white disabled:opacity-50"
       >
         <Trash2 className="h-4 w-4" aria-hidden />
         {pending ? 'Suppression…' : 'Supprimer mon compte'}
       </button>
       {error && (
-        <p role="alert" className="mt-3 text-[14px] text-error">
+        <p role="alert" className="t-small mt-3 text-error">
           {error}
         </p>
       )}

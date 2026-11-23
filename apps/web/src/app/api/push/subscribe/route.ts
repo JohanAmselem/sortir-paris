@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { and, count, eq } from 'drizzle-orm'
 import { alertSettings, db, pushSubscriptions } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
 
 export const dynamic = 'force-dynamic'
 

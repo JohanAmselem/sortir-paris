@@ -8,8 +8,6 @@
  */
 import type { CardEvent } from '../events/types'
 
-export type { CardEvent }
-
 export type HomeWhen = 'tonight' | 'tomorrow' | 'weekend'
 
 export interface EnvieTile {

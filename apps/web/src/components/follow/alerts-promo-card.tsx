@@ -3,7 +3,7 @@ import { ArrowRight, BellRing } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * Entry point to the « Alertes concerts » (compte, Club, newsletter…).
+ * Entry point to the « Alertes concerts » (compte, newsletter…).
  * Members go to « Mes artistes », visitors to the presentation page.
  */
 export function AlertsPromoCard({
@@ -35,10 +35,10 @@ export function AlertsPromoCard({
         <BellRing className="h-6 w-6" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[17px] font-semibold text-ink">{title}</span>
-        <span className="block text-[14px] text-text-secondary">{body}</span>
+        <span className="t-title3 block font-semibold text-ink">{title}</span>
+        <span className="t-small block text-text-secondary">{body}</span>
       </span>
-      <span className="hidden shrink-0 items-center gap-1 text-[14px] font-semibold text-accent sm:inline-flex">
+      <span className="t-small hidden shrink-0 items-center gap-1 font-semibold text-accent sm:inline-flex">
         {member ? 'Mes artistes' : 'Découvrir'}
         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
       </span>

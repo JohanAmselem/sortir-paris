@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSessionUser } from '@/app/club/_lib/api'
+import { getSessionUser } from '@/lib/member/api'
 import { getPersonalPicks } from '@/lib/recommendations'
 
 /** GET /api/me/picks — "Pour toi" for the logged-in member (keeps the homepage cacheable). */

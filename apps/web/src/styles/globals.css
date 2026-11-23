@@ -2,69 +2,79 @@
 @plugin "@tailwindcss/typography";
 
 /*
- * PANAME CLUB — Design System v4 « Affiche »
- * Papier légèrement chaud, encre teintée de violet, violet de marque,
- * vermillon réservé à l'urgence. Titres en Archivo condensé (affiche),
- * texte en Archivo standard.
+ * PANAME CLUB — Design System v5 « Nuit » (refonte du 23/11/2026)
+ * Une seule ambiance, sombre, pour le site et l'appli : grandes photos,
+ * violet de la marque éclairci pour le noir, vermillon pour l'urgence.
+ *
+ * ATTENTION, noms historiques inversés : « ink » est désormais la couleur
+ * CLAIRE du texte, « paper » la couleur SOMBRE du fond. Ainsi `text-ink` reste
+ * « le texte » et `bg-ink text-paper` reste « le bouton contrasté » (clair sur
+ * sombre). Pour du code neuf, préférer les noms sémantiques : bg, surface,
+ * text-primary, text-secondary, text-muted, accent, accent-strong.
+ * Jetons identiques dans l'appli : apps/mobile/src/theme.ts.
  */
 
 @theme {
-  /* Ink & paper (neutrals tinted toward the brand violet / warm paper) */
-  --color-ink: oklch(0.2 0.02 290);
-  --color-ink-soft: oklch(0.3 0.02 290);
-  --color-paper: oklch(0.985 0.004 85);
-  --color-paper-deep: oklch(0.955 0.008 85);
-  --color-night: oklch(0.19 0.045 288);
-  --color-night-soft: oklch(0.26 0.05 288);
+  /* Texte clair (« ink ») et fonds sombres (« paper ») */
+  --color-ink: #f6f4f0;
+  --color-ink-soft: #d9d6df;
+  --color-paper: #0c0b11;
+  --color-paper-deep: #17151f;
+  --color-night: #13111b;
+  --color-night-soft: #221f2c;
 
-  /* Legacy names kept so untouched pages stay coherent */
+  /* Anciens noms gardés pour les pages non refaites */
   --color-primary: var(--color-ink);
-  --color-primary-light: oklch(0.25 0.02 290);
-  --color-primary-hover: oklch(0.32 0.025 290);
+  --color-primary-light: #e9e6ee;
+  --color-primary-hover: #ffffff;
 
-  /* Brand violet */
-  --color-accent: oklch(0.52 0.24 292);
-  --color-accent-hover: oklch(0.46 0.23 292);
-  --color-accent-soft: oklch(0.96 0.03 292);
-  --color-accent-glow: oklch(0.75 0.14 292);
+  /* Violet de la marque, éclairci pour le fond sombre */
+  --color-accent: #b39bff;
+  --color-accent-hover: #c9b6ff;
+  --color-accent-strong: #7c4dff;
+  --color-accent-strong-hover: #6a3cf0;
+  --color-accent-soft: rgb(179 155 255 / 0.14);
+  --color-accent-glow: #cbb9ff;
 
-  /* Vermillon (urgency, "dernière chance") */
-  --color-neon: oklch(0.6 0.2 32);
-  --color-neon-soft: oklch(0.96 0.03 32);
+  /* Vermillon : urgence, nouveauté */
+  --color-neon: #ff6a4d;
+  --color-neon-soft: rgb(255 106 77 / 0.16);
 
   /* Surfaces */
   --color-bg: var(--color-paper);
-  --color-surface: oklch(0.995 0.002 85);
-  --color-surface-hover: oklch(0.965 0.006 85);
-  --color-surface-dark: var(--color-night);
-  --color-border: oklch(0.9 0.008 85);
-  --color-border-strong: oklch(0.82 0.01 85);
+  --color-surface: #17151f;
+  --color-surface-hover: #221f2c;
+  --color-surface-dark: #08070c;
+  --color-field: #1a1823;
+  --color-border: rgb(255 255 255 / 0.09);
+  --color-border-strong: rgb(255 255 255 / 0.18);
 
-  /* Text (all ≥ 4.5:1 on paper) */
+  /* Texte (contrastes ≥ 4,5:1 sur le fond) */
   --color-text-primary: var(--color-ink);
-  --color-text-secondary: oklch(0.42 0.015 290);
-  --color-text-muted: oklch(0.5 0.012 290);
+  --color-text-secondary: #c9c5d1;
+  --color-text-muted: #a9a5b4;
+  --color-text-faint: #8c8897;
 
-  /* Semantic */
-  --color-success: oklch(0.55 0.13 160);
-  --color-warning: oklch(0.72 0.15 75);
-  --color-error: oklch(0.55 0.2 27);
-  --color-free: oklch(0.5 0.12 160);
+  /* Sémantique */
+  --color-success: #5be0a4;
+  --color-warning: #f5b94a;
+  --color-error: #ff6b6b;
+  --color-free: #5be0a4;
 
-  /* Radius: posters are sharp, controls are soft */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
+  /* Rayons : cartes arrondies, pastilles en gélule */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
 
-  --shadow-xs: 0 1px 2px oklch(0.2 0.02 290 / 0.04);
-  --shadow-sm: 0 1px 3px oklch(0.2 0.02 290 / 0.06), 0 1px 2px oklch(0.2 0.02 290 / 0.03);
-  --shadow-md: 0 6px 16px -6px oklch(0.2 0.02 290 / 0.14);
-  --shadow-lg: 0 16px 32px -12px oklch(0.2 0.02 290 / 0.2);
-  --shadow-xl: 0 24px 48px -16px oklch(0.2 0.02 290 / 0.24);
-  --shadow-glow: 0 0 0 4px oklch(0.52 0.24 292 / 0.15);
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 8px 20px -8px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 18px 36px -14px rgb(0 0 0 / 0.65);
+  --shadow-xl: 0 28px 56px -18px rgb(0 0 0 / 0.7);
+  --shadow-glow: 0 0 0 4px rgb(179 155 255 / 0.22);
 
   /* Type */
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -96,7 +106,7 @@
 @keyframes swipe-left { to { transform: translateX(-150%) rotate(-18deg); opacity: 0; } }
 
 /* Base */
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; color-scheme: dark; }
 /* Full-bleed bands use 100vw: never let them create a horizontal scroll. */
 html, body { overflow-x: clip; }
 body {
@@ -111,14 +121,33 @@ body {
 /* Poster headings: condensed, tight, heavy */
 .font-display {
   font-family: var(--font-display);
-  font-variation-settings: 'wdth' 72;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  line-height: 0.95;
+  font-variation-settings: 'wdth' 78;
+  font-weight: 820;
+  letter-spacing: -0.015em;
+  line-height: 0.98;
 }
-.font-condensed { font-variation-settings: 'wdth' 82; }
+.font-condensed { font-variation-settings: 'wdth' 85; }
 
-::selection { background-color: var(--color-accent); color: var(--color-paper); }
+/*
+ * Échelle de texte « Nuit » : 7 tailles, les mêmes dans l'appli (theme.ts → type).
+ * Toute nouvelle taille passe par ici, jamais de text-[NNpx] dans les pages.
+ */
+@layer components {
+  .t-display { font-family: var(--font-display); font-variation-settings: 'wdth' 78; font-weight: 820; font-size: 2.75rem; line-height: 0.98; letter-spacing: -0.015em; }
+  .t-title1 { font-family: var(--font-display); font-variation-settings: 'wdth' 78; font-weight: 800; font-size: 2rem; line-height: 1; letter-spacing: -0.01em; }
+  .t-title2 { font-family: var(--font-display); font-variation-settings: 'wdth' 85; font-weight: 780; font-size: 1.5rem; line-height: 1.1; letter-spacing: -0.01em; }
+  .t-title3 { font-weight: 700; font-size: 1.125rem; line-height: 1.25; }
+  .t-body { font-size: 1rem; line-height: 1.55; }
+  .t-small { font-size: 0.875rem; line-height: 1.45; }
+  .t-micro { font-size: 0.75rem; line-height: 1.3; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  @media (min-width: 768px) {
+    .t-display { font-size: 4rem; }
+    .t-title1 { font-size: 2.5rem; }
+    .t-title2 { font-size: 1.75rem; }
+  }
+}
+
+::selection { background-color: var(--color-accent-strong); color: #ffffff; }
 
 :focus-visible {
   outline: 2px solid var(--color-accent);
@@ -156,19 +185,19 @@ input[type='search']::-webkit-search-decoration { -webkit-appearance: none; appe
 }
 
 .glass {
-  background: oklch(0.995 0.002 85 / 0.9);
+  background: rgb(12 11 17 / 0.86);
   backdrop-filter: saturate(1.4) blur(12px);
   -webkit-backdrop-filter: saturate(1.4) blur(12px);
 }
 
 /* Kept for legacy pages; renders as a solid accent (no gradient text). */
 .gradient-text { color: var(--color-accent); }
-.glass-dark { background: oklch(0.19 0.045 288 / 0.92); }
+.glass-dark { background: rgb(12 11 17 / 0.92); }
 
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 @media (hover: none) {
-  button, a { -webkit-tap-highlight-color: oklch(0.52 0.24 292 / 0.12); }
+  button, a { -webkit-tap-highlight-color: rgb(179 155 255 / 0.14); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -179,3 +208,12 @@ input[type='search']::-webkit-search-decoration { -webkit-appearance: none; appe
     scroll-behavior: auto !important;
   }
 }
+
+/* Contrôles Mapbox dans l'ambiance « Nuit » (le zoom passe sous les filtres de la carte). */
+.mapboxgl-ctrl-group { background: var(--color-surface) !important; border: 1px solid var(--color-border-strong); box-shadow: var(--shadow-md) !important; }
+.mapboxgl-ctrl-group button + button { border-top: 1px solid var(--color-border) !important; }
+.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon { filter: invert(1); }
+.mapboxgl-ctrl-top-right { top: 10.5rem !important; }
+.mapboxgl-ctrl-attrib.mapboxgl-compact { background: color-mix(in srgb, var(--color-paper) 80%, transparent) !important; color: var(--color-text-muted); }
+.mapboxgl-ctrl-attrib a { color: var(--color-text-muted) !important; }
+@media (max-width: 767px) { .mapboxgl-ctrl-top-right { display: none; } }

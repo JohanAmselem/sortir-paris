@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { clientSignalsSchema, clientToSignals } from '@/lib/recommendations'
-import { errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
-import { getAnonymousDrop, getMemberDrop } from '@/app/club/_lib/drop'
+import { errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
+import { getAnonymousDrop, getMemberDrop } from '@/lib/member/drop'
 
 export const dynamic = 'force-dynamic'
 

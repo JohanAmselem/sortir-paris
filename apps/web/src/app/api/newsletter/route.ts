@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db, newsletterSubscribers } from '@sortir/db'
-import { errors, limit, parseBody } from '@/app/club/_lib/api'
+import { errors, limit, parseBody } from '@/lib/member/api'
 import { absoluteUrl, SITE_NAME } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db, users } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, limit } from '@/app/club/_lib/api'
+import { ensureUserRow, errors, getSessionUser, limit } from '@/lib/member/api'
 
 export const dynamic = 'force-dynamic'
 

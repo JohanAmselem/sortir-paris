@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { getSessionUser } from '@/app/club/_lib/api'
-import { safeNext } from '@/app/club/_lib/safe-next'
+import { getSessionUser } from '@/lib/member/api'
+import { safeNext } from '@/lib/member/safe-next'
 import { LoginForm } from './login-form'
 
 export const dynamic = 'force-dynamic'
@@ -26,19 +26,19 @@ export default async function LoginPage({
   return (
     <div className="mx-auto grid max-w-5xl gap-10 px-4 pb-16 pt-10 md:grid-cols-2 md:items-center md:pt-16">
       <section>
-        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Rejoins le Club</p>
-        <h1 className="font-display mt-2 text-[3.2rem] text-ink sm:text-[4.2rem]">Garde tes sorties, reçois les tiennes.</h1>
-        <ul className="mt-6 space-y-3 text-[15px] text-text-secondary">
+        <p className="t-micro text-accent">Ton compte Paname Club</p>
+        <h1 className="t-display mt-2 text-ink">Garde tes sorties, reçois les tiennes.</h1>
+        <ul className="t-body mt-6 space-y-3 text-text-secondary">
           <li>
             <strong className="font-semibold text-ink">Tes sorties au même endroit.</strong> Garde ce qui te tente, retrouve-le
             sur tous tes appareils.
           </li>
           <li>
-            <strong className="font-semibold text-ink">Le Drop du lundi.</strong> 5 idées par semaine, choisies selon tes goûts.
+            <strong className="font-semibold text-ink">Le Drop du lundi.</strong> 5 idées par semaine en notification, choisies selon tes goûts.
           </li>
           <li>
-            <strong className="font-semibold text-ink">Rien de perdu.</strong> Tes swipes et ton quiz faits sans compte sont
-            repris automatiquement.
+            <strong className="font-semibold text-ink">Tes artistes.</strong> Une alerte dès qu’ils annoncent une date à Paris, et
+            la veille du concert.
           </li>
         </ul>
       </section>

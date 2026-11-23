@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, desc, eq, notInArray } from 'drizzle-orm'
 import { alertSettings, db, pushSubscriptions } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
 import { isExpoPushToken } from '@/lib/push-server'
 
 /**

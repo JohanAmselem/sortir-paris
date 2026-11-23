@@ -7,8 +7,8 @@ import type { EventMapProps } from './event-map'
 const EventMap = dynamic(() => import('./event-map').then((m) => m.EventMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center bg-paper-deep" role="status">
-      <p className="text-[15px] text-text-secondary">Chargement de la carte…</p>
+    <div className="flex h-full items-center justify-center bg-surface" role="status">
+      <p className="t-body text-text-secondary">Chargement de la carte…</p>
     </div>
   ),
 })

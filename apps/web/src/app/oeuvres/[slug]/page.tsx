@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/events/blocks'
 import { OutboundLink } from '@/components/events/outbound-link'
 import { SignatureBadge } from '@/components/events/signature-badge'
 import { EventImage } from '@/components/ui/event-image'
+import { MAPBOX_STYLE_ID, STATIC_PIN } from '@/lib/map-style'
 import { FollowButton } from '@/components/follow/follow-button'
 import { followableFromTitle } from '@/lib/follows'
 import { bucketNow } from '@/lib/events/query'
@@ -63,9 +64,9 @@ function priceLabel(g: { priceMin: number; priceMax: number; anyFree: boolean })
 }
 
 function staticMapUrl(pins: Array<{ lat: number; lng: number }>, token: string): string {
-  const overlays = pins.map((p, i) => `pin-s-${i + 1}+7c3aed(${p.lng},${p.lat})`).join(',')
+  const overlays = pins.map((p, i) => `pin-s-${i + 1}+${STATIC_PIN}(${p.lng},${p.lat})`).join(',')
   const center = pins.length === 1 ? `${pins[0].lng},${pins[0].lat},14,0` : 'auto'
-  return `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${overlays}/${center}/720x320@2x?padding=48&access_token=${token}`
+  return `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE_ID}/static/${overlays}/${center}/720x320@2x?padding=48&access_token=${token}`
 }
 
 function eventsJsonLd(title: string, slug: string, rows: WorkRow[], image: string | null) {
@@ -124,7 +125,7 @@ export default async function WorkPage({ params }: Props) {
           title="Plus de date à venir"
           actions={[
             { href: '/categories/theatre', label: 'Le théâtre à l’affiche' },
-            { href: '/evenements?when=week', label: 'Les sorties de la semaine' },
+            { href: '/agenda?when=week', label: 'Les sorties de la semaine' },
           ]}
         >
           Nous n’avons plus de date repérée à Paris pour ce spectacle.
@@ -163,7 +164,7 @@ export default async function WorkPage({ params }: Props) {
   return (
     <div className="px-4 pb-16">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
-      <nav aria-label="Fil d’Ariane" className="py-3 text-[13px] text-text-secondary">
+      <nav aria-label="Fil d’Ariane" className="t-small py-3 text-text-secondary">
         <ol className="flex min-w-0 items-center gap-1.5">
           {crumbs.slice(0, -1).map((c) => (
             <li key={c.href} className="flex items-center gap-1.5">
@@ -184,9 +185,9 @@ export default async function WorkPage({ params }: Props) {
           <EventImage src={image} alt={title} sizes="(max-width: 768px) 100vw, 320px" priority categorySlug={category?.slug} />
         </div>
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">{category?.name ?? 'Spectacle'} · toutes les dates</p>
-          <h1 className="font-display mt-1 text-[2.6rem] text-ink sm:text-[3.4rem]">{title}</h1>
-          <p className="mt-2 text-[16px] text-text-secondary">
+          <p className="t-micro font-semibold text-accent">{category?.name ?? 'Spectacle'} · toutes les dates</p>
+          <h1 className="t-display mt-1 text-ink">{title}</h1>
+          <p className="t-body mt-2 text-text-secondary">
             {total} date{rows.length > 1 ? 's' : ''} à venir dans {groups.length} lieu{groups.length > 1 ? 'x' : ''}.
           </p>
           {followable && (
@@ -196,11 +197,11 @@ export default async function WorkPage({ params }: Props) {
                 label={`Suivre « ${followable.label} »`}
                 className="items-start"
               />
-              <p className="text-[14px] text-text-secondary">Reçois une alerte dès qu’une nouvelle date est annoncée.</p>
+              <p className="t-small text-text-secondary">Reçois une alerte dès qu’une nouvelle date est annoncée.</p>
             </div>
           )}
           {text && (
-            <div className="mt-4 max-w-[68ch] whitespace-pre-line text-[16px] leading-relaxed text-ink-soft">
+            <div className="t-body mt-4 max-w-[68ch] whitespace-pre-line leading-relaxed text-ink-soft">
               {text.length > 1200 ? text.slice(0, 1200).replace(/\s+\S*$/, '') + '…' : text}
             </div>
           )}
@@ -209,7 +210,7 @@ export default async function WorkPage({ params }: Props) {
 
       {pinned.length > 0 && mapToken && (
         <section className="mt-10" aria-labelledby="map-title">
-          <h2 id="map-title" className="font-display text-[1.8rem] text-ink">
+          <h2 id="map-title" className="t-title2 text-ink">
             Où le voir
           </h2>
           <div className="relative mt-3 aspect-[9/4] w-full overflow-hidden rounded-xl bg-paper-deep">
@@ -226,7 +227,7 @@ export default async function WorkPage({ params }: Props) {
       )}
 
       <section className="mt-10" aria-labelledby="dates-title">
-        <h2 id="dates-title" className="font-display text-[1.8rem] text-ink">
+        <h2 id="dates-title" className="t-title2 text-ink">
           Les dates, lieu par lieu
         </h2>
         <ul className="mt-3 divide-y divide-border border-y border-border">
@@ -240,7 +241,7 @@ export default async function WorkPage({ params }: Props) {
               <li key={d.id}>
                 <Link
                   href={`/evenements/${d.slug}`}
-                  className="inline-flex min-h-10 items-center rounded-full border border-border-strong bg-surface px-3 text-[14px] font-semibold text-ink transition-colors hover:border-ink"
+                  className="t-small inline-flex min-h-10 items-center rounded-full border border-border-strong bg-surface px-3 font-semibold text-ink transition-colors hover:border-ink"
                 >
                   {formatWhen(d, now)}
                 </Link>
@@ -252,7 +253,7 @@ export default async function WorkPage({ params }: Props) {
                   <div className="flex min-w-0 items-start gap-3">
                     {pin && (
                       <span
-                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[12px] font-bold text-paper"
+                        className="t-small mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent font-bold text-paper"
                         aria-label={`Repère ${pin} sur le plan`}
                       >
                         {pin}
@@ -260,20 +261,20 @@ export default async function WorkPage({ params }: Props) {
                     )}
                     <div className="min-w-0">
                       {g.venue ? (
-                        <Link href={`/lieux/${g.venue.slug}`} className="text-[17px] font-semibold text-ink hover:underline">
+                        <Link href={`/lieux/${g.venue.slug}`} className="t-title3 font-semibold text-ink hover:underline">
                           {g.venue.name}
                         </Link>
                       ) : (
-                        <span className="text-[17px] font-semibold text-ink">Lieu non précisé</span>
+                        <span className="t-title3 font-semibold text-ink">Lieu non précisé</span>
                       )}
                       {g.venue?.signature && <SignatureBadge className="ml-2 align-middle" />}
                       {g.venue && (g.venue.address || g.venue.arrondissement || g.venue.city) && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[14px] text-text-secondary">
+                        <p className="t-small mt-0.5 flex items-center gap-1 text-text-secondary">
                           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                           <span>{[g.venue.address, g.venue.arrondissement ?? g.venue.city].filter(Boolean).join(' · ')}</span>
                         </p>
                       )}
-                      {price && <p className={'mt-0.5 text-[14px] font-semibold ' + (price === 'Gratuit' ? 'text-free' : 'text-ink')}>{price}</p>}
+                      {price && <p className={'t-small mt-0.5 font-semibold' + (price === 'Gratuit' ? 'text-free' : 'text-ink')}>{price}</p>}
                     </div>
                   </div>
                   {booking && (
@@ -282,7 +283,7 @@ export default async function WorkPage({ params }: Props) {
                       eventId={g.dates[0].id}
                       source={g.dates[0].source}
                       kind="booking"
-                      className="inline-flex h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-[14px] font-semibold text-paper transition-colors hover:bg-accent-hover"
+                      className="t-small inline-flex h-11 items-center gap-1.5 rounded-full bg-accent px-4 font-semibold text-paper transition-colors hover:bg-accent-hover"
                     >
                       {g.anyFree && !g.priceMax ? 'Infos & inscription' : 'Réserver'}
                       <ExternalLink className="h-4 w-4" aria-hidden />
@@ -295,7 +296,7 @@ export default async function WorkPage({ params }: Props) {
                 </ul>
                 {rest.length > 0 && (
                   <details className="mt-2">
-                    <summary className="inline-flex h-10 cursor-pointer items-center text-[14px] font-semibold text-accent hover:underline">
+                    <summary className="t-small inline-flex h-10 cursor-pointer items-center font-semibold text-accent hover:underline">
                       Voir {rest.length === 1 ? 'l’autre date' : `les ${rest.length} autres dates`}
                     </summary>
                     <ul className="mt-2 flex flex-wrap gap-2">{rest.map(chip)}</ul>
@@ -305,7 +306,7 @@ export default async function WorkPage({ params }: Props) {
             )
           })}
         </ul>
-        <p className="mt-6 text-[14px] text-text-secondary">
+        <p className="t-small mt-6 text-text-secondary">
           Dates regroupées à partir de nos sources par titre identique. Horaires et tarifs peuvent changer : vérifie auprès de l’organisateur avant de te déplacer.
         </p>
       </section>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { limit } from '@/app/club/_lib/api'
+import { limit } from '@/lib/member/api'
 import { unsubscribeByToken } from '@/lib/alerts-server'
 
 export const dynamic = 'force-dynamic'

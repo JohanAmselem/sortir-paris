@@ -127,7 +127,7 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
           else if (canFollowTyped) follow(typedName, key)
         }}
       >
-        <label htmlFor={`${listId}-input`} className="text-[14px] font-semibold text-ink">
+        <label htmlFor={`${listId}-input`} className="t-small font-semibold text-ink">
           Ajouter un artiste
         </label>
         <div className="relative mt-2">
@@ -141,7 +141,7 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
             autoComplete="off"
             maxLength={120}
             aria-controls={`${listId}-list`}
-            className="h-12 w-full rounded-full border border-border-strong bg-surface pl-11 pr-11 text-[16px] text-ink placeholder:text-text-muted focus:border-ink focus:outline-none"
+            className="t-body h-12 w-full rounded-full border border-border-strong bg-surface pl-11 pr-11 text-ink placeholder:text-text-muted focus:border-ink focus:outline-none"
           />
           {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" aria-hidden />}
         </div>
@@ -155,8 +155,8 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
               <li key={s.key} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
                 <Music className="h-5 w-5 shrink-0 text-accent" aria-hidden />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold text-ink">{s.name}</span>
-                  <span className="block text-[13px] text-text-secondary">
+                  <span className="t-body block truncate font-semibold text-ink">{s.name}</span>
+                  <span className="t-small block text-text-secondary">
                     {s.dates} date{s.dates > 1 ? 's' : ''} à venir à Paris
                   </span>
                 </span>
@@ -173,8 +173,8 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
             <li className="flex min-h-[56px] items-center gap-3 px-4 py-2">
               <Plus className="h-5 w-5 shrink-0 text-accent" aria-hidden />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-semibold text-ink">{typedName}</span>
-                <span className="block text-[13px] text-text-secondary">Pas de date annoncée pour l’instant : on te prévient dès qu’il y en a une.</span>
+                <span className="t-body block truncate font-semibold text-ink">{typedName}</span>
+                <span className="t-small block text-text-secondary">Pas de date annoncée pour l’instant : on te prévient dès qu’il y en a une.</span>
               </span>
               <FollowSmallButton following={false} busy={busyKey === key} onClick={() => follow(typedName, key)} name={typedName} />
             </li>
@@ -183,21 +183,21 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
       )}
 
       {message && (
-        <p role="status" className="mt-3 text-[14px] font-medium text-accent">
+        <p role="status" className="t-small mt-3 font-medium text-accent">
           {message}
         </p>
       )}
       {error && (
-        <p role="alert" className="mt-3 text-[14px] font-medium text-error">
+        <p role="alert" className="t-small mt-3 font-medium text-error">
           {error}
         </p>
       )}
 
-      <h2 className="font-display mt-10 text-[2rem] text-ink">
-        Tes artistes{artists.length > 0 && <span className="ml-2 text-[1.4rem] text-text-muted">{artists.length}</span>}
+      <h2 className="t-title1 mt-10 text-ink">
+        Tes artistes{artists.length > 0 && <span className="t-title2 ml-2 text-text-muted">{artists.length}</span>}
       </h2>
       {artists.length === 0 ? (
-        <p className="mt-3 text-[15px] text-text-secondary">
+        <p className="t-body mt-3 text-text-secondary">
           Tu ne suis encore aucun artiste. Cherche-les ci-dessus{spotifyImport ? ', importe-les depuis Spotify' : ''} ou appuie sur « Suivre » sur la page d’un concert.
         </p>
       ) : (
@@ -206,11 +206,11 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
             <li key={a.id} className="flex items-start gap-3 px-4 py-3">
               <Music className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold text-ink">{a.label}</p>
+                <p className="t-body truncate font-semibold text-ink">{a.label}</p>
                 {a.dates.length ? (
                   <ul className="mt-1 space-y-0.5">
                     {a.dates.map((d) => (
-                      <li key={d.slug} className="truncate text-[13px] text-text-secondary">
+                      <li key={d.slug} className="t-small truncate text-text-secondary">
                         <Link href={`/evenements/${d.slug}`} className="hover:text-ink hover:underline">
                           {formatWhen(d)}
                           {d.venueName && ` · ${d.venueName}`}
@@ -219,13 +219,13 @@ export function ArtistsManager({ initial, spotifyImport = false }: { initial: Fo
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-0.5 text-[13px] text-text-secondary">Pas de date à Paris pour l’instant.</p>
+                  <p className="t-small mt-0.5 text-text-secondary">Pas de date à Paris pour l’instant.</p>
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => unfollow(a)}
-                className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-surface-hover hover:text-ink"
+                className="t-small inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 font-semibold text-text-secondary transition-colors hover:bg-surface-hover hover:text-ink"
               >
                 <X className="h-4 w-4" aria-hidden />
                 Ne plus suivre
@@ -246,7 +246,7 @@ function FollowSmallButton({ following, busy, onClick, name }: { following: bool
       onClick={onClick}
       disabled={busy || following}
       className={cn(
-        'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors',
+        't-small inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 font-semibold transition-colors',
         following ? 'border-accent bg-accent-soft text-accent' : 'border-border-strong bg-surface text-ink hover:border-ink'
       )}
     >

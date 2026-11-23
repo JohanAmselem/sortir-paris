@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 vi.mock('web-push', () => ({ default: { setVapidDetails: vi.fn(), sendNotification: vi.fn() } }))
 vi.mock('@sortir/db', () => ({ db: {}, alertSettings: {}, pushSubscriptions: {} }))
-vi.mock('@/app/club/_lib/drop', () => ({ getMemberDrop: vi.fn() }))
+vi.mock('@/lib/member/drop', () => ({ getMemberDrop: vi.fn() }))
 
 import { bearerToken } from './supabase/bearer'
 import { expoTicketResult, isExpoPushToken, pushTargetUsable } from './push-server'

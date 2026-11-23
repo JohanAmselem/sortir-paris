@@ -48,14 +48,14 @@ export default function AlertesConcertsPage() {
       {/* Hero + live demo */}
       <section aria-labelledby="hero-title" className="grid gap-8 pt-8 sm:pt-12 lg:grid-cols-[1.1fr_1fr] lg:items-start lg:gap-12">
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Alertes concerts</p>
-          <h1 id="hero-title" className="font-display mt-2 text-[3rem] leading-[1.02] text-ink sm:text-[4.4rem]">
+          <p className="t-micro font-semibold text-accent">Alertes concerts</p>
+          <h1 id="hero-title" className="t-display mt-2 leading-[1.02] text-ink">
             Tes artistes passent à Paris ? Tu es prévenu le premier.
           </h1>
-          <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-text-secondary">
+          <p className="t-title3 mt-4 max-w-xl leading-relaxed text-text-secondary">
             Suis tes artistes, on surveille les nouvelles dates pour toi. C’est gratuit, à Paris et en petite couronne.
           </p>
-          <ul className="mt-6 flex flex-wrap gap-2 text-[13px] font-semibold text-ink">
+          <ul className="t-small mt-6 flex flex-wrap gap-2 font-semibold text-ink">
             {['Gratuit', 'Paris et petite couronne', 'E-mail ou notification'].map((t) => (
               <li key={t} className="rounded-full border border-border-strong bg-surface px-3 py-1.5">
                 {t}
@@ -64,9 +64,9 @@ export default function AlertesConcertsPage() {
           </ul>
         </div>
         <div className="rounded-2xl border border-border bg-paper-deep p-4 sm:p-6">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-text-muted">Essaie, sans compte</p>
+          <p className="t-micro font-semibold text-text-muted">Essaie, sans compte</p>
           <ArtistAlertSearch source="landing" className="mt-3" />
-          <p className="mt-4 text-[13px] text-text-secondary">
+          <p className="t-small mt-4 text-text-secondary">
             Déjà membre ?{' '}
             <Link href="/compte/artistes" className="font-semibold text-accent underline underline-offset-2">
               Gère tes artistes
@@ -77,8 +77,8 @@ export default function AlertesConcertsPage() {
 
       {/* How it works */}
       <section aria-labelledby="how-title" className="pt-16">
-        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">En trois étapes</p>
-        <h2 id="how-title" className="font-display mt-1 text-[2rem] text-ink sm:text-[2.6rem]">
+        <p className="t-micro font-semibold text-accent">En trois étapes</p>
+        <h2 id="how-title" className="t-title1 mt-1 text-ink">
           Comment ça marche
         </h2>
         <ol className="mt-6 grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
@@ -87,13 +87,13 @@ export default function AlertesConcertsPage() {
             return (
               <li key={s.title} className="bg-surface p-5 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <span className="font-display flex h-9 w-9 items-center justify-center rounded-full bg-accent text-[1.2rem] text-paper" aria-hidden>
+                  <span className="t-title2 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-paper" aria-hidden>
                     {i + 1}
                   </span>
                   <Icon className="h-5 w-5 text-accent" aria-hidden />
                 </div>
-                <h3 className="mt-4 text-[17px] font-semibold text-ink">{s.title}</h3>
-                <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">{s.text}</p>
+                <h3 className="t-title3 mt-4 font-semibold text-ink">{s.title}</h3>
+                <p className="t-body mt-1 leading-relaxed text-text-secondary">{s.text}</p>
               </li>
             )
           })}
@@ -102,8 +102,8 @@ export default function AlertesConcertsPage() {
 
       {/* The three moments */}
       <section aria-labelledby="moments-title" className="pt-16">
-        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Au bon moment</p>
-        <h2 id="moments-title" className="font-display mt-1 text-[2rem] text-ink sm:text-[2.6rem]">
+        <p className="t-micro font-semibold text-accent">Au bon moment</p>
+        <h2 id="moments-title" className="t-title1 mt-1 text-ink">
           Trois alertes, pas une de plus
         </h2>
         <ul className="mt-6 grid gap-4 md:grid-cols-3">
@@ -112,8 +112,8 @@ export default function AlertesConcertsPage() {
             return (
               <li key={m.title} className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
                 <Icon className="h-7 w-7 text-accent" aria-hidden />
-                <h3 className="mt-3 text-[17px] font-semibold text-ink">{m.title}</h3>
-                <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">{m.text}</p>
+                <h3 className="t-title3 mt-3 font-semibold text-ink">{m.title}</h3>
+                <p className="t-body mt-1 leading-relaxed text-text-secondary">{m.text}</p>
               </li>
             )
           })}
@@ -122,21 +122,21 @@ export default function AlertesConcertsPage() {
 
       {/* Channels */}
       <section aria-labelledby="channels-title" className="pt-16">
-        <h2 id="channels-title" className="font-display text-[2rem] text-ink sm:text-[2.6rem]">
+        <h2 id="channels-title" className="t-title1 text-ink">
           Par e-mail ou sur ton téléphone
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
             <Mail className="h-7 w-7 text-accent" aria-hidden />
-            <h3 className="mt-3 text-[17px] font-semibold text-ink">E-mail, par défaut</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
+            <h3 className="t-title3 mt-3 font-semibold text-ink">E-mail, par défaut</h3>
+            <p className="t-body mt-1 leading-relaxed text-text-secondary">
               Rien à régler : les alertes arrivent à l’adresse de ton compte, regroupées en un seul message.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
             <Smartphone className="h-7 w-7 text-accent" aria-hidden />
-            <h3 className="mt-3 text-[17px] font-semibold text-ink">Notifications sur l’appareil</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
+            <h3 className="t-title3 mt-3 font-semibold text-ink">Notifications sur l’appareil</h3>
+            <p className="t-body mt-1 leading-relaxed text-text-secondary">
               À activer dans « Mes artistes », sur Android ou sur ordinateur. Sur iPhone, Apple ne les autorise qu’une fois le site
               ajouté à l’écran d’accueil (Safari : Partager, puis « Sur l’écran d’accueil »).
             </p>
@@ -145,14 +145,14 @@ export default function AlertesConcertsPage() {
       </section>
 
       {/* Commitments + coverage */}
-      <section aria-labelledby="promise-title" className="mx-[calc(50%-50vw)] mt-16 bg-night py-12 text-paper">
+      <section aria-labelledby="promise-title" className="mx-[calc(50%-50vw)] mt-16 border-y border-border bg-surface py-12 text-ink">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 md:grid-cols-2">
           <div>
             <ShieldCheck className="h-8 w-8 text-accent-glow" aria-hidden />
-            <h2 id="promise-title" className="font-display mt-3 text-[2rem] sm:text-[2.6rem]">
+            <h2 id="promise-title" className="t-title1 mt-3">
               Nos engagements
             </h2>
-            <ul className="mt-4 space-y-2 text-[16px] text-paper/85">
+            <ul className="t-body mt-4 space-y-2 text-ink-soft">
               {PROMISES.map((p) => (
                 <li key={p} className="flex gap-2">
                   <span aria-hidden className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-glow" />
@@ -160,22 +160,22 @@ export default function AlertesConcertsPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-[14px] text-paper/70">
+            <p className="t-small mt-4 text-text-secondary">
               Le détail :{' '}
-              <Link href="/confidentialite" className="font-semibold text-paper underline underline-offset-2">
+              <Link href="/confidentialite" className="font-semibold text-accent underline underline-offset-2">
                 politique de confidentialité
               </Link>
               .
             </p>
           </div>
           <div>
-            <h2 className="font-display text-[2rem] sm:text-[2.6rem]">Ce qu’on couvre</h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-paper/85">
+            <h2 className="t-title1">Ce qu’on couvre</h2>
+            <p className="t-body mt-4 leading-relaxed text-ink-soft">
               Les alertes reposent sur les concerts référencés sur Paname Club : nous rassemblons chaque jour les agendas de
               billetteries et d’agendas culturels (Ticketmaster, Offi, OpenAgenda…) et les programmes des salles, à Paris et en
               petite couronne.
             </p>
-            <p className="mt-3 text-[16px] leading-relaxed text-paper/85">
+            <p className="t-body mt-3 leading-relaxed text-ink-soft">
               Nous ne voyons pas tous les concerts : une date absente de Paname Club ne déclenche pas d’alerte. Pense à vérifier
               auprès de la salle ou de la billetterie.
             </p>
@@ -185,19 +185,19 @@ export default function AlertesConcertsPage() {
 
       {/* FAQ */}
       <section aria-labelledby="faq-title" className="mx-auto max-w-3xl pt-16">
-        <h2 id="faq-title" className="font-display text-[2rem] text-ink sm:text-[2.6rem]">
+        <h2 id="faq-title" className="t-title1 text-ink">
           Questions fréquentes
         </h2>
         <div className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
           {ALERTS_FAQ.map((f) => (
             <details key={f.q} className="group">
-              <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 text-[16px] font-semibold text-ink hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
+              <summary className="t-body flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 font-semibold text-ink hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
                 {f.q}
-                <span aria-hidden className="text-[20px] text-text-muted transition-transform group-open:rotate-45">
+                <span aria-hidden className="t-title3 text-text-muted transition-transform group-open:rotate-45">
                   +
                 </span>
               </summary>
-              <p className="px-5 pb-5 text-[15px] leading-relaxed text-text-secondary">{f.a}</p>
+              <p className="t-body px-5 pb-5 leading-relaxed text-text-secondary">{f.a}</p>
             </details>
           ))}
         </div>
@@ -205,7 +205,7 @@ export default function AlertesConcertsPage() {
 
       {/* Last call */}
       <section aria-labelledby="last-title" className="mx-auto max-w-2xl pt-16">
-        <h2 id="last-title" className="font-display text-center text-[2rem] text-ink sm:text-[2.6rem]">
+        <h2 id="last-title" className="t-title1 text-center text-ink">
           Qui veux-tu ne plus rater ?
         </h2>
         <ArtistAlertSearch source="landing" className="mt-6" />

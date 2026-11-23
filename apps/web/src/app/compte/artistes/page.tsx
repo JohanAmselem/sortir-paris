@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import { DataUnavailable } from '@/components/events/blocks'
 import { ArtistsManager, type FollowedArtist } from '@/components/follow/artists-manager'
 import { AlertSettingsForm } from '@/components/follow/alert-settings-form'
-import { requireUser } from '@/app/club/_lib/api'
-import { listFollows } from '@/app/club/_lib/follows'
-import { getAlertSettings, getArtistDates } from '@/app/club/_lib/artists'
+import { requireUser } from '@/lib/member/api'
+import { listFollows } from '@/lib/member/follows'
+import { getAlertSettings, getArtistDates } from '@/lib/member/artists'
 import { DEFAULT_ALERT_SETTINGS } from '@/lib/alerts'
 import { artistKey } from '@/lib/artists'
 import { spotifyImportEnabled } from '@/lib/spotify'
@@ -64,8 +64,8 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16 pt-6">
       <BackLink />
-      <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.6rem]">Mes artistes</h1>
-      <p className="mt-1 text-[15px] text-text-secondary">
+      <h1 className="t-display mt-2 text-ink">Mes artistes</h1>
+      <p className="t-body mt-1 text-text-secondary">
         Suis tes artistes : on te prévient quand ils annoncent une date à Paris et quand la billetterie ouvre.{' '}
         <Link href="/alertes-concerts" className="font-semibold text-accent underline underline-offset-2">
           Comment ça marche
@@ -78,8 +78,8 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
           role="status"
           className={
             spotify.tone === 'ok'
-              ? 'mt-6 rounded-xl bg-accent-soft p-4 text-[15px] font-semibold text-accent'
-              : 'mt-6 rounded-xl bg-neon-soft p-4 text-[15px] font-semibold text-ink'
+              ? 't-body mt-6 rounded-xl bg-accent-soft p-4 font-semibold text-accent'
+              : 't-body mt-6 rounded-xl bg-neon-soft p-4 font-semibold text-ink'
           }
         >
           {spotify.text}
@@ -92,14 +92,14 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
         <>
           {spotifyImportEnabled() && (
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4">
-              <p className="min-w-0 flex-1 text-[14px] text-text-secondary">
-                <span className="block text-[15px] font-semibold text-ink">Importer depuis Spotify</span>
+              <p className="t-small min-w-0 flex-1 text-text-secondary">
+                <span className="t-body block font-semibold text-ink">Importer depuis Spotify</span>
                 Tes artistes les plus écoutés et ceux que tu suis. On ne garde aucun accès à ton compte.
               </p>
               {/* Plain link: a full navigation to Spotify (not a client-side route). */}
               <a
                 href="/api/spotify/login"
-                className="inline-flex h-11 shrink-0 items-center rounded-full bg-ink px-5 text-[14px] font-semibold text-paper transition-opacity hover:opacity-90"
+                className="t-small inline-flex h-11 shrink-0 items-center rounded-full bg-ink px-5 font-semibold text-paper transition-opacity hover:opacity-90"
               >
                 Importer mes artistes
               </a>
@@ -111,7 +111,7 @@ export default async function MesArtistesPage({ searchParams }: { searchParams: 
           </section>
 
           <section aria-labelledby="alertes-title" id="alertes" className="mt-12 scroll-mt-20">
-            <h2 id="alertes-title" className="font-display text-[2rem] text-ink">
+            <h2 id="alertes-title" className="t-title1 text-ink">
               Tes alertes
             </h2>
             <div className="mt-4">

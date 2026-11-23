@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { and, count, eq, sql } from 'drizzle-orm'
 import { db, events, userAttendances } from '@sortir/db'
 import { effectiveEndSql } from '@/lib/events/query'
-import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/app/club/_lib/api'
-import { syncGamification } from '@/app/club/_lib/member'
+import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody, parseIdParam } from '@/lib/member/api'
+import { syncGamification } from '@/lib/member/member'
 
 export const dynamic = 'force-dynamic'
 

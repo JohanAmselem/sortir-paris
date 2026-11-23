@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getSessionUser } from '@/app/club/_lib/api'
+import { getSessionUser } from '@/lib/member/api'
 import { DeleteAccountForm } from './delete-account-form'
 
 export const dynamic = 'force-dynamic'
@@ -21,25 +21,25 @@ export default async function SuppressionComptePage({ searchParams }: { searchPa
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16 pt-10">
-      <h1 className="font-display text-[3rem] text-ink sm:text-[3.6rem]">Supprimer mon compte</h1>
+      <h1 className="t-display text-ink">Supprimer mon compte</h1>
 
       {fait ? (
-        <p role="status" className="mt-4 text-[16px] text-ink">
-          C’est fait : ton compte et tes données ont été supprimés. Merci d’avoir fait partie du Club.
+        <p role="status" className="t-body mt-4 text-ink">
+          C’est fait : ton compte et tes données ont été supprimés. Merci d’être passé par Paname Club.
         </p>
       ) : (
         <>
-          <p className="mt-3 text-[15px] text-text-secondary">
+          <p className="t-body mt-3 text-text-secondary">
             La suppression est définitive. Elle efface ton compte de connexion et toutes les données liées : sorties gardées,
             « J’y vais », artistes et lieux suivis, alertes, swipes, Drop, quiz, profil culturel, avis, appareils inscrits aux
             notifications et inscription à la lettre.
           </p>
 
           <section aria-labelledby="where-title" className="mt-8">
-            <h2 id="where-title" className="font-display text-[2rem] text-ink">
+            <h2 id="where-title" className="t-title1 text-ink">
               Trois façons de le faire
             </h2>
-            <ul className="mt-3 space-y-3 text-[15px] text-text-secondary">
+            <ul className="t-body mt-3 space-y-3 text-text-secondary">
               <li>
                 <strong className="font-semibold text-ink">Dans l’appli :</strong> Profil → Mon compte → Supprimer mon compte.
               </li>
@@ -62,7 +62,7 @@ export default async function SuppressionComptePage({ searchParams }: { searchPa
             ) : (
               <Link
                 href="/login?next=/suppression-compte"
-                className="inline-flex h-11 items-center rounded-full bg-ink px-5 text-[14px] font-semibold text-paper"
+                className="t-small inline-flex h-11 items-center rounded-full bg-ink px-5 font-semibold text-paper"
               >
                 Me connecter pour supprimer mon compte
               </Link>

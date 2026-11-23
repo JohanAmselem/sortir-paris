@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { db, newsletterSubscribers } from '@sortir/db'
-import { limit } from '@/app/club/_lib/api'
+import { limit } from '@/lib/member/api'
 
 export const dynamic = 'force-dynamic'
 

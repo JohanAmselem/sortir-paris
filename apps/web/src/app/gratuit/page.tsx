@@ -1,32 +1,24 @@
-import { Listing, PageIntro } from '@/components/events/listing'
-import { parseEventParams } from '@/lib/events/params'
+import { AgendaView, mergeParams, type SearchParams } from '@/components/agenda/agenda-view'
 import { listingMetadata } from '@/lib/seo'
 
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> }
+type Props = { searchParams: Promise<SearchParams> }
 
 export async function generateMetadata({ searchParams }: Props) {
   return listingMetadata(
     '/gratuit',
     'Sorties gratuites à Paris : concerts, expos, rencontres',
-    'Les sorties culturelles gratuites à Paris cette semaine. Uniquement des événements annoncés gratuits par leurs organisateurs.',
+    'Les sorties gratuites à Paris, jour par jour et mois par mois. Uniquement des événements annoncés gratuits par leurs organisateurs.',
     await searchParams
   )
 }
 
 export default async function GratuitPage({ searchParams }: Props) {
-  const query = parseEventParams(await searchParams)
   return (
-    <div className="px-4">
-      <PageIntro kicker="0 €" title="Gratuit">
-        Uniquement des sorties annoncées gratuites par leurs organisateurs. Quand le prix est inconnu, on ne l’affiche pas ici.
-      </PageIntro>
-      <Listing
-        query={query}
-        fixed={{ free: true, when: query.when ?? 'week' }}
-        locked={['free']}
-        basePath="/gratuit"
-        emptyActions={[{ href: '/gratuit?when=month', label: 'Sur tout le mois' }]}
-      />
-    </div>
+    <AgendaView
+      params={mergeParams(await searchParams, { free: '1' })}
+      title="Gratuit"
+      intro="Uniquement des sorties annoncées gratuites par leurs organisateurs. Choisis un mois ou un jour pour aller plus loin."
+      emptyActions={[{ href: '/agenda', label: 'Tout l’agenda' }]}
+    />
   )
 }

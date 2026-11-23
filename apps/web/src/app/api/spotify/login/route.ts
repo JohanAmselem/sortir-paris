@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { getSessionUser, limit } from '@/app/club/_lib/api'
+import { getSessionUser, limit } from '@/lib/member/api'
 import { SPOTIFY_STATE_COOKIE, spotifyAuthorizeUrl, spotifyConfigured, spotifyRedirectUri } from '@/lib/spotify'
 
 export const dynamic = 'force-dynamic'

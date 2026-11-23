@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { alertSettings, db } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
-import { getAlertSettings } from '@/app/club/_lib/artists'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
+import { getAlertSettings } from '@/lib/member/artists'
 
 export const dynamic = 'force-dynamic'
 

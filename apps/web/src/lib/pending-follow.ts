@@ -7,7 +7,7 @@
  * fallback, by POST /api/follows/pending from the destination page. The
  * outcome is handed to the page in a second short cookie, read by the banner.
  */
-import { safeNext } from '@/app/club/_lib/safe-next'
+import { safeNext } from '@/lib/member/safe-next'
 
 export const PENDING_FOLLOW_COOKIE = 'pc_pending_follow'
 export const ACTIVATED_COOKIE = 'pc_alert_activated'

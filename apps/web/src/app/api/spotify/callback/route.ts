@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { ensureUserRow, getSessionUser, limit } from '@/app/club/_lib/api'
-import { followArtists } from '@/app/club/_lib/artists'
+import { ensureUserRow, getSessionUser, limit } from '@/lib/member/api'
+import { followArtists } from '@/lib/member/artists'
 import { scheduleWelcomeEmail } from '@/lib/follow-server'
 import { SPOTIFY_STATE_COOKIE, spotifyArtistNames, spotifyConfigured, spotifyRedirectUri } from '@/lib/spotify'
 

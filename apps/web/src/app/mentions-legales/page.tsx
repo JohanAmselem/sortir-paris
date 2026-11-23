@@ -14,13 +14,13 @@ const LAST_UPDATE = '13 octobre 2026'
 export default function MentionsLegalesPage() {
   return (
     <article className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:pt-12">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Informations légales</p>
-      <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.6rem]">Mentions légales</h1>
-      <p className="mt-2 text-[14px] text-text-muted">Dernière mise à jour : {LAST_UPDATE}</p>
+      <p className="t-micro font-semibold text-accent">Informations légales</p>
+      <h1 className="t-display mt-2 text-ink">Mentions légales</h1>
+      <p className="t-small mt-2 text-text-muted">Dernière mise à jour : {LAST_UPDATE}</p>
 
-      <div className="mt-8 space-y-8 text-[16px] leading-relaxed text-ink-soft">
+      <div className="t-body mt-8 space-y-8 leading-relaxed text-ink-soft">
         <section aria-labelledby="editeur">
-          <h2 id="editeur" className="font-display text-[1.8rem] text-ink">
+          <h2 id="editeur" className="t-title2 text-ink">
             Éditeur du site
           </h2>
           <p className="mt-3">
@@ -30,7 +30,7 @@ export default function MentionsLegalesPage() {
             </a>
             ) est édité par :
           </p>
-          <dl className="mt-3 divide-y divide-border rounded-xl border border-border bg-surface text-[15px]">
+          <dl className="t-body mt-3 divide-y divide-border rounded-xl border border-border bg-surface">
             {[
               ['Société', 'JUNO, SARL (société à responsabilité limitée)'],
               ['Capital social', '10 000 €'],
@@ -57,7 +57,7 @@ export default function MentionsLegalesPage() {
         </section>
 
         <section aria-labelledby="hebergement">
-          <h2 id="hebergement" className="font-display text-[1.8rem] text-ink">
+          <h2 id="hebergement" className="t-title2 text-ink">
             Hébergement
           </h2>
           <p className="mt-3">
@@ -78,7 +78,7 @@ export default function MentionsLegalesPage() {
         </section>
 
         <section aria-labelledby="contenus">
-          <h2 id="contenus" className="font-display text-[1.8rem] text-ink">
+          <h2 id="contenus" className="t-title2 text-ink">
             Contenus et informations publiées
           </h2>
           <p className="mt-3">
@@ -98,7 +98,7 @@ export default function MentionsLegalesPage() {
         </section>
 
         <section aria-labelledby="propriete">
-          <h2 id="propriete" className="font-display text-[1.8rem] text-ink">
+          <h2 id="propriete" className="t-title2 text-ink">
             Propriété intellectuelle
           </h2>
           <p className="mt-3">
@@ -108,7 +108,7 @@ export default function MentionsLegalesPage() {
         </section>
 
         <section aria-labelledby="donnees">
-          <h2 id="donnees" className="font-display text-[1.8rem] text-ink">
+          <h2 id="donnees" className="t-title2 text-ink">
             Données personnelles
           </h2>
           <p className="mt-3">

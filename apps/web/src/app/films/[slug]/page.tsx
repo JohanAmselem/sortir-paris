@@ -82,7 +82,7 @@ export default async function FilmPage({ params }: Props) {
         <EmptyState
           title="Plus de séance à venir"
           actions={[
-            { href: '/evenements?cat=cinema&when=tonight', label: 'Les films ce soir' },
+            { href: '/agenda?cat=cinema&when=tonight', label: 'Les films ce soir' },
             { href: '/categories/cinema', label: 'Tout le cinéma' },
           ]}
         >
@@ -94,7 +94,7 @@ export default async function FilmPage({ params }: Props) {
 
   return (
     <div className="px-4 pb-16">
-      <nav aria-label="Fil d’Ariane" className="py-3 text-[13px] text-text-secondary">
+      <nav aria-label="Fil d’Ariane" className="t-small py-3 text-text-secondary">
         <Link href="/categories/cinema" className="hover:text-ink hover:underline">
           Cinéma
         </Link>
@@ -104,19 +104,19 @@ export default async function FilmPage({ params }: Props) {
           <EventImage src={image} alt={`Affiche de ${first.title}`} sizes="240px" priority categorySlug="cinema" />
         </div>
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Au cinéma</p>
-          <h1 className="font-display mt-1 text-[2.6rem] text-ink sm:text-[3.4rem]">{first.title}</h1>
-          <p className="mt-2 text-[16px] text-text-secondary">
+          <p className="t-micro font-semibold text-accent">Au cinéma</p>
+          <h1 className="t-display mt-1 text-ink">{first.title}</h1>
+          <p className="t-body mt-2 text-text-secondary">
             {seances.length >= 300 ? 'Plus de 300' : seances.length} séance{seances.length > 1 ? 's' : ''} à venir dans {salles} salle{salles > 1 ? 's' : ''} à Paris et autour.
           </p>
-          {first.shortDesc && <p className="mt-4 max-w-[68ch] text-[16px] leading-relaxed text-ink-soft">{first.shortDesc}</p>}
+          {first.shortDesc && <p className="t-body mt-4 max-w-[68ch] leading-relaxed text-ink-soft">{first.shortDesc}</p>}
 
           <div className="mt-8 space-y-8">
             {days.map((day) => {
               const label = formatLongDay(day.date, now)
               return (
                 <section key={day.key} aria-label={label}>
-                  <h2 className="sticky top-14 z-10 -mx-4 bg-paper/95 px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">
+                  <h2 className="t-micro sticky top-14 z-10 -mx-4 bg-paper/95 px-4 py-2 text-accent backdrop-blur-md md:top-16">
                     {label}
                   </h2>
                   <ul className="divide-y divide-border">
@@ -124,14 +124,14 @@ export default async function FilmPage({ params }: Props) {
                       <li key={c.venue?.slug ?? c.seances[0].id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           {c.venue ? (
-                            <Link href={`/lieux/${c.venue.slug}`} className="text-[16px] font-semibold text-ink hover:underline">
+                            <Link href={`/lieux/${c.venue.slug}`} className="t-body font-semibold text-ink hover:underline">
                               {c.venue.name}
                             </Link>
                           ) : (
-                            <span className="text-[16px] font-semibold text-ink">Salle non précisée</span>
+                            <span className="t-body font-semibold text-ink">Salle non précisée</span>
                           )}
                           {c.venue && (c.venue.arrondissement || c.venue.city) && (
-                            <p className="flex items-center gap-1 text-[13px] text-text-secondary">
+                            <p className="t-small flex items-center gap-1 text-text-secondary">
                               <MapPin className="h-3.5 w-3.5" aria-hidden />
                               {c.venue.arrondissement ?? c.venue.city}
                             </p>
@@ -144,7 +144,7 @@ export default async function FilmPage({ params }: Props) {
                               <li key={s.id}>
                                 <Link
                                   href={`/evenements/${s.slug}`}
-                                  className="inline-flex h-10 min-w-[3.5rem] items-center justify-center rounded-full border border-border-strong bg-surface px-3 text-[14px] font-semibold text-ink transition-colors hover:border-ink"
+                                  className="t-small inline-flex h-10 min-w-[3.5rem] items-center justify-center rounded-full border border-border-strong bg-surface px-3 font-semibold text-ink transition-colors hover:border-ink"
                                   title={price.tone === 'paid' ? price.label : undefined}
                                 >
                                   {s.timeKnown ? formatTime(new Date(s.startDate)) : 'Horaire ?'}

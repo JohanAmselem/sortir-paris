@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { requireUser } from '@/app/club/_lib/api'
-import { loadPreferences } from '@/app/onboarding/load-preferences'
-import { PreferencesForm } from '@/app/onboarding/preferences-form'
+import { requireUser } from '@/lib/member/api'
+import { loadPreferences } from '@/lib/member/preferences'
+import { PreferencesForm } from '@/components/account/preferences-form'
 import { BackLink } from '../_components/back-link'
 import { LogoutButton } from '../_components/logout-button'
 
@@ -20,18 +20,18 @@ export default async function ParametresPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16 pt-6">
       <BackLink />
-      <h1 className="font-display mt-2 text-[3rem] text-ink sm:text-[3.6rem]">Préférences</h1>
-      <p className="mt-1 text-[15px] text-text-secondary">Elles orientent ton Drop du lundi et la sélection « Pour toi ».</p>
+      <h1 className="t-display mt-2 text-ink">Préférences</h1>
+      <p className="t-body mt-1 text-text-secondary">Elles orientent les 5 idées du Drop du lundi.</p>
 
       <div className="mt-8">
         <PreferencesForm initial={initial} mode="settings" />
       </div>
 
       <section aria-labelledby="account-title" className="mt-14 border-t border-border pt-8">
-        <h2 id="account-title" className="font-display text-[2rem] text-ink">
+        <h2 id="account-title" className="t-title1 text-ink">
           Compte
         </h2>
-        <p className="mt-2 text-[15px] text-text-secondary">
+        <p className="t-body mt-2 text-text-secondary">
           Connecté avec {user.email}. La lettre hebdo se gère sur la{' '}
           <Link href="/newsletter" className="font-semibold text-accent underline underline-offset-2">
             page newsletter

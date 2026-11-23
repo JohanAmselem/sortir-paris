@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db, userPreferences, users } from '@sortir/db'
 import { ARRONDISSEMENTS, CATEGORY_BY_SLUG, INTENT_BY_SLUG } from '@/lib/events/taxonomy'
-import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
 
 export const dynamic = 'force-dynamic'
 

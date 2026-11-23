@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
-import { COLLECTIONS } from '@/lib/collections'
+import { sitemapMonthPaths } from '@/lib/agenda-pages'
 import { getActiveVenues } from '@/lib/venues'
 import { SITE_URL } from '@/lib/site'
 
@@ -14,22 +14,19 @@ export const revalidate = 3600
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const hubs: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: 'hourly', priority: 1 },
+    { url: `${SITE_URL}/agenda`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/ce-soir`, changeFrequency: 'hourly', priority: 0.9 },
     { url: `${SITE_URL}/ce-week-end`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/gratuit`, changeFrequency: 'daily', priority: 0.8 },
-    { url: `${SITE_URL}/evenements`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${SITE_URL}/carte`, changeFrequency: 'daily', priority: 0.6 },
-    { url: `${SITE_URL}/autour-de-moi`, changeFrequency: 'daily', priority: 0.5 },
-    { url: `${SITE_URL}/collections`, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${SITE_URL}/lieux`, changeFrequency: 'weekly', priority: 0.6 },
-    { url: `${SITE_URL}/club`, changeFrequency: 'weekly', priority: 0.4 },
-    { url: `${SITE_URL}/news`, changeFrequency: 'weekly', priority: 0.4 },
     { url: `${SITE_URL}/alertes-concerts`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${SITE_URL}/mentions-legales`, changeFrequency: 'yearly', priority: 0.1 },
     { url: `${SITE_URL}/confidentialite`, changeFrequency: 'yearly', priority: 0.1 },
+    // Pages mois indexables : les 12 prochains mois, seuls et par grande catégorie.
+    ...sitemapMonthPaths().map((path) => ({ url: `${SITE_URL}${path}`, changeFrequency: 'daily' as const, priority: path.split('/').length > 3 ? 0.6 : 0.7 })),
     ...CATEGORIES.map((c) => ({ url: `${SITE_URL}/categories/${c.slug}`, changeFrequency: 'daily' as const, priority: 0.8 })),
     ...ARRONDISSEMENTS.map((a) => ({ url: `${SITE_URL}/paris/${a}`, changeFrequency: 'daily' as const, priority: 0.7 })),
-    ...COLLECTIONS.map((c) => ({ url: `${SITE_URL}/collections/${c.slug}`, changeFrequency: 'daily' as const, priority: 0.6 })),
   ]
 
   let venuePages: MetadataRoute.Sitemap = []

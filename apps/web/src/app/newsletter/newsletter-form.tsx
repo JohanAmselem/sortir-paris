@@ -49,7 +49,7 @@ export function NewsletterForm({ source = 'newsletter-page', className }: { sour
 
   if (status === 'success') {
     return (
-      <p className={cn('flex items-center justify-center gap-2 rounded-xl bg-accent-soft p-4 text-[15px] font-semibold text-accent', className)} role="status">
+      <p className={cn('t-body flex items-center justify-center gap-2 rounded-xl bg-accent-soft p-4 font-semibold text-accent', className)} role="status">
         <Check className="h-5 w-5 shrink-0" aria-hidden />
         {message}
       </p>
@@ -72,12 +72,12 @@ export function NewsletterForm({ source = 'newsletter-page', className }: { sour
           placeholder="toi@exemple.fr"
           aria-invalid={status === 'error' || undefined}
           aria-describedby={status === 'error' ? 'newsletter-error' : undefined}
-          className="h-12 min-w-0 flex-1 rounded-full border border-border-strong bg-surface px-5 text-[16px] text-ink placeholder:text-text-muted focus:border-accent focus:outline-none"
+          className="t-body h-12 min-w-0 flex-1 rounded-full border border-border-strong bg-surface px-5 text-ink placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <button
           type="submit"
           disabled={status === 'loading'}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-ink px-6 text-[15px] font-semibold text-paper transition-colors hover:bg-ink-soft disabled:opacity-60"
+          className="t-body inline-flex h-12 items-center justify-center gap-2 rounded-full bg-ink px-6 font-semibold text-paper transition-colors hover:bg-ink-soft disabled:opacity-60"
         >
           {status === 'loading' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
           Je m’inscris
@@ -89,7 +89,7 @@ export function NewsletterForm({ source = 'newsletter-page', className }: { sour
         <input id="newsletter-website" type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
       {status === 'error' && (
-        <p id="newsletter-error" className="mt-2 text-[14px] font-medium text-error" role="alert">
+        <p id="newsletter-error" className="t-small mt-2 font-medium text-error" role="alert">
           {message}
         </p>
       )}

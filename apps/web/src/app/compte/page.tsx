@@ -1,12 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Bookmark, ChevronRight, Dna, Music, Settings, Sparkles } from 'lucide-react'
-import { DataUnavailable } from '@/components/events/blocks'
-import { ARCHETYPES } from '@/lib/taste-quiz-data'
-import { requireUser } from '@/app/club/_lib/api'
-import { getMemberOverview } from '@/app/club/_lib/member'
-import { BadgeGrid, LevelMeter, StatTiles } from '@/app/club/_components/member-ui'
-import { getFollowFeed } from '@/app/club/_lib/follows'
+import { Bookmark, ChevronRight, Mic2, Settings, UserX } from 'lucide-react'
+import { requireUser } from '@/lib/member/api'
+import { getMemberOverview } from '@/lib/member/member'
+import { getFollowFeed } from '@/lib/member/follows'
 import { bucketNow } from '@/lib/events/query'
 import { LogoutButton } from './_components/logout-button'
 import { FollowsSection } from './_components/follows-section'
@@ -26,68 +23,24 @@ export default async function ComptePage() {
   const [overview, feed] = await Promise.all([getMemberOverview(user.id), getFollowFeed(user.id)])
   const now = bucketNow()
   const name = overview?.name ?? user.email?.split('@')[0] ?? 'Membre'
-  const archetype = overview?.archetype ? ARCHETYPES[overview.archetype] : null
   const artistCount = feed.follows.filter((f) => f.kind === 'artist').length
 
   const links = [
-    {
-      href: '/compte/sauvegardes',
-      icon: Bookmark,
-      label: 'Mes sorties',
-      desc: overview ? `${overview.upcomingSaved} à venir` : 'Tes événements gardés',
-    },
-    { href: '/compte/adn', icon: Dna, label: 'Mon ADN culturel', desc: archetype ? archetype.name : 'Ce que tu aimes vraiment' },
-    { href: '/compte/artistes', icon: Music, label: 'Mes artistes', desc: 'Nouvelles dates, billetteries, rappels' },
-    { href: '/club', icon: Sparkles, label: 'Le Club', desc: 'Match, quiz, Drop du lundi' },
-    { href: '/compte/parametres', icon: Settings, label: 'Préférences', desc: 'Catégories, ambiances, quartiers' },
+    { href: '/mes-sorties', icon: Bookmark, label: 'Mes sorties', desc: overview ? `${overview.upcomingSaved} à venir` : 'Gardées et « J’y vais »' },
+    { href: '/compte/artistes', icon: Mic2, label: 'Mes artistes', desc: 'Nouvelles dates, billetteries, rappels' },
+    { href: '/compte/parametres', icon: Settings, label: 'Réglages', desc: 'Catégories, quartiers, compte' },
+    { href: '/suppression-compte', icon: UserX, label: 'Supprimer mon compte', desc: 'Et toutes mes données' },
   ]
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:pt-12">
-      <header className="flex items-center gap-4">
-        <span
-          className="font-display flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent text-[2rem] text-paper"
-          aria-hidden
-        >
-          {name.charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <h1 className="font-display truncate text-[2.6rem] text-ink">{name}</h1>
-          <p className="truncate text-[14px] text-text-secondary">
-            {user.email}
-            {overview?.memberSince && ` · membre depuis ${dateFmt.format(new Date(overview.memberSince))}`}
-          </p>
-        </div>
+    <div className="mx-auto max-w-3xl px-4 pb-10 pt-6 md:pt-10">
+      <header className="min-w-0">
+        <h1 className="t-display truncate text-ink">{name}</h1>
+        <p className="t-small mt-1 truncate text-text-secondary">
+          {user.email}
+          {overview?.memberSince && ` · membre depuis ${dateFmt.format(new Date(overview.memberSince))}`}
+        </p>
       </header>
-
-      <AlertsPromoCard
-        member
-        className="mt-8"
-        text={
-          feed.error
-            ? undefined
-            : artistCount > 0
-              ? `${artistCount} artiste${artistCount > 1 ? 's' : ''} suivi${artistCount > 1 ? 's' : ''} : nouvelles dates à Paris, billetteries, rappel la veille.`
-              : 'Ajoute tes artistes : on te prévient dès qu’ils annoncent une date à Paris.'
-        }
-      />
-
-      {overview ? (
-        <>
-          <LevelMeter xp={overview.xp} className="mt-8 rounded-2xl border border-border bg-surface p-5" />
-          <StatTiles
-            className="mt-4"
-            items={[
-              { label: 'Sorties gardées', value: overview.stats.saves, href: '/compte/sauvegardes' },
-              { label: '« J’y vais »', value: overview.stats.attendances },
-              { label: 'Avis', value: overview.stats.reviews },
-              { label: 'Swipes', value: overview.stats.swipes, href: '/match' },
-            ]}
-          />
-        </>
-      ) : (
-        <DataUnavailable className="mt-8" />
-      )}
 
       <nav aria-label="Mon compte" className="mt-8">
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
@@ -95,11 +48,11 @@ export default async function ComptePage() {
             const Icon = l.icon
             return (
               <li key={l.href}>
-                <Link href={l.href} className="flex min-h-[64px] items-center gap-4 px-5 py-3 transition-colors hover:bg-surface-hover">
+                <Link href={l.href} className="flex min-h-16 items-center gap-4 px-5 py-3 transition-colors hover:bg-surface-hover">
                   <Icon className="h-5 w-5 shrink-0 text-accent" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold text-ink">{l.label}</span>
-                    <span className="block truncate text-[13px] text-text-secondary">{l.desc}</span>
+                    <span className="t-body block font-semibold text-ink">{l.label}</span>
+                    <span className="t-small block truncate text-text-muted">{l.desc}</span>
                   </span>
                   <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
                 </Link>
@@ -109,16 +62,19 @@ export default async function ComptePage() {
         </ul>
       </nav>
 
-      <FollowsSection feed={feed} now={now} />
+      <AlertsPromoCard
+        member
+        className="mt-6"
+        text={
+          feed.error
+            ? undefined
+            : artistCount > 0
+              ? `${artistCount} artiste${artistCount > 1 ? 's' : ''} suivi${artistCount > 1 ? 's' : ''} : nouvelles dates à Paris, billetteries, rappel la veille.`
+              : 'Ajoute tes artistes : on te prévient dès qu’ils annoncent une date à Paris.'
+        }
+      />
 
-      {overview && (
-        <section aria-labelledby="badges-title" className="mt-10">
-          <h2 id="badges-title" className="font-display text-[2rem] text-ink">
-            Badges
-          </h2>
-          <BadgeGrid earned={overview.badges} stats={overview.stats} className="mt-4" />
-        </section>
-      )}
+      <FollowsSection feed={feed} now={now} />
 
       <div className="mt-10">
         <LogoutButton />

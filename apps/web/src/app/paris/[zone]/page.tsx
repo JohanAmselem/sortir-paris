@@ -1,13 +1,12 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
-import { Listing, PageIntro } from '@/components/events/listing'
-import { parseEventParams } from '@/lib/events/params'
+import { AgendaView, mergeParams, type SearchParams } from '@/components/agenda/agenda-view'
 import { ARRONDISSEMENTS, normalizeArrondissement } from '@/lib/events/taxonomy'
 import { listingMetadata } from '@/lib/seo'
 
 type Props = {
   params: Promise<{ zone: string }>
-  searchParams: Promise<Record<string, string | string[] | undefined>>
+  searchParams: Promise<SearchParams>
 }
 
 /** Neighbourhood flavour, so each page is genuinely different. */
@@ -55,36 +54,32 @@ export default async function ZonePage({ params, searchParams }: Props) {
   const arr = normalizeArrondissement(decodeURIComponent(zone))
   if (!arr) notFound()
   if (arr !== decodeURIComponent(zone)) permanentRedirect(`/paris/${arr}`)
-  const query = parseEventParams(await searchParams)
   const n = ARRONDISSEMENTS.indexOf(arr)
   const neighbours = [ARRONDISSEMENTS[n - 1], ARRONDISSEMENTS[n + 1]].filter(Boolean)
 
   return (
-    <div className="px-4">
-      <PageIntro kicker={QUARTIERS[arr]} title={`Sortir dans le ${arr}`}>
-        Concerts, expos, théâtre et bons plans dans le {arr} arrondissement, classés par intérêt.
-      </PageIntro>
-      <Listing
-        query={query}
-        fixed={{ arrondissements: [arr] }}
-        locked={['arrondissements']}
-        basePath={`/paris/${arr}`}
-        emptyTitle={`Calme plat dans le ${arr}`}
-        emptyText="Aucune sortie repérée ici avec ces critères. Les arrondissements voisins ont peut-être ce qu’il te faut."
+    <>
+      <AgendaView
+        params={mergeParams(await searchParams, { arr })}
+        title={`Sortir dans le ${arr}`}
+        intro={`${QUARTIERS[arr]}. Concerts, expos, théâtre et sorties gratuites dans le ${arr} arrondissement, jour par jour.`}
         emptyActions={neighbours.map((a) => ({ href: `/paris/${a}`, label: `Le ${a}` }))}
       />
-      <nav aria-label="Autres arrondissements" className="mt-12">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-text-secondary">Autres arrondissements</h2>
+      <nav aria-label="Autres arrondissements" className="mt-12 px-4">
+        <h2 className="t-micro text-text-muted">Autres arrondissements</h2>
         <ul className="mt-3 flex flex-wrap gap-2">
           {ARRONDISSEMENTS.filter((a) => a !== arr).map((a) => (
             <li key={a}>
-              <Link href={`/paris/${a}`} className="inline-flex h-10 min-w-11 items-center justify-center rounded-lg border border-border bg-surface px-3 text-[14px] font-semibold hover:border-ink">
+              <Link
+                href={`/paris/${a}`}
+                className="t-small inline-flex h-11 min-w-11 items-center justify-center rounded-lg border border-border-strong px-3 font-semibold text-ink hover:border-ink"
+              >
                 {a}
               </Link>
             </li>
           ))}
         </ul>
       </nav>
-    </div>
+    </>
   )
 }

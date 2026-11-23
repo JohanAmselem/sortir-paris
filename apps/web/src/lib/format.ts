@@ -107,3 +107,23 @@ export function safeUrl(url: string | null | undefined): string | null {
     return null
   }
 }
+
+/** « 38,50 € », « 12 € » : le prix exact, centimes compris quand il y en a. */
+export function formatEuros(cents: number): string {
+  const v = cents / 100
+  return `${Number.isInteger(v) ? v : v.toFixed(2).replace('.', ',')}\u00a0€`
+}
+
+/**
+ * Prix d'une carte de sortie : « Gratuit », « dès 38,50 € », « 25 € », et
+ * « Prix sur la billetterie » quand on ne le connaît pas (jamais « 0 € »).
+ */
+export function cardPrice(p: PriceInfo): { label: string; tone: PriceTone; from: string | null } {
+  const { tone } = formatPrice(p)
+  if (tone === 'free') return { label: 'Gratuit', tone, from: null }
+  if (tone === 'unknown') return { label: 'Prix sur la billetterie', tone, from: null }
+  const min = Math.min(p.priceMin || p.priceMax, p.priceMax || p.priceMin)
+  const max = Math.max(p.priceMin, p.priceMax)
+  const from = formatEuros(min)
+  return { label: min < max ? `dès ${from}` : from, tone, from }
+}

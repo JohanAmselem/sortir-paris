@@ -3,7 +3,7 @@
  *
  * XP, level and badges are DERIVED from what the member actually did
  * (saves, outings, reviews, swipes, quiz). They are recomputed after every
- * action (see app/club/_lib/member.ts → syncGamification), so:
+ * action (see lib/member/member.ts → syncGamification), so:
  *   - an action grants XP once per (member, event): saving twice is impossible;
  *   - undoing an action (unsave, "je n'y vais plus", delete review) removes its XP;
  *   - levels and badges can never drift from the data.

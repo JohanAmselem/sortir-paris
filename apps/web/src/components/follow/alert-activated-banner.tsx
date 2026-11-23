@@ -75,10 +75,10 @@ export function AlertActivatedBanner() {
       >
         <BellRing className={'mt-0.5 h-5 w-5 shrink-0 ' + (result.ok ? 'text-accent' : 'text-neon')} aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-ink">
+          <p className="t-body font-semibold text-ink">
             {result.ok ? `Alerte activée pour ${result.label}` : `Alerte non créée pour ${result.label}`}
           </p>
-          <p className="mt-0.5 text-[14px] text-text-secondary">
+          <p className="t-small mt-0.5 text-text-secondary">
             {result.ok ? 'On te prévient dès qu’une nouvelle date est annoncée à Paris. ' : `${result.error} `}
             <Link href="/compte/artistes" className="font-semibold text-accent underline underline-offset-2" onClick={() => setResult(null)}>
               Gérer mes alertes

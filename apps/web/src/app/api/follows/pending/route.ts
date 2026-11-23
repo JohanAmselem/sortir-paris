@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { errors, getSessionUser, limit } from '@/app/club/_lib/api'
+import { errors, getSessionUser, limit } from '@/lib/member/api'
 import { applyActivatedCookies, consumePendingFollow } from '@/lib/follow-server'
 import { PENDING_FOLLOW_COOKIE } from '@/lib/pending-follow'
 

@@ -17,7 +17,7 @@ export function SignatureBadge({ className, compact = false }: { className?: str
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-accent/30 px-2 py-0.5 text-[12px] font-semibold text-accent',
+        't-small inline-flex items-center gap-1 rounded-full border border-accent/30 px-2 py-0.5 font-semibold text-accent',
         className
       )}
       title="Une des grandes scènes ou institutions culturelles de Paris"

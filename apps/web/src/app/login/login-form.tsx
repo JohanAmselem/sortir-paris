@@ -46,15 +46,15 @@ export function LoginForm({ next, authError }: { next: string; authError: boolea
     return (
       <div className="rounded-2xl border border-accent bg-accent-soft p-6 text-center" role="status">
         <Mail className="mx-auto h-8 w-8 text-accent" aria-hidden />
-        <p className="font-display mt-3 text-[1.8rem] text-ink">Regarde tes mails</p>
-        <p className="mt-1 text-[15px] text-text-secondary">
+        <p className="t-title2 mt-3 text-ink">Regarde tes mails</p>
+        <p className="t-body mt-1 text-text-secondary">
           On a envoyé un lien de connexion à <strong className="font-semibold text-ink">{email.trim()}</strong>. Pense à vérifier les
           indésirables.
         </p>
         <button
           type="button"
           onClick={() => setSent(false)}
-          className="mt-4 inline-flex h-11 items-center px-3 text-[14px] font-semibold text-accent underline underline-offset-2"
+          className="t-small mt-4 inline-flex h-11 items-center px-3 font-semibold text-accent underline underline-offset-2"
         >
           Utiliser une autre adresse
         </button>
@@ -68,7 +68,7 @@ export function LoginForm({ next, authError }: { next: string; authError: boolea
         type="button"
         onClick={google}
         disabled={loading !== null}
-        className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-border-strong bg-surface text-[15px] font-semibold text-ink transition-colors hover:border-ink disabled:opacity-60"
+        className="t-body flex h-12 w-full items-center justify-center gap-3 rounded-full border border-border-strong bg-surface font-semibold text-ink transition-colors hover:border-ink disabled:opacity-60"
       >
         {loading === 'google' ? (
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
@@ -83,14 +83,14 @@ export function LoginForm({ next, authError }: { next: string; authError: boolea
         Continuer avec Google
       </button>
 
-      <div className="my-6 flex items-center gap-3 text-[13px] text-text-muted" aria-hidden>
+      <div className="t-small my-6 flex items-center gap-3 text-text-muted" aria-hidden>
         <span className="h-px flex-1 bg-border" />
         ou par email
         <span className="h-px flex-1 bg-border" />
       </div>
 
       <form onSubmit={magicLink} noValidate>
-        <label htmlFor="login-email" className="block text-[14px] font-semibold text-ink">
+        <label htmlFor="login-email" className="t-small block font-semibold text-ink">
           Ton adresse email
         </label>
         <input
@@ -103,23 +103,23 @@ export function LoginForm({ next, authError }: { next: string; authError: boolea
           placeholder="toi@exemple.fr"
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={error ? 'login-error' : undefined}
-          className="mt-1.5 h-12 w-full rounded-xl border border-border-strong bg-surface px-4 text-[16px] text-ink placeholder:text-text-muted focus:border-accent focus:outline-none"
+          className="t-body mt-1.5 h-12 w-full rounded-xl border border-border-strong bg-surface px-4 text-ink placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         {error && (
-          <p id="login-error" className="mt-2 text-[14px] font-medium text-error" role="alert">
+          <p id="login-error" className="t-small mt-2 font-medium text-error" role="alert">
             {error}
           </p>
         )}
         <button
           type="submit"
           disabled={loading !== null}
-          className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink text-[15px] font-semibold text-paper transition-colors hover:bg-ink-soft disabled:opacity-60"
+          className="t-body mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink font-semibold text-paper transition-colors hover:bg-ink-soft disabled:opacity-60"
         >
           {loading === 'email' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Recevoir un lien de connexion
           {loading !== 'email' && <ArrowRight className="h-4 w-4" aria-hidden />}
         </button>
-        <p className="mt-2 text-[13px] text-text-muted">Pas de mot de passe : un lien suffit.</p>
+        <p className="t-small mt-2 text-text-muted">Pas de mot de passe : un lien suffit.</p>
       </form>
     </div>
   )

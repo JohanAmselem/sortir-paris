@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { and, eq, sql } from 'drizzle-orm'
 import { db, events, userSaves } from '@sortir/db'
-import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody } from '@/app/club/_lib/api'
-import { getSavedEvents, syncGamification } from '@/app/club/_lib/member'
+import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody } from '@/lib/member/api'
+import { getSavedEvents, syncGamification } from '@/lib/member/member'
 
 export const dynamic = 'force-dynamic'
 

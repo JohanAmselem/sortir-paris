@@ -130,8 +130,8 @@ export function AlertSettingsForm({
   const toggle = (key: Key, label: string, desc: string, disabled = false) => (
     <li className="flex min-h-[60px] items-center gap-4 px-4 py-3">
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold text-ink">{label}</span>
-        <span className="block text-[13px] text-text-secondary">{desc}</span>
+        <span className="t-body block font-semibold text-ink">{label}</span>
+        <span className="t-small block text-text-secondary">{desc}</span>
       </span>
       <button
         type="button"
@@ -152,7 +152,7 @@ export function AlertSettingsForm({
 
   return (
     <div>
-      <h3 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-text-muted">Comment</h3>
+      <h3 className="t-micro font-semibold text-text-muted">Comment</h3>
       <ul className="mt-2 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
         {toggle(
           'emailEnabled',
@@ -166,18 +166,18 @@ export function AlertSettingsForm({
         {device === 'checking' ? (
           <div className="h-10" aria-hidden />
         ) : device === 'unsupported' ? (
-          <p className="text-[13px] text-text-secondary">
+          <p className="t-small text-text-secondary">
             {vapidPublicKey
               ? 'Ce navigateur ne gère pas les notifications. Sur iPhone, ajoute d’abord Paname Club à l’écran d’accueil (Partager → Sur l’écran d’accueil), puis ouvre-le depuis là.'
               : 'Les notifications arrivent très bientôt.'}
           </p>
         ) : device === 'denied' ? (
-          <p className="text-[13px] text-text-secondary">
+          <p className="t-small text-text-secondary">
             Les notifications sont bloquées pour ce site dans ton navigateur. Autorise-les dans ses réglages, puis recharge la page.
           </p>
         ) : device === 'on' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-2 text-[14px] font-semibold text-accent">
+            <p className="t-small flex items-center gap-2 font-semibold text-accent">
               <BellRing className="h-4 w-4" aria-hidden />
               Notifications activées sur cet appareil
             </p>
@@ -185,7 +185,7 @@ export function AlertSettingsForm({
               type="button"
               onClick={disableDevice}
               disabled={deviceBusy}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-text-secondary hover:bg-surface-hover hover:text-ink"
+              className="t-small inline-flex h-10 items-center gap-1.5 rounded-full px-3 font-semibold text-text-secondary hover:bg-surface-hover hover:text-ink"
             >
               {deviceBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
               Couper sur cet appareil
@@ -196,7 +196,7 @@ export function AlertSettingsForm({
             type="button"
             onClick={enableDevice}
             disabled={deviceBusy}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong bg-surface px-4 text-[14px] font-semibold text-ink transition-colors hover:border-ink"
+            className="t-small inline-flex h-11 items-center gap-2 rounded-full border border-border-strong bg-surface px-4 font-semibold text-ink transition-colors hover:border-ink"
           >
             {deviceBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BellRing className="h-4 w-4" aria-hidden />}
             Activer les notifications sur cet appareil
@@ -204,7 +204,7 @@ export function AlertSettingsForm({
         )}
       </div>
 
-      <h3 className="mt-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-text-muted">Quand</h3>
+      <h3 className="t-micro mt-6 font-semibold text-text-muted">Quand</h3>
       <ul className="mt-2 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
         {toggle('notifyNewDate', 'Nouvelle date', 'Un artiste que tu suis annonce un concert à Paris.')}
         {toggle('notifyOnSale', 'Ouverture de la billetterie', 'Le jour où les places sont mises en vente.')}
@@ -212,7 +212,7 @@ export function AlertSettingsForm({
       </ul>
 
       {error && (
-        <p role="alert" className="mt-3 text-[14px] font-medium text-error">
+        <p role="alert" className="t-small mt-3 font-medium text-error">
           {error}
         </p>
       )}

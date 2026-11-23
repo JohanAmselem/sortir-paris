@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { desc, eq } from 'drizzle-orm'
 import { db, tasteProfiles, tasteQuizAnswers } from '@sortir/db'
 import { isKnownQuestion, MIN_ANSWERS, scoreQuiz, type QuizAnswers } from '@/lib/taste-quiz-data'
-import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/app/club/_lib/api'
-import { syncGamification } from '@/app/club/_lib/member'
+import { ensureUserRow, errors, getSessionUser, limit, parseBody } from '@/lib/member/api'
+import { syncGamification } from '@/lib/member/member'
 
 export const dynamic = 'force-dynamic'
 

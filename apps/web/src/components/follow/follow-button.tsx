@@ -23,7 +23,7 @@ function query(t: FollowTarget): string {
 
 /**
  * Follow a venue or an artist / work: its new dates show up in « Nouveautés
- * pour toi » (compte, Club) and in the « Alertes concerts ». Optimistic toggle.
+ * pour toi » (compte, Mes sorties) and in the « Alertes concerts ». Optimistic toggle.
  * Visitors: the follow is kept (pending-follow cookie) while they log in, and
  * created on their return (lib/pending-follow.ts).
  */
@@ -94,7 +94,7 @@ export function FollowButton({ target, label, className, compact = false }: Foll
         aria-pressed={following}
         className={cn(
           'inline-flex max-w-full items-center justify-center rounded-full border font-semibold transition-colors',
-          compact ? 'h-9 gap-1.5 px-3 text-[13px]' : 'h-11 gap-2 px-4 text-[14px]',
+          compact ? 't-small h-9 gap-1.5 px-3' : 't-small h-11 gap-2 px-4',
           following ? 'border-accent bg-accent-soft text-accent' : 'border-border-strong bg-surface text-ink hover:border-ink'
         )}
       >
@@ -106,9 +106,9 @@ export function FollowButton({ target, label, className, compact = false }: Foll
           {following ? `${compact ? 'Suivi' : ''} : ${label.replace(/^Suivre /, '')}, cliquer pour ne plus suivre` : compact ? label : ''}
         </span>
       </button>
-      {following && !error && !compact && <p className="text-[13px] text-text-secondary">Les nouvelles dates arrivent dans ton compte.</p>}
+      {following && !error && !compact && <p className="t-small text-text-secondary">Les nouvelles dates arrivent dans ton compte.</p>}
       {error && (
-        <p className="text-[13px] font-medium text-error" role="alert">
+        <p className="t-small font-medium text-error" role="alert">
           {error}
         </p>
       )}

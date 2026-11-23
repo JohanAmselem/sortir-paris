@@ -33,9 +33,9 @@ export default async function NewsletterPage({
   return (
     <div className="px-4 pb-16 pt-10 sm:pt-14">
       <section className="mx-auto max-w-2xl text-center">
-        <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">La lettre</p>
-        <h1 className="font-display mt-2 text-[3.2rem] text-ink sm:text-[4.4rem]">Le meilleur de Paris, une fois par semaine.</h1>
-        <p className="mx-auto mt-4 max-w-lg text-[16px] leading-relaxed text-text-secondary">
+        <p className="t-micro font-semibold text-accent">La lettre</p>
+        <h1 className="t-display mt-2 text-ink">Le meilleur de Paris, une fois par semaine.</h1>
+        <p className="t-body mx-auto mt-4 max-w-lg leading-relaxed text-text-secondary">
           Une sélection courte : les sorties à ne pas rater, les bons plans gratuits et les expos qui ferment bientôt. Pas de
           spam.
         </p>
@@ -44,15 +44,15 @@ export default async function NewsletterPage({
             role="status"
             className={
               confirmation.tone === 'ok'
-                ? 'mx-auto mt-6 max-w-lg rounded-xl bg-accent-soft p-4 text-[15px] font-semibold text-accent'
-                : 'mx-auto mt-6 max-w-lg rounded-xl bg-neon-soft p-4 text-[15px] font-semibold text-ink'
+                ? 't-body mx-auto mt-6 max-w-lg rounded-xl bg-accent-soft p-4 font-semibold text-accent'
+                : 't-body mx-auto mt-6 max-w-lg rounded-xl bg-neon-soft p-4 font-semibold text-ink'
             }
           >
             {confirmation.text}
           </p>
         )}
         <NewsletterForm className="mx-auto mt-8 max-w-lg text-left" />
-        <p className="mt-3 text-[13px] text-text-muted">Ton adresse ne sert qu’à t’envoyer la lettre.</p>
+        <p className="t-small mt-3 text-text-muted">Ton adresse ne sert qu’à t’envoyer la lettre.</p>
         <AlertsPromoCard
           member={false}
           className="mx-auto mt-10 max-w-lg text-left"
@@ -63,7 +63,7 @@ export default async function NewsletterPage({
 
       {!preview.error && preview.events.length > 0 && (
         <section aria-labelledby="preview-title" className="pt-16">
-          <SectionHeader id="preview-title" kicker="Pour te donner une idée" title="Cette semaine, on aurait parlé de…" />
+          <SectionHeader id="preview-title" title="Cette semaine, on aurait parlé de…" />
           <EventRail events={diversify(preview.events, 8)} now={now} className="mt-5" />
         </section>
       )}

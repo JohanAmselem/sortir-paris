@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { notFound, redirect } from 'next/navigation'
-import { getSessionUser } from '@/app/club/_lib/api'
+import { getSessionUser } from '@/lib/member/api'
 import { isAdminEmail } from '@/lib/instagram/admin'
 import { addExclusion, deleteCredentials, removeExclusion, saveCredentials, setStatus } from '@/lib/instagram/data'
 import { InstagramGraph } from '@/lib/instagram/graph'

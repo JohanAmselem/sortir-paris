@@ -4,9 +4,9 @@ import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db, events, userSwipes } from '@sortir/db'
 import { diversify, effectiveEndSql, safeQueryEvents } from '@/lib/events/query'
 import { parisDayStart } from '@/lib/paris-time'
-import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody } from '@/app/club/_lib/api'
-import { getCardsByIds, getSwipedIds, syncGamification } from '@/app/club/_lib/member'
-import { interleaveByCategory, MATCH_DAILY_LIMIT, MATCH_IMPORT_MAX } from '@/app/club/_lib/deck'
+import { ensureUserRow, errors, getSessionUser, idSchema, limit, parseBody } from '@/lib/member/api'
+import { getCardsByIds, getSwipedIds, syncGamification } from '@/lib/member/member'
+import { interleaveByCategory, MATCH_DAILY_LIMIT, MATCH_IMPORT_MAX } from '@/lib/member/deck'
 
 export const dynamic = 'force-dynamic'
 

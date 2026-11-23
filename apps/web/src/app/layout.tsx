@@ -7,6 +7,7 @@ import { Header } from '@/components/layout/header'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { Footer } from '@/components/layout/footer'
 import { AlertActivatedBanner } from '@/components/follow/alert-activated-banner'
+import { SavedIdsProvider } from '@/components/events/saved-ids'
 import { SITE_URL } from '@/lib/site'
 import '@/styles/globals.css'
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     template: '%s · Paname Club',
   },
   description:
-    'Concerts, expos, théâtre, sorties gratuites : les meilleures idées pour sortir à Paris ce soir, demain ou ce week-end, choisies parmi des milliers d’événements.',
+    'Concerts, expos, théâtre, sorties gratuites : que faire à Paris ce soir, ce week-end ou dans six mois, jour par jour, parmi des milliers de sorties.',
   metadataBase: new URL(SITE_URL),
   applicationName: 'Paname Club',
   openGraph: {
@@ -44,7 +45,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#1c1730',
+  themeColor: '#0c0b11',
 }
 
 const plausibleDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN
@@ -52,19 +53,21 @@ const plausibleDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={archivo.variable}>
-      <body className="min-h-screen bg-bg pb-[calc(4rem+env(safe-area-inset-bottom))] antialiased md:pb-0">
+      <body className="min-h-screen bg-bg antialiased">
         <a
           href="#contenu"
           className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-ink focus:px-3 focus:py-2 focus:text-paper"
         >
           Aller au contenu
         </a>
-        <Header />
-        <main id="contenu" className="mx-auto max-w-7xl">
-          {children}
-        </main>
-        <Footer />
-        <BottomNav />
+        <SavedIdsProvider>
+          <Header />
+          <main id="contenu" className="mx-auto max-w-7xl">
+            {children}
+          </main>
+          <Footer />
+          <BottomNav />
+        </SavedIdsProvider>
         <AlertActivatedBanner />
         {/* Enable Web Analytics / Speed Insights in the Vercel dashboard, then set these flags. */}
         {process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === '1' && <Analytics />}

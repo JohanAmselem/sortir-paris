@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDistance, formatPrice, formatPriceShort, safeUrl, sourceLabel } from './format'
+import { cardPrice, formatDistance, formatPrice, formatPriceShort, safeUrl, sourceLabel } from './format'
 import { safeJsonLd } from './json-ld'
 import { normalizeArrondissement } from './events/taxonomy'
 
@@ -61,5 +61,17 @@ describe('safeJsonLd', () => {
     const out = safeJsonLd({ name: '</script><script>alert(1)</script>' })
     expect(out).not.toContain('</script>')
     expect(JSON.parse(out).name).toBe('</script><script>alert(1)</script>')
+  })
+})
+
+describe('cardPrice', () => {
+  it('ne montre jamais « 0 € » quand le prix est inconnu', () => {
+    expect(cardPrice({ priceMin: 0, priceMax: 0, priceStatus: 'unknown' }).label).toBe('Prix sur la billetterie')
+    expect(cardPrice({ priceMin: 200, priceMax: 200, priceStatus: 'paid' }).label).toBe('Prix sur la billetterie')
+  })
+  it('donne le prix de départ exact', () => {
+    expect(cardPrice({ priceMin: 3850, priceMax: 6600, priceStatus: 'paid' })).toEqual({ label: 'dès 38,50\u00a0€', tone: 'paid', from: '38,50\u00a0€' })
+    expect(cardPrice({ priceMin: 0, priceMax: 2500, priceStatus: 'paid' }).label).toBe('25\u00a0€')
+    expect(cardPrice({ priceMin: 0, priceMax: 0, priceStatus: 'free' }).label).toBe('Gratuit')
   })
 })

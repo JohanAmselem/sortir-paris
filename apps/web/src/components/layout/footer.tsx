@@ -1,85 +1,51 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ARRONDISSEMENTS, CATEGORIES } from '@/lib/events/taxonomy'
+import { CATEGORY_BY_SLUG } from '@/lib/events/taxonomy'
+import { monthTitle } from '@/lib/agenda-view'
+import { nextMonthKeys } from '@/lib/paris-time'
 
-const DISCOVER = [
-  { href: '/ce-soir', label: 'Que faire ce soir' },
-  { href: '/ce-week-end', label: 'Sorties ce week-end' },
-  { href: '/gratuit', label: 'Sorties gratuites' },
-  { href: '/carte', label: 'Carte des sorties' },
-  { href: '/autour-de-moi', label: 'Autour de moi, maintenant' },
-  { href: '/collections', label: 'Nos sélections' },
-  { href: '/lieux', label: 'Lieux culturels' },
-]
+const CATEGORIES = ['concerts', 'theatre', 'spectacles', 'expos', 'soirees'] as const
 
-const CLUB = [
-  { href: '/club', label: 'Le Club' },
+const SITE = [
   { href: '/alertes-concerts', label: 'Alertes concerts' },
-  { href: '/surprise', label: 'Surprends-moi' },
-  { href: '/match', label: 'Match culturel' },
-  { href: '/quiz', label: 'Quiz « Tu préfères »' },
-  { href: '/news', label: 'Le journal' },
-  { href: '/newsletter', label: 'Newsletter' },
-]
-
-const LEGAL = [
-  { href: '/mentions-legales', label: 'Mentions légales' },
+  { href: '/lieux', label: 'Les lieux' },
   { href: '/confidentialite', label: 'Confidentialité' },
+  { href: '/mentions-legales', label: 'Mentions légales' },
+  { href: '/suppression-compte', label: 'Supprimer mon compte' },
 ]
 
+/** Pied de page réduit : une quinzaine de liens utiles (l'Agenda, quelques mois, les grandes catégories). */
 export function Footer() {
+  const now = new Date()
+  const months = nextMonthKeys(4, now).slice(1)
+  const agenda = [
+    { href: '/agenda', label: 'Tout l’agenda' },
+    ...months.map((m) => ({ href: `/agenda/${m}`, label: monthTitle(m, now) })),
+  ]
+  const categories = CATEGORIES.map((slug) => ({ href: `/categories/${slug}`, label: CATEGORY_BY_SLUG[slug].plural }))
+
   return (
-    <footer className="mt-16 bg-night text-paper/75">
-      <div className="mx-auto max-w-7xl px-4 pb-10 pt-14">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <footer className="mt-20 border-t border-border bg-surface-dark">
+      <div className="mx-auto max-w-7xl px-4 pb-28 pt-12 md:pb-12">
+        <div className="grid gap-10 md:grid-cols-[1.3fr_1fr_1fr_1fr]">
           <div>
             <p className="flex items-center gap-3">
-              <Image src="/brand/logo-mark-light.svg" alt="" width={48} height={50} unoptimized className="h-[50px] w-auto" />
-              <Image src="/brand/logo-wordmark-light.svg" alt="Paname Club" width={204} height={21} unoptimized className="h-[21px] w-auto" />
+              <Image src="/brand/logo-mark-light.svg" alt="" width={40} height={42} unoptimized className="h-[40px] w-auto" />
+              <Image src="/brand/logo-wordmark-light.svg" alt="Paname Club" width={170} height={18} unoptimized className="h-[16px] w-auto" />
             </p>
-            <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-paper/75">
-              Les meilleures idées de sortie à Paris, choisies chaque jour parmi des milliers d’événements.
-            </p>
+            <p className="t-small mt-3 max-w-xs text-text-secondary">Que faire à Paris ce soir, ce week-end ou dans six mois : toutes les sorties, jour par jour.</p>
           </div>
-
-          <FooterList title="Découvrir" links={DISCOVER} />
-          <FooterList
-            title="Catégories"
-            links={CATEGORIES.map((c) => ({ href: `/categories/${c.slug}`, label: c.plural }))}
-          />
-          <FooterList title="Le Club" links={CLUB} />
+          <FooterList title="Agenda" links={agenda} />
+          <FooterList title="Sortir" links={categories} />
+          <FooterList title="Paname Club" links={SITE} />
         </div>
-
-        <div className="mt-12">
-          <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/60">Par arrondissement</h2>
-          <ul className="mt-3 flex flex-wrap gap-x-1 gap-y-1">
-            {ARRONDISSEMENTS.map((arr) => (
-              <li key={arr}>
-                <Link
-                  href={`/paris/${arr}`}
-                  className="inline-flex h-10 min-w-10 items-center justify-center rounded px-2 text-[14px] text-paper/75 transition-colors hover:bg-paper/10 hover:text-paper"
-                >
-                  {arr}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-12 flex flex-col gap-3 border-t border-paper/10 pt-6 text-[13px] text-paper/60 md:flex-row md:items-start md:justify-between">
+        <div className="t-small mt-10 flex flex-col gap-3 border-t border-border pt-6 text-text-muted md:flex-row md:items-center md:justify-between">
           <p className="max-w-3xl">
-            © {new Date().getFullYear()} Paname Club. Informations issues des agendas officiels et des sites des lieux :
-            vérifie toujours horaires et tarifs auprès de l’organisateur.
+            © {now.getFullYear()} Paname Club. Informations issues des agendas officiels et des sites des lieux : vérifie horaires et tarifs auprès de l’organisateur.
           </p>
-          <ul className="flex shrink-0 flex-wrap gap-x-5">
-            {LEGAL.map((l) => (
-              <li key={l.href}>
-                <Link href={l.href} className="inline-flex min-h-10 items-center text-paper/75 underline-offset-2 transition-colors hover:text-paper hover:underline">
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <a href="mailto:contact@panameclub.fr" className="inline-flex min-h-11 shrink-0 items-center font-semibold text-text-secondary underline-offset-2 hover:text-ink hover:underline">
+            contact@panameclub.fr
+          </a>
         </div>
       </div>
     </footer>
@@ -89,11 +55,11 @@ export function Footer() {
 function FooterList({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
   return (
     <div>
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/60">{title}</h2>
-      <ul className="mt-4">
+      <h2 className="t-micro text-text-muted">{title}</h2>
+      <ul className="mt-3">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="inline-flex min-h-10 items-center text-[15px] text-paper/80 transition-colors hover:text-paper">
+            <Link href={l.href} className="t-small inline-flex min-h-11 items-center text-text-secondary transition-colors hover:text-ink">
               {l.label}
             </Link>
           </li>

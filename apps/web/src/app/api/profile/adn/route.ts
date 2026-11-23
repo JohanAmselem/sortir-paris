@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getXpProgress } from '@/lib/gamification'
-import { errors, getSessionUser } from '@/app/club/_lib/api'
-import { getMemberOverview, getTasteDna } from '@/app/club/_lib/member'
+import { errors, getSessionUser } from '@/lib/member/api'
+import { getMemberOverview, getTasteDna } from '@/lib/member/member'
 
 export const dynamic = 'force-dynamic'
 

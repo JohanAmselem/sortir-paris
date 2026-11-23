@@ -38,7 +38,7 @@ export function MarkSeenButton({ id, label = 'Marquer comme vu', className }: { 
       onClick={onClick}
       disabled={isPending}
       className={cn(
-        'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink',
+        't-small inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3.5 font-semibold text-ink transition-colors hover:border-ink',
         className
       )}
     >

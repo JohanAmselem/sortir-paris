@@ -36,13 +36,13 @@ export default async function DesinscriptionPage({ searchParams }: { searchParam
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16 pt-10 sm:pt-14">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-accent">Alertes artistes</p>
-      <h1 className="font-display mt-2 text-[2.6rem] text-ink sm:text-[3.2rem]">
+      <p className="t-micro font-semibold text-accent">Alertes artistes</p>
+      <h1 className="t-display mt-2 text-ink">
         {state === 'ok' ? 'C’est noté.' : 'Ne plus recevoir les alertes par e-mail ?'}
       </h1>
 
       {state === 'ok' ? (
-        <p role="status" className="mt-4 text-[16px] leading-relaxed text-text-secondary">
+        <p role="status" className="t-body mt-4 leading-relaxed text-text-secondary">
           Tu ne recevras plus d’alertes par e-mail. Tu suis toujours tes artistes : tu peux réactiver les e-mails ou choisir les
           notifications sur ton téléphone depuis{' '}
           <Link href="/compte/artistes" className="font-semibold text-accent underline underline-offset-2">
@@ -51,7 +51,7 @@ export default async function DesinscriptionPage({ searchParams }: { searchParam
           .
         </p>
       ) : state === 'invalide' || (!state && !token) ? (
-        <p role="alert" className="mt-4 rounded-xl bg-neon-soft p-4 text-[15px] text-ink">
+        <p role="alert" className="t-body mt-4 rounded-xl bg-neon-soft p-4 text-ink">
           Ce lien n’est pas valide. Connecte-toi et règle tes alertes depuis{' '}
           <Link href="/compte/artistes" className="font-semibold text-accent underline underline-offset-2">
             Mes artistes
@@ -61,11 +61,11 @@ export default async function DesinscriptionPage({ searchParams }: { searchParam
       ) : (
         <>
           {state === 'erreur' && (
-            <p role="alert" className="mt-4 rounded-xl bg-neon-soft p-4 text-[15px] text-ink">
+            <p role="alert" className="t-body mt-4 rounded-xl bg-neon-soft p-4 text-ink">
               La désinscription n’a pas abouti. Réessaie dans un instant.
             </p>
           )}
-          <p className="mt-4 text-[16px] leading-relaxed text-text-secondary">
+          <p className="t-body mt-4 leading-relaxed text-text-secondary">
             Tu ne recevras plus d’e-mails pour les nouvelles dates, les ouvertures de billetterie et les rappels de tes sorties. Tes
             artistes suivis restent dans ton compte.
           </p>
@@ -73,7 +73,7 @@ export default async function DesinscriptionPage({ searchParams }: { searchParam
             <input type="hidden" name="token" value={token} />
             <button
               type="submit"
-              className="inline-flex h-12 items-center rounded-full bg-accent px-6 text-[15px] font-semibold text-paper transition-colors hover:bg-accent-hover"
+              className="t-body inline-flex h-12 items-center rounded-full bg-accent px-6 font-semibold text-paper transition-colors hover:bg-accent-hover"
             >
               Me désinscrire des e-mails
             </button>

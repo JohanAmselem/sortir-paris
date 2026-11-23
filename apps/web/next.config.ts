@@ -51,11 +51,30 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: securityHeaders }]
   },
   async redirects() {
+    // Refonte 2.0 (23/11/2026) : les pages retirées redirigent, rien ne casse pour Google
+    // ni pour les liens partagés. Les paramètres d'URL sont transmis tels quels.
+    const gone = (source: string, destination: string) => ({ source, destination, permanent: true })
     return [
-      { source: '/recherche', destination: '/evenements', permanent: true },
-      { source: '/search', destination: '/evenements', permanent: true },
-      { source: '/collections/expos-printemps', destination: '/collections/expos-du-moment', permanent: true },
-      { source: '/categories/expositions', destination: '/categories/expos', permanent: true },
+      gone('/recherche', '/agenda'),
+      gone('/search', '/agenda'),
+      gone('/evenements', '/agenda'),
+      gone('/categories/expositions', '/categories/expos'),
+      // Le Club sort du site (Match, quiz, ADN, Top, défis) ; /news n'est plus tenu.
+      gone('/club', '/'),
+      gone('/match', '/'),
+      gone('/drop', '/'),
+      gone('/quiz', '/'),
+      gone('/top', '/'),
+      gone('/partage', '/'),
+      gone('/news', '/'),
+      gone('/news/:slug', '/'),
+      gone('/onboarding', '/'),
+      gone('/compte/adn', '/compte'),
+      gone('/compte/sauvegardes', '/mes-sorties'),
+      gone('/surprise', '/agenda'),
+      gone('/collections', '/agenda'),
+      gone('/collections/:slug', '/agenda'),
+      gone('/autour-de-moi', '/carte'),
     ]
   },
 }

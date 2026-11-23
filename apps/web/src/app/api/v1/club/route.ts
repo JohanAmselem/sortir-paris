@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getSessionUser } from '@/app/club/_lib/api'
-import { getMemberOverview, getMembersLovedPast, getMembersTopThisWeek } from '@/app/club/_lib/member'
-import { getAnonymousDrop, getMemberDrop } from '@/app/club/_lib/drop'
-import { getCommunityHighlights, getWeeklyChallenge } from '@/app/club/_lib/community'
+import { getSessionUser } from '@/lib/member/api'
+import { getMemberOverview, getMembersLovedPast, getMembersTopThisWeek } from '@/lib/member/member'
+import { getAnonymousDrop, getMemberDrop } from '@/lib/member/drop'
+import { getCommunityHighlights, getWeeklyChallenge } from '@/lib/member/community'
 import { BADGES, getXpProgress } from '@/lib/gamification'
 import type { ClubMemberV1, ClubResponse } from '@/lib/api-v1/contract'
 

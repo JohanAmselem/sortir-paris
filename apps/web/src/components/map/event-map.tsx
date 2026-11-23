@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { ChevronDown, ChevronUp, Loader2, LocateFixed, X } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronUp, Loader2, LocateFixed, X } from 'lucide-react'
 import { EventCard } from '@/components/events/event-card'
 import { CATEGORIES } from '@/lib/events/taxonomy'
+import { MAPBOX_STYLE_URL, themeColor } from '@/lib/map-style'
+import { monthTitle } from '@/lib/agenda-view'
+import { nextMonthKeys } from '@/lib/paris-time'
 import type { CardEvent, EventPage } from '@/lib/events/types'
 import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
@@ -14,12 +17,16 @@ import { cn } from '@/lib/utils'
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 const PARIS: [number, number] = [2.3488, 48.8566]
 
+/** Le même choix de date que l'Agenda : une fenêtre, un mois ou un jour. */
 const WHEN = [
   { id: 'tonight', label: 'Ce soir' },
   { id: 'tomorrow', label: 'Demain' },
   { id: 'weekend', label: 'Week-end' },
   { id: 'week', label: '7 jours' },
+  { id: 'month', label: '30 jours' },
 ] as const
+
+const isPreset = (when: string) => WHEN.some((w) => w.id === when)
 
 interface VenueProps {
   slug: string
@@ -77,7 +84,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
     try {
       m = new mapboxgl.Map({
         container: container.current,
-        style: 'mapbox://styles/mapbox/light-v11',
+        style: MAPBOX_STYLE_URL,
         center: initialView ? [initialView.lng, initialView.lat] : PARIS,
         zoom: initialView?.zoom ?? 12,
         minZoom: 9,
@@ -100,6 +107,11 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
     })
 
     m.on('load', () => {
+      // Couleurs du thème « Nuit », lues dans la feuille de style (jetons de globals.css).
+      const ink = themeColor('--color-ink')
+      const paper = themeColor('--color-paper')
+      const accent = themeColor('--color-accent')
+      const free = themeColor('--color-free')
       m.addSource('venues', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -114,10 +126,10 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         source: 'venues',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color': '#1c1730',
+          'circle-color': ink,
           'circle-radius': ['step', ['get', 'total'], 16, 10, 20, 50, 26, 200, 32],
           'circle-stroke-width': 3,
-          'circle-stroke-color': '#f7f5ef',
+          'circle-stroke-color': paper,
         },
       })
       m.addLayer({
@@ -126,7 +138,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         source: 'venues',
         filter: ['has', 'point_count'],
         layout: { 'text-field': ['get', 'total'], 'text-size': 13, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'] },
-        paint: { 'text-color': '#f7f5ef' },
+        paint: { 'text-color': paper },
       })
       m.addLayer({
         id: 'venue',
@@ -134,10 +146,10 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         source: 'venues',
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-color': ['case', ['>', ['get', 'free'], 0], '#0f8a5f', '#7c3aed'],
+          'circle-color': ['case', ['>', ['get', 'free'], 0], free, accent],
           'circle-radius': ['interpolate', ['linear'], ['get', 'n'], 1, 8, 10, 13, 40, 18],
           'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#ffffff',
+          'circle-stroke-color': paper,
         },
       })
       m.addLayer({
@@ -146,7 +158,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         source: 'venues',
         filter: ['all', ['!', ['has', 'point_count']], ['>', ['get', 'n'], 1]],
         layout: { 'text-field': ['get', 'n'], 'text-size': 11, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'] },
-        paint: { 'text-color': '#ffffff' },
+        paint: { 'text-color': paper },
       })
       m.addLayer({
         id: 'venue-label',
@@ -162,7 +174,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
           'text-optional': true,
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
         },
-        paint: { 'text-color': '#1c1730', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+        paint: { 'text-color': ink, 'text-halo-color': paper, 'text-halo-width': 1.5 },
       })
 
       m.on('click', 'clusters', (e) => {
@@ -286,7 +298,7 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
         }
         userMarker.current?.remove()
         const el = document.createElement('div')
-        el.className = 'h-4 w-4 rounded-full border-[3px] border-white bg-[#2563eb] shadow-[0_0_0_6px_rgba(37,99,235,0.2)]'
+        el.className = 'h-4 w-4 rounded-full border-[3px] border-ink bg-accent-strong shadow-glow'
         el.setAttribute('aria-label', 'Ma position')
         userMarker.current = new mapboxgl.Marker({ element: el }).setLngLat(lngLat).addTo(map.current)
         map.current.flyTo({ center: lngLat, zoom: 14.5 })
@@ -308,58 +320,87 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
 
   if (mapError) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-paper-deep p-6 text-center">
-        <p className="font-display text-[2rem]">Carte indisponible</p>
-        <p className="max-w-sm text-[15px] text-text-secondary">{mapError}</p>
-        <Link href="/evenements" className="inline-flex h-11 items-center rounded-full bg-ink px-5 text-[15px] font-semibold text-paper">
-          Voir la liste des sorties
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface p-6 text-center">
+        <p className="t-title2 text-ink">Carte indisponible</p>
+        <p className="t-body max-w-sm text-text-secondary">{mapError}</p>
+        <Link href="/agenda" className="t-body inline-flex h-11 items-center rounded-full bg-ink px-5 font-semibold text-paper">
+          Voir l’agenda
         </Link>
       </div>
     )
   }
 
+  const chip = 't-small h-11 shrink-0 whitespace-nowrap rounded-full border px-4 font-semibold shadow-md backdrop-blur-md transition-colors'
+  const off = 'border-border-strong bg-paper/85 text-ink hover:border-ink'
+  const on = 'border-ink bg-ink text-paper'
+  const months = nextMonthKeys(13, now).slice(1)
+  const pickedMonth = /^\d{4}-\d{2}$/.test(state.when) ? state.when : ''
+  const pickedDay = /^\d{4}-\d{2}-\d{2}$/.test(state.when) ? state.when : ''
+
   return (
     <div className="relative h-full w-full">
       <div ref={container} className="absolute inset-0 h-full w-full" role="region" aria-label="Carte des sorties à Paris" />
 
-      {/* Filters */}
+      {/* Quand, et quoi : les mêmes choix que l'Agenda */}
       <div className="absolute inset-x-0 top-0 z-10 p-3">
-        <div className="rail scrollbar-hide mx-0 px-0">
+        <div className="rail scrollbar-hide mx-0 px-0 pb-1" role="group" aria-label="Quand ?">
           {WHEN.map((w) => (
             <button
               key={w.id}
               type="button"
               aria-pressed={state.when === w.id}
               onClick={() => setState((s) => ({ ...s, when: w.id }))}
-              className={cn('h-10 rounded-full px-4 text-[14px] font-semibold shadow-md', state.when === w.id ? 'bg-ink text-paper' : 'bg-surface text-ink')}
+              className={cn(chip, state.when === w.id ? on : off)}
             >
               {w.label}
             </button>
           ))}
+          <label className="relative shrink-0">
+            <span className="sr-only">Un mois</span>
+            <select
+              value={pickedMonth}
+              onChange={(e) => e.target.value && setState((s) => ({ ...s, when: e.target.value }))}
+              className={cn(chip, 'appearance-none pl-4 pr-9', pickedMonth ? on : off)}
+            >
+              <option value="">Un mois…</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {monthTitle(m, now)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4" aria-hidden />
+          </label>
+          <label className={cn(chip, 'relative flex items-center gap-2', pickedDay ? on : off)}>
+            <CalendarDays className="h-4 w-4" aria-hidden />
+            <span className="sr-only">Un jour précis</span>
+            <input
+              type="date"
+              value={pickedDay}
+              min={nowIso.slice(0, 10)}
+              onChange={(e) => e.target.value && setState((s) => ({ ...s, when: e.target.value }))}
+              className="t-small w-[8.5rem] bg-transparent font-semibold text-inherit [color-scheme:dark] focus:outline-none"
+            />
+          </label>
           <button
             type="button"
             aria-pressed={state.free}
             onClick={() => setState((s) => ({ ...s, free: !s.free }))}
-            className={cn('h-10 rounded-full px-4 text-[14px] font-semibold shadow-md', state.free ? 'bg-free text-paper' : 'bg-surface text-ink')}
+            className={cn(chip, state.free ? 'border-free bg-free text-paper' : off)}
           >
             Gratuit
           </button>
           {state.cat !== 'cinema' && (
-            <button
-              type="button"
-              aria-pressed={Boolean(state.noCinema)}
-              onClick={() => setState((s) => ({ ...s, noCinema: !s.noCinema }))}
-              className={cn('h-10 whitespace-nowrap rounded-full px-4 text-[14px] font-semibold shadow-md', state.noCinema ? 'bg-ink text-paper' : 'bg-surface text-ink')}
-            >
+            <button type="button" aria-pressed={Boolean(state.noCinema)} onClick={() => setState((s) => ({ ...s, noCinema: !s.noCinema }))} className={cn(chip, state.noCinema ? on : off)}>
               Sans cinéma
             </button>
           )}
-          <label className="relative">
+          <label className="relative shrink-0">
             <span className="sr-only">Catégorie</span>
             <select
               value={state.cat ?? ''}
               onChange={(e) => setState((s) => ({ ...s, cat: e.target.value || null }))}
-              className="h-10 appearance-none rounded-full bg-surface pl-4 pr-9 text-[14px] font-semibold text-ink shadow-md"
+              className={cn(chip, 'appearance-none pl-4 pr-9', state.cat ? on : off)}
             >
               <option value="">Tout type</option>
               {CATEGORIES.map((c) => (
@@ -368,23 +409,28 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-3 h-4 w-4" aria-hidden />
+            <ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4" aria-hidden />
           </label>
         </div>
+        {!isPreset(state.when) && (
+          <p className="t-small mt-1 inline-flex rounded-full bg-paper/85 px-3 py-1 font-semibold text-ink backdrop-blur-md">
+            {pickedDay ? new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${pickedDay}T12:00:00Z`)) : monthTitle(pickedMonth, now)}
+          </p>
+        )}
       </div>
 
       {/* Locate */}
       <button
         type="button"
         onClick={locate}
-        className="absolute right-3 top-28 z-10 flex h-11 items-center gap-2 rounded-full bg-surface px-4 text-[14px] font-semibold text-ink shadow-md md:top-24"
+        className="t-small absolute right-3 top-32 z-10 flex h-11 items-center gap-2 rounded-full border border-border-strong bg-paper/85 px-4 font-semibold text-ink shadow-md backdrop-blur-md md:top-28"
       >
         {geo.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <LocateFixed className="h-4 w-4 text-accent" aria-hidden />}
         Autour de moi
       </button>
 
       {(loading || dataError || geo.status === 'error') && (
-        <div className="absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-paper shadow-md" role="status">
+        <div className="t-small absolute left-1/2 top-44 z-10 -translate-x-1/2 rounded-full bg-ink px-4 py-2 font-semibold text-paper shadow-md md:top-40" role="status">
           {loading ? 'Chargement…' : dataError ? (
             <button type="button" onClick={() => loadData(state)} className="underline">
               Erreur de chargement, réessayer
@@ -399,15 +445,15 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
       <section
         aria-label={selected ? `Programme de ${selected.name}` : 'Lieux dans cette zone'}
         className={cn(
-          'absolute inset-x-0 bottom-0 z-20 flex max-h-[70%] flex-col rounded-t-2xl bg-paper shadow-[0_-8px_24px_-12px_rgba(28,23,48,0.35)] transition-[max-height] md:inset-y-3 md:left-3 md:right-auto md:max-h-none md:w-[380px] md:rounded-2xl',
+          'absolute inset-x-0 bottom-0 z-20 flex max-h-[70%] flex-col rounded-t-2xl border-t border-border-strong bg-paper shadow-xl transition-[max-height] md:inset-y-3 md:left-3 md:right-auto md:top-40 md:max-h-none md:w-[380px] md:rounded-2xl md:border',
           !panelOpen && !selected && 'max-h-[96px] md:max-h-none'
         )}
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           {selected ? (
             <div className="min-w-0">
-              <p className="truncate text-[17px] font-semibold text-ink">{selected.name}</p>
-              <p className="text-[13px] text-text-secondary">
+              <p className="t-title3 truncate text-ink">{selected.name}</p>
+              <p className="t-small text-text-secondary">
                 {selected.n} sortie{selected.n > 1 ? 's' : ''}
                 {selected.arr ? ` · ${selected.arr}` : ''} ·{' '}
                 <Link href={`/lieux/${selected.slug}`} className="font-semibold text-accent underline">
@@ -417,10 +463,10 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
             </div>
           ) : (
             <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setPanelOpen((o) => !o)} aria-expanded={panelOpen}>
-              <p className="text-[17px] font-semibold text-ink">
+              <p className="t-title3 text-ink">
                 {totalVisible.toLocaleString('fr-FR')} sortie{totalVisible > 1 ? 's' : ''} dans cette zone
               </p>
-              <p className="text-[13px] text-text-secondary">{visible.length} lieux · zoome pour affiner</p>
+              <p className="t-small text-text-secondary">{visible.length} lieux · zoome pour affiner</p>
             </button>
           )}
           {selected ? (
@@ -439,11 +485,11 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
             selectedEvents == null ? (
               <div className="space-y-3 py-4">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="skeleton h-[72px] rounded-md" />
+                  <div key={i} className="skeleton h-[76px] rounded-xl" />
                 ))}
               </div>
             ) : selectedEvents.length === 0 ? (
-              <p className="py-4 text-[15px] text-text-secondary">Pas de sortie pour ces filtres ici.</p>
+              <p className="t-body py-4 text-text-secondary">Pas de sortie pour ces filtres ici.</p>
             ) : (
               <div className="divide-y divide-border">
                 {selectedEvents.map((e) => (
@@ -452,18 +498,18 @@ export function EventMap({ initialView, initialState }: EventMapProps) {
               </div>
             )
           ) : visible.length === 0 ? (
-            <p className="py-4 text-[15px] text-text-secondary">{loading ? 'Chargement…' : 'Aucun lieu dans cette zone. Dézoome ou change de filtre.'}</p>
+            <p className="t-body py-4 text-text-secondary">{loading ? 'Chargement…' : 'Aucun lieu dans cette zone. Dézoome ou change de filtre.'}</p>
           ) : (
             <ul className="divide-y divide-border">
               {visible.slice(0, 60).map((v) => (
                 <li key={v.slug}>
-                  <button type="button" onClick={() => focusVenue(v)} className="flex w-full items-center gap-3 py-3 text-left">
-                    <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-paper', v.free > 0 ? 'bg-free' : 'bg-accent')}>
+                  <button type="button" onClick={() => focusVenue(v)} className="flex min-h-12 w-full items-center gap-3 py-3 text-left">
+                    <span className={cn('t-small flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold text-paper', v.free > 0 ? 'bg-free' : 'bg-accent')}>
                       {v.n}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-[15px] font-semibold text-ink">{v.name}</span>
-                      <span className="block truncate text-[13px] text-text-secondary">
+                      <span className="t-body block truncate font-semibold text-ink">{v.name}</span>
+                      <span className="t-small block truncate text-text-secondary">
                         {v.top}
                         {v.arr ? ` · ${v.arr}` : ''}
                       </span>

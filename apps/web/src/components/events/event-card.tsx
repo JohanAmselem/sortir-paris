@@ -1,282 +1,238 @@
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { MapPin, Sparkles } from 'lucide-react'
 import { EventImage } from '@/components/ui/event-image'
 import { SaveButton } from './save-button'
-import { SignatureBadge } from './signature-badge'
-import { formatPrice } from '@/lib/format'
-import { formatFilmTimes, formatWhen, isLongRun, urgencyBadge } from '@/lib/paris-time'
+import { cardPrice } from '@/lib/format'
+import { formatHour, premier } from '@/lib/agenda-view'
+import { formatFilmTimes, formatWhen, isLongRun, parisParts, urgencyBadge } from '@/lib/paris-time'
 import { cn } from '@/lib/utils'
 import type { CardEvent } from '@/lib/events/types'
 
 /**
- * Event cards. Information order follows how people decide:
- *   1. WHEN (relative, in Paris time)  2. WHAT  3. WHERE (venue + arr.)
- *   4. PRICE (free / paid / unknown)    5. WHY (reason badge, optional)
- * Server component: only the save button hydrates.
+ * LA carte de sortie du site, en 3 formats :
+ *   - `poster` : grande photo, texte sur un dégradé (Notre choix) ;
+ *   - `card`   : photo puis texte, pour les rails (avec `dateBox` : le pavé « 17 FÉVR. 27 ») ;
+ *   - `row`    : ligne de liste, vignette de 76 px (Agenda, fiches, carte).
+ * Ordre des informations : QUAND, QUOI, OÙ, PRIX, puis la raison. Composant
+ * serveur : seul le bouton « Garder » s'hydrate.
  */
-
-/** 'compact': a row on mobile, a poster from `sm` up (long listings). */
-type Variant = 'poster' | 'row' | 'feature' | 'tile' | 'compact'
+export type EventCardVariant = 'poster' | 'card' | 'row'
 
 interface EventCardProps {
   event: CardEvent
-  variant?: Variant
+  variant?: EventCardVariant
   className?: string
   priority?: boolean
-  /** Shown before the title in ranked lists ("1", "2"…). */
-  rank?: number
   now?: Date
   showSave?: boolean
+  /** Ligne : l'heure seule (le jour est dans l'en-tête de la liste). */
+  timeOnly?: boolean
+  /** Carte : pavé de date sur la photo (Les grosses dates). */
+  dateBox?: boolean
 }
 
-/** "11e" in Paris, the town name outside (Montreuil, Saint-Denis…). */
+/** « 11e » à Paris, le nom de la ville ailleurs (Montreuil, Saint-Denis…). */
 export function venueArea(venue: CardEvent['venue']): string | null {
   if (!venue) return null
   return venue.arrondissement ?? venue.city ?? null
 }
 
-/** "12 séances · 8 salles" for a film card. */
+/** « 12 séances · 8 salles » pour une carte de film. */
 export function filmCounts(film: NonNullable<CardEvent['film']>): string {
   const seances = `${film.seances} séance${film.seances > 1 ? 's' : ''}`
   return film.salles > 1 ? `${seances} · ${film.salles} salles` : seances
 }
 
-function Where({ event, className }: { event: CardEvent; className?: string }) {
-  if (event.film) {
-    return (
-      <p className={cn('flex min-w-0 items-center gap-1 text-[13px] text-text-secondary', className)}>
-        <span className="truncate">{event.film.salles > 1 ? filmCounts(event.film) : `${event.venue?.name ?? ''} · ${filmCounts(event.film)}`}</span>
-      </p>
-    )
-  }
-  if (!event.venue) return null
-  const area = venueArea(event.venue)
-  return (
-    <p className={cn('flex min-w-0 items-center gap-1 text-[13px] text-text-secondary', className)}>
-      <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="truncate">{event.venue.name}</span>
-      {event.venue.signature && <SignatureBadge compact />}
-      {area &&<span className="shrink-0 text-text-muted">· {area}</span>}
-    </p>
-  )
+export function eventHref(event: CardEvent): string {
+  return event.film ? `/films/${event.film.slug}` : `/evenements/${event.slug}`
 }
 
-function Price({ event, className }: { event: CardEvent; className?: string }) {
-  const { label, tone } = formatPrice(event)
-  if (tone === 'unknown') return null
+/** « L’Olympia · 9e » ou « 12 séances · 8 salles ». */
+export function whereLabel(event: CardEvent): string | null {
+  if (event.film) return event.film.salles > 1 ? filmCounts(event.film) : [event.venue?.name, filmCounts(event.film)].filter(Boolean).join(' · ')
+  if (!event.venue) return null
+  const area = venueArea(event.venue)
+  return area ? `${event.venue.name} · ${area}` : event.venue.name
+}
+
+function whenLabel(event: CardEvent, now: Date, timeOnly: boolean): string {
+  if (event.film) return formatFilmTimes(event.film.nextTimes, now) || formatWhen(event, now)
+  if (timeOnly && !isLongRun(event)) {
+    const start = new Date(event.startDate)
+    if (start <= now) return formatWhen(event, now)
+    return event.timeKnown ? formatHour(start) : 'Horaire à venir'
+  }
+  return premier(formatWhen(event, now)).replace(/(\d{1,2})h(\d{2})?\b/g, (_, h: string, m?: string) => (m ? `${h}\u00a0h\u00a0${m}` : `${h}\u00a0h`))
+}
+
+const MONTHS_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+
+/** Pavé de date : « 17 » et « févr. 27 » (l'année quand ce n'est pas l'année en cours). */
+export function DateBox({ date, now, className }: { date: Date; now: Date; className?: string }) {
+  const p = parisParts(date)
+  const year = p.year !== parisParts(now).year ? ` ${String(p.year).slice(2)}` : ''
   return (
-    <span className={cn('text-[13px] font-semibold', tone === 'free' ? 'text-free' : 'text-ink', className)}>
-      {label}
+    <span className={cn('flex min-w-14 flex-col items-center rounded-lg bg-paper/90 px-2.5 pb-1.5 pt-1 text-center text-ink backdrop-blur', className)}>
+      <span className="t-title1">{p.day}</span>
+      <span className="t-micro mt-0.5">
+        {MONTHS_SHORT[p.month - 1]}
+        {year}
+      </span>
     </span>
   )
 }
 
-function whenTone(event: CardEvent, now: Date) {
-  const label = (event.film && formatFilmTimes(event.film.nextTimes, now)) || formatWhen(event, now)
-  const hot = /^(Ce soir|En ce moment|Dernier jour|Plus que)/.test(label)
-  return { label, hot }
+function NewBadge({ onImage = false }: { onImage?: boolean }) {
+  return (
+    <span className={cn('t-micro inline-flex items-center gap-1 rounded-md px-2 py-1', onImage ? 'bg-neon text-paper' : 'bg-neon-soft text-neon')}>
+      <Sparkles className="h-3 w-3" aria-hidden />
+      Nouvelle date
+    </span>
+  )
 }
 
-export function EventCard({ event, variant = 'poster', className, priority, rank, now = new Date(), showSave = true }: EventCardProps) {
-  const href = event.film ? `/films/${event.film.slug}` : `/evenements/${event.slug}`
-  const when = whenTone(event, now)
-  const badge = urgencyBadge(event, now)
-
-  if (variant === 'row') {
-    return (
-      <article className={cn('group relative flex gap-3 py-3', className)}>
-        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md bg-paper-deep">
-          <EventImage src={event.imageUrl} alt="" sizes="72px" categorySlug={event.category?.slug} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={cn('text-[13px] font-semibold', when.hot ? 'text-accent' : 'text-text-secondary')}>{when.label}</p>
-          <h3 className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
-            <Link href={href} className="after:absolute after:inset-0 group-hover:underline group-hover:decoration-1 group-hover:underline-offset-2">
-              {event.title}
-            </Link>
-          </h3>
-          <div className="mt-1 flex items-center gap-2">
-            <Where event={event} className="min-w-0 flex-1" />
-            <Price event={event} className="shrink-0" />
-          </div>
-          {event.reason && <p className="mt-1 text-[12px] text-accent">{event.reason}</p>}
-        </div>
-      </article>
-    )
-  }
-
-  if (variant === 'feature') {
-    return (
-      <article className={cn('group relative overflow-hidden rounded-xl bg-night text-paper', className)}>
-        <div className="relative aspect-[5/4] sm:aspect-[16/10]">
-          <EventImage
-            src={event.imageUrl}
-            alt=""
-            sizes="(max-width: 640px) 100vw, 640px"
-            priority={priority}
-            categorySlug={event.category?.slug}
-            className="transition-transform duration-700 ease-[var(--ease-out-quart)] group-hover:scale-[1.03]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-night via-night/45 to-transparent" />
-          {showSave && (
-            <div className="absolute right-3 top-3 z-10">
-              <SaveButton eventId={event.id} />
-            </div>
-          )}
-          <div className="absolute inset-x-0 bottom-0 p-5">
-            {/* The rank sits on the same line as the time: it can never cover it. */}
-            <p className={cn('flex items-baseline gap-3 text-[14px] font-semibold', when.hot ? 'text-accent-glow' : 'text-paper/80')}>
-              {rank != null && (
-                <span className="font-display text-[2.6rem] leading-none text-paper" aria-label={`Numéro ${rank}`}>
-                  {rank}
-                </span>
-              )}
-              <span>{when.label}</span>
-            </p>
-            <h3 className="font-display mt-1.5 text-[2rem] leading-[0.95] text-paper sm:text-[2.4rem]">
-              <Link href={href} className="after:absolute after:inset-0">
-                {event.title}
-              </Link>
-            </h3>
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-paper/80">
-              {event.film ? (
-                <span>{filmCounts(event.film)}</span>
-              ) : (
-                event.venue && (
-                  <span>
-                    {event.venue.name}
-                    {venueArea(event.venue) ? ` · ${venueArea(event.venue)}` : ''}
-                  </span>
-                )
-              )}
-              {formatPrice(event).tone !== 'unknown' && (
-                <span className={cn('font-semibold', formatPrice(event).tone === 'free' ? 'text-[oklch(0.82_0.12_160)]' : 'text-paper')}>
-                  {formatPrice(event).label}
-                </span>
-              )}
-            </div>
-            {event.reason && <p className="mt-2 text-[13px] text-accent-glow">{event.reason}</p>}
-          </div>
-        </div>
-      </article>
-    )
-  }
-
-  if (variant === 'tile') {
-    // Tall poster tile for exhibitions / runs.
-    return (
-      <article className={cn('group relative w-[180px] sm:w-[200px]', className)}>
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-paper-deep">
-          <EventImage
-            src={event.imageUrl}
-            alt=""
-            sizes="200px"
-            categorySlug={event.category?.slug}
-            className="transition-transform duration-500 group-hover:scale-[1.04]"
-          />
-          {badge && (
-            <span className="absolute left-2 top-2 rounded bg-neon px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-paper">
-              {badge}
-            </span>
-          )}
-        </div>
-        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
-          <Link href={href} className="after:absolute after:inset-0">
-            {event.title}
-          </Link>
-        </h3>
-        <p className="mt-0.5 line-clamp-1 text-[13px] text-text-secondary">{event.film ? filmCounts(event.film) : event.venue?.name}</p>
-        <p className={cn('mt-0.5 text-[13px]', when.hot ? 'font-semibold text-neon' : 'text-text-muted')}>
-          {isLongRun(event) ? when.label.replace(/^En cours · /, '') : when.label}
-        </p>
-      </article>
-    )
-  }
-
-  if (variant === 'compact') {
-    // Mobile: dense row (about 5 per screen). From `sm`: the poster card.
-    return (
-      <article className={cn('group relative flex gap-3 py-3 sm:flex-col sm:gap-0 sm:py-0', className)}>
-        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md bg-paper-deep sm:aspect-[3/2] sm:h-auto sm:w-full sm:rounded-lg">
-          <EventImage
-            src={event.imageUrl}
-            alt=""
-            sizes="(max-width: 640px) 72px, (max-width: 1024px) 45vw, 300px"
-            priority={priority}
-            categorySlug={event.category?.slug}
-            className="transition-transform duration-500 ease-[var(--ease-out-quart)] sm:group-hover:scale-[1.04]"
-          />
-          <div className="absolute left-2 top-2 hidden gap-1.5 sm:flex">
-            {event.priceStatus === 'free' && (
-              <span className="rounded bg-free px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-paper">Gratuit</span>
-            )}
-            {badge && (
-              <span className="rounded bg-ink/80 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-paper">{badge}</span>
-            )}
-          </div>
-          {showSave && (
-            <div className="absolute right-2 top-2 z-10 hidden sm:block">
-              <SaveButton eventId={event.id} />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1 sm:mt-2.5">
-          <p className={cn('text-[13px] font-semibold', when.hot ? 'text-accent' : 'text-text-secondary')}>{when.label}</p>
-          <h3 className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug text-ink sm:min-h-[2lh] sm:text-[16px]">
-            <Link href={href} className="after:absolute after:inset-0 group-hover:underline group-hover:decoration-1 group-hover:underline-offset-2">
-              {event.title}
-            </Link>
-          </h3>
-          <div className="mt-1 flex items-center gap-2">
-            <Where event={event} className="min-w-0 flex-1" />
-            <Price event={event} className="shrink-0" />
-          </div>
-          {event.reason && <p className="mt-1 text-[12px] font-medium text-accent">{event.reason}</p>}
-        </div>
-      </article>
-    )
-  }
-
-  // Poster (default): image + compact info block.
+function PriceLine({ event, className }: { event: CardEvent; className?: string }) {
+  const price = cardPrice(event)
   return (
-    <article className={cn('group relative flex flex-col', className)}>
-      <div className="relative aspect-[3/2] overflow-hidden rounded-lg bg-paper-deep">
+    <span className={cn('t-small', price.tone === 'free' ? 'font-semibold text-free' : price.tone === 'paid' ? 'font-semibold text-ink' : 'text-text-muted', className)}>
+      {price.label}
+    </span>
+  )
+}
+
+export function EventCard({ event, variant = 'row', className, priority, now = new Date(), showSave = true, timeOnly = false, dateBox = false }: EventCardProps) {
+  const href = eventHref(event)
+  const when = whenLabel(event, now, timeOnly)
+  const where = whereLabel(event)
+  const hot = /^(Ce soir|En ce moment|Dernier jour|Plus que|Dans \d)/.test(when)
+  const badge = urgencyBadge(event, now)
+  const catSlug = event.category?.slug
+
+  if (variant === 'poster') {
+    const price = cardPrice(event)
+    return (
+      <article className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface', className)}>
         <EventImage
           src={event.imageUrl}
           alt=""
-          sizes="(max-width: 640px) 85vw, (max-width: 1024px) 45vw, 300px"
+          fallback="lg"
+          fallbackTop
+          sizes="(max-width: 640px) 80vw, (max-width: 1024px) 45vw, 380px"
           priority={priority}
-          categorySlug={event.category?.slug}
-          className="transition-transform duration-500 ease-[var(--ease-out-quart)] group-hover:scale-[1.04]"
+          categorySlug={catSlug}
+          className="transition-transform duration-700 ease-[var(--ease-out-quart)] group-hover:scale-[1.03]"
         />
-        <div className="absolute left-2 top-2 flex gap-1.5">
-          {event.priceStatus === 'free' && (
-            <span className="rounded bg-free px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-paper">Gratuit</span>
-          )}
-          {badge && (
-            <span className="rounded bg-ink/80 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-paper">{badge}</span>
-          )}
-        </div>
+        <div className="absolute inset-0 bg-linear-to-b from-transparent from-35% to-surface-dark/90" aria-hidden />
         {showSave && (
-          <div className="absolute right-2 top-2 z-10">
+          <div className="absolute right-3 top-3 z-10">
             <SaveButton eventId={event.id} />
           </div>
         )}
+        {event.isNew && (
+          <div className="absolute left-3 top-3 z-10">
+            <NewBadge onImage />
+          </div>
+        )}
+        <div className="absolute inset-x-4 bottom-4 text-ink">
+          <p className="t-micro text-ink-soft">
+            {when}
+            {event.category ? ` · ${event.category.name}` : ''}
+          </p>
+          <h3 className="t-title2 mt-1.5 line-clamp-3">
+            <Link href={href} className="after:absolute after:inset-0">
+              {event.title}
+            </Link>
+          </h3>
+          <p className="t-small mt-2 line-clamp-1 text-ink-soft">
+            {[where, price.tone === 'unknown' ? null : price.label].filter(Boolean).join(' · ')}
+          </p>
+          {event.reason && (
+            <p className="t-small mt-2.5 inline-flex rounded-full bg-ink/15 px-2.5 py-1 font-semibold text-ink backdrop-blur-md">{event.reason}</p>
+          )}
+        </div>
+      </article>
+    )
+  }
+
+  if (variant === 'card') {
+    return (
+      <article className={cn('group relative flex flex-col', className)}>
+        <div className="relative aspect-[3/2] overflow-hidden rounded-xl bg-surface">
+          <EventImage
+            src={event.imageUrl}
+            alt=""
+            title={event.title}
+            sizes="(max-width: 640px) 220px, 280px"
+            priority={priority}
+            categorySlug={catSlug}
+            className="transition-transform duration-500 ease-[var(--ease-out-quart)] group-hover:scale-[1.04]"
+          />
+          {dateBox && <DateBox date={new Date(event.startDate)} now={now} className="absolute left-2.5 top-2.5" />}
+          {!dateBox && (badge || event.isNew) && (
+            <span className="absolute left-2.5 top-2.5 z-10">
+              {event.isNew ? <NewBadge onImage /> : <span className="t-micro rounded-md bg-neon px-2 py-1 text-paper">{badge}</span>}
+            </span>
+          )}
+          {showSave && (
+            <div className="absolute right-2 top-2 z-10">
+              <SaveButton eventId={event.id} />
+            </div>
+          )}
+        </div>
+        <div className="mt-2.5 min-w-0">
+          {!dateBox && <p className={cn('t-small font-bold', hot ? 'text-neon' : 'text-accent')}>{when}</p>}
+          <h3 className="t-body mt-0.5 line-clamp-2 font-bold leading-snug text-ink">
+            <Link href={href} className="after:absolute after:inset-0 group-hover:underline group-hover:decoration-1 group-hover:underline-offset-2">
+              {event.title}
+            </Link>
+          </h3>
+          {where && (
+            <p className="t-small mt-0.5 flex min-w-0 items-center gap-1 text-text-muted">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="truncate">{where}</span>
+            </p>
+          )}
+          {dateBox ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {event.isNew && <NewBadge />}
+              <PriceLine event={event} />
+            </div>
+          ) : (
+            <PriceLine event={event} className="mt-0.5 block" />
+          )}
+        </div>
+      </article>
+    )
+  }
+
+  // Ligne de liste.
+  return (
+    <article className={cn('group relative grid grid-cols-[76px_1fr_auto] items-center gap-3 py-3', className)}>
+      <div className="relative h-[76px] w-[76px] overflow-hidden rounded-xl bg-surface">
+        <EventImage src={event.imageUrl} alt="" title={event.title} fallback="sm" sizes="76px" categorySlug={catSlug} />
       </div>
-      <div className="mt-2.5 min-w-0">
-        <p className={cn('text-[13px] font-semibold', when.hot ? 'text-accent' : 'text-text-secondary')}>{when.label}</p>
-        {/* Two lines reserved: cards of a row keep the same height. */}
-        <h3 className="mt-0.5 line-clamp-2 min-h-[2lh] text-[16px] font-semibold leading-snug text-ink">
+      <div className="min-w-0">
+        <p className={cn('t-small font-bold', hot ? 'text-neon' : 'text-accent')}>
+          {when}
+          {event.reason && <span className="font-semibold text-text-secondary"> · {event.reason}</span>}
+        </p>
+        <h3 className="t-body mt-0.5 line-clamp-2 font-bold leading-snug text-ink">
           <Link href={href} className="after:absolute after:inset-0 group-hover:underline group-hover:decoration-1 group-hover:underline-offset-2">
             {event.title}
           </Link>
         </h3>
-        <div className="mt-1 flex items-center gap-2">
-          <Where event={event} className="min-w-0 flex-1" />
-          {event.priceStatus !== 'free' && <Price event={event} className="shrink-0" />}
-        </div>
-        {event.reason && <p className="mt-1 text-[12px] font-medium text-accent">{event.reason}</p>}
+        <p className="t-small mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-text-muted">
+          {where && <span className="min-w-0 truncate">{where}</span>}
+          <PriceLine event={event} />
+          {event.distanceKm != null && <span>{event.distanceKm < 1 ? `${Math.round(event.distanceKm * 1000)} m` : `${event.distanceKm.toFixed(1).replace('.', ',')} km`}</span>}
+        </p>
+        {event.isNew && (
+          <p className="mt-1.5">
+            <NewBadge />
+          </p>
+        )}
       </div>
+      {showSave ? <SaveButton eventId={event.id} appearance="plain" /> : <span aria-hidden />}
     </article>
   )
 }

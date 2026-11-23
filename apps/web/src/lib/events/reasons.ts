@@ -25,8 +25,8 @@ export function pickReason(e: CardEvent, now: Date = new Date()): string | null 
   if (e.priceStatus === 'free') return 'Gratuit'
   const max = Math.max(e.priceMin, e.priceMax)
   if (e.priceStatus === 'paid' && max >= 300) {
-    if (max <= 1500) return 'Moins de 15 €'
-    if (max <= 2500) return 'Moins de 25 €'
+    if (max < 1500) return 'Moins de 15 €'
+    if (max < 2500) return 'Moins de 25 €'
   }
   if (e.isNew) return 'Nouveau'
   if (e.venue?.signature) return 'Lieu phare'

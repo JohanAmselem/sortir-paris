@@ -5,7 +5,7 @@
  * /api/v2/agenda (app 2.0).
  */
 import 'server-only'
-import { suggestArtists } from '@/app/club/_lib/artists'
+import { suggestArtists } from '@/lib/member/artists'
 import { getSuggestions } from '@/lib/events/suggest'
 import { getDayCounts, getMonthCounts } from '@/lib/events/calendar'
 import { parseEventParams } from '@/lib/events/params'

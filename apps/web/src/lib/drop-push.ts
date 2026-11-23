@@ -12,7 +12,7 @@
 import 'server-only'
 import { and, asc, eq, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import { alertSettings, db, pushSubscriptions } from '@sortir/db'
-import { getMemberDrop } from '@/app/club/_lib/drop'
+import { getMemberDrop } from '@/lib/member/drop'
 import { parisWeekStart } from '@/lib/paris-time'
 import { expoPushConfigured, sendPush } from './push-server'
 import type { PushPayload } from './alerts'

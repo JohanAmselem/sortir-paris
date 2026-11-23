@@ -165,18 +165,23 @@ input[type='search']::-webkit-search-decoration { -webkit-appearance: none; appe
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Horizontal rails: snap + edge bleed on mobile */
-.rail {
-  display: flex;
-  gap: 0.75rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding-inline: 1rem;
-  padding-inline: 1rem;
-  margin-inline: -1rem;
-  overscroll-behavior-x: contain;
+/*
+ * Horizontal rails: snap + edge bleed on mobile. In the components layer so
+ * utilities (md:grid, md:overflow-visible…) can turn a rail into a grid.
+ */
+@layer components {
+  .rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1rem;
+    padding-inline: 1rem;
+    margin-inline: -1rem;
+    overscroll-behavior-x: contain;
+  }
+  .rail > * { scroll-snap-align: start; flex-shrink: 0; }
 }
-.rail > * { scroll-snap-align: start; flex-shrink: 0; }
 
 .skeleton {
   background: linear-gradient(90deg, var(--color-surface-hover) 25%, var(--color-surface) 50%, var(--color-surface-hover) 75%);

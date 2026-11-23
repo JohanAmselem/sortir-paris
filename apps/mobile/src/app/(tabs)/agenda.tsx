@@ -11,6 +11,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, StyleShee
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
+import * as Haptics from 'expo-haptics'
 import { ChevronDown, LocateFixed, Search, X } from 'lucide-react-native'
 import { ARRONDISSEMENTS, CATEGORIES, formatLongDay, parisISODate, type AgendaResponse, type CardEvent } from '@/shared'
 import { api, errorMessage } from '@/lib/api'
@@ -143,12 +144,15 @@ export default function Agenda() {
   const first = list.data?.pages[0] as AgendaResponse | undefined
   const understood = first?.understood
 
+  // Date lue dans le texte (« Angèle en mars ») : le texte cherché est alors le reste.
+  const dateFromText = !f.when && !f.raw && understood?.when ? understood.when : null
+  const textQ = dateFromText ? (understood?.text ?? '') : f.q
   // Mois (toujours) et jours du mois choisi : mêmes filtres, sans la date.
-  const month = monthOf(f.when) ?? (understood?.when && /^\d{4}-\d{2}$/.test(understood.when) ? understood.when : null)
+  const month = monthOf(f.when) ?? monthOf(dateFromText)
   const counts = useQuery({
-    queryKey: ['agenda-counts', toParams({ ...f, when: null }), month],
+    queryKey: ['agenda-counts', toParams({ ...f, q: textQ, when: null }), month],
     queryFn: () => {
-      const sp = new URLSearchParams(toParams({ ...f, when: month }))
+      const sp = new URLSearchParams(toParams({ ...f, q: textQ, when: month }))
       sp.set('limit', '1')
       return api<AgendaResponse>(`/api/v2/agenda?${sp.toString()}`, { timeoutMs: 20_000 })
     },
@@ -168,7 +172,10 @@ export default function Agenda() {
 
   const setWhen = (when: string | null) => {
     track('agenda_when', { kind: when ? (when.length === 7 ? 'month' : 'day') : 'all' })
-    setF((x) => ({ ...x, when }))
+    Haptics.selectionAsync().catch(() => {})
+    // Une date choisie à la main remplace celle lue dans le texte.
+    if (dateFromText) setText(textQ)
+    setF((x) => ({ ...x, when, q: dateFromText ? textQ : x.q }))
   }
   const toggleNear = async () => {
     if (f.near) return setF((x) => ({ ...x, near: null }))
@@ -179,7 +186,7 @@ export default function Agenda() {
     else showToast(locateMessage(r.reason))
   }
   const active = f.cats.length + (f.price ? 1 : 0) + f.arr.length + (f.zone ? 1 : 0) + (f.near ? 1 : 0)
-  const fromText = !f.when && understood?.when && understood.whenLabel && !f.raw ? understood.whenLabel : null
+  const fromText = dateFromText && understood?.whenLabel ? understood.whenLabel : null
 
   const header = (
     <View>
@@ -279,12 +286,12 @@ export default function Agenda() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.months}>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: !f.when }} onPress={() => setWhen(null)} style={[styles.month, !f.when && styles.monthOn]}>
-            <Text style={[styles.monthLabel, !f.when && styles.monthLabelOn]}>Tout</Text>
-            <Text style={[styles.monthCount, !f.when && styles.monthLabelOn]}>à venir</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: !month && !f.when }} onPress={() => setWhen(null)} style={[styles.month, !month && !f.when && styles.monthOn]}>
+            <Text style={[styles.monthLabel, !month && !f.when && styles.monthLabelOn]}>Tout</Text>
+            <Text style={[styles.monthCount, !month && !f.when && styles.monthLabelOn]}>à venir</Text>
           </Pressable>
           {months.map((m) => {
-            const on = monthOf(f.when) === m.key
+            const on = month === m.key
             return (
               <Pressable
                 key={m.key}
@@ -301,7 +308,7 @@ export default function Agenda() {
           })}
         </ScrollView>
 
-        {monthOf(f.when) && days.length ? (
+        {month && days.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.days}>
             {days.map((d) => {
               const on = f.when === d.key

@@ -1,5 +1,5 @@
 /**
- * Rejoindre le Club : Apple (iPhone), Google, ou e-mail avec un code à 6 chiffres.
+ * Se connecter : Apple (iPhone), Google, ou e-mail avec un code à 6 chiffres.
  * Tout ce qui a été fait sans compte sur le téléphone est repris (lib/auth.tsx).
  */
 import { useState } from 'react'
@@ -49,12 +49,12 @@ export default function Connexion() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: colors.paper }}>
       <ScrollView contentContainerStyle={{ padding: GUTTER, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
-        <Image source={require('@/../assets/brand/wordmark.png')} style={styles.logo} contentFit="contain" accessibilityLabel="Paname Club" />
-        <T v="h1" style={{ marginTop: 20 }}>
-          Garde tes sorties, reçois les tiennes.
+        <Image source={require('@/../assets/brand/wordmark-light.png')} style={styles.logo} contentFit="contain" accessibilityLabel="Paname Club" />
+        <T v="title1" style={{ marginTop: 20 }}>
+          Retrouve tes sorties partout
         </T>
         <T v="small" style={{ marginTop: 8 }}>
-          {(raison && REASONS[raison]) || 'Tes sorties sur tous tes appareils, tes alertes concerts, ton Drop du lundi. Ce que tu as fait sans compte est repris.'}
+          {(raison && REASONS[raison]) || 'Tes sorties gardées sur tous tes appareils et tes alertes concerts. Ce que tu as gardé sans compte est repris.'}
         </T>
 
         {error ? <View style={{ marginTop: 16, marginHorizontal: -GUTTER }}><Notice text={error} tone="error" /></View> : null}

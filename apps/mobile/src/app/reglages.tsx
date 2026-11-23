@@ -14,7 +14,6 @@ import { enablePush, pushStatus, type PushStatus } from '@/lib/push'
 import { openWeb } from '@/lib/actions'
 import { errorMessage } from '@/lib/api'
 import { CONTACT_EMAIL } from '@/lib/config'
-import { clearHiddenReviews, useLocalState } from '@/lib/local-store'
 import { Button, Notice, T } from '@/components/ui'
 import { colors, fonts, GUTTER, radius } from '@/theme'
 
@@ -56,7 +55,6 @@ export default function Reglages() {
   const update = useUpdateAlerts()
   const [status, setStatus] = useState<PushStatus | null>(null)
   const [busy, setBusy] = useState(false)
-  const hiddenCount = useLocalState((st) => st.hiddenReviews.length + st.blockedAuthors.length)
 
   useEffect(() => {
     pushStatus().then(setStatus)
@@ -78,7 +76,7 @@ export default function Reglages() {
   const confirmDelete = () => {
     Alert.alert(
       'Supprimer ton compte ?',
-      'Ton compte et toutes tes données (sorties gardées, suivis, alertes, Club, avis) seront supprimés définitivement. Ce n’est pas réversible.',
+      'Ton compte et toutes tes données (sorties gardées, suivis, alertes) seront supprimés définitivement. Ce n’est pas réversible.',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -163,12 +161,6 @@ export default function Reglages() {
         <LinkRow label="Politique de confidentialité" onPress={() => openWeb('https://www.panameclub.fr/confidentialite')} />
         <LinkRow label="Mentions légales" onPress={() => openWeb('https://www.panameclub.fr/mentions-legales')} />
         <LinkRow label="Nous écrire" onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)} />
-        {hiddenCount > 0 ? (
-          <LinkRow
-            label={`Réafficher les avis masqués (${hiddenCount})`}
-            onPress={() => Alert.alert('Réafficher les avis masqués ?', 'Les avis et les membres que tu as masqués réapparaîtront.', [{ text: 'Annuler', style: 'cancel' }, { text: 'Réafficher', onPress: clearHiddenReviews }])}
-          />
-        ) : null}
         {!auth.session ? <LinkRow label="Supprimer un compte" onPress={() => openWeb('https://www.panameclub.fr/suppression-compte')} /> : null}
       </Group>
 

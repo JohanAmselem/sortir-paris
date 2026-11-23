@@ -27,6 +27,16 @@ const ENVIES: Array<Omit<EnvieTile, 'imageUrl'> & { query: EventQuery }> = [
 const BIG_DATES_MONTHS = 6
 const BIG_DATES_CATEGORIES = ['concerts', 'spectacles', 'festivals']
 
+/** One photo per tile, never the same photo on two tiles. */
+export function pickEnvieImages(lists: Array<Array<{ imageUrl: string | null }>>): Array<string | null> {
+  const used = new Set<string>()
+  return lists.map((list) => {
+    const hit = list.find((e) => e.imageUrl && !used.has(e.imageUrl))?.imageUrl ?? null
+    if (hit) used.add(hit)
+    return hit
+  })
+}
+
 export async function getHomeV2(when: HomeWhen, near: { lat: number; lng: number } | null = null): Promise<HomeV2Response> {
   const now = bucketNow()
   const base: EventQuery = { withImage: true, oneOffOnly: true, excludeCategories: ['cinema'] }
@@ -40,7 +50,7 @@ export async function getHomeV2(when: HomeWhen, near: { lat: number; lng: number
     safeQueryEvents({ when, oneOffOnly: true, limit: 1 }),
     safeQueryEvents({ ...base, when: 'weekend', limit: 30 }),
     safeQueryEvents({ categories: ['expos'], when: 'month', runsEndingWithinDays: 400, withImage: true, limit: 12 }),
-    Promise.all(ENVIES.map((e) => safeQueryEvents({ ...e.query, withImage: true, when: 'week', limit: 1 }))),
+    Promise.all(ENVIES.map((e) => safeQueryEvents({ ...e.query, withImage: true, when: 'week', limit: 6 }))),
     Promise.all(bigMonths.map((m) => safeQueryEvents({ ...bigBase, when: m }))),
   ])
 
@@ -58,11 +68,11 @@ export async function getHomeV2(when: HomeWhen, near: { lat: number; lng: number
     whenLabel: getWindow(when, now).label,
     count: countPage.total,
     picks,
-    envies: ENVIES.map((e, i) => ({
-      slug: e.slug,
-      label: e.label,
-      params: buildEventParams(e.query).toString(),
-      imageUrl: envies[i]?.events[0]?.imageUrl ?? null,
+    envies: pickEnvieImages(envies.map((p) => p.events)).map((imageUrl, i) => ({
+      slug: ENVIES[i].slug,
+      label: ENVIES[i].label,
+      params: buildEventParams(ENVIES[i].query).toString(),
+      imageUrl,
     })),
     weekend,
     bigDates,

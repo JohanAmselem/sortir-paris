@@ -77,7 +77,8 @@ export function parisNightDay(date: Date): { year: number; month: number; day: n
 export type WindowKey = 'now' | 'next3h' | 'tonight' | 'today' | 'tomorrow' | 'weekend' | 'week' | 'month'
 
 export interface TimeWindow {
-  key: WindowKey | 'date'
+  /** 'date' = one Paris day, 'calendar-month' = YYYY-MM, 'range' = from..to (inclusive days). */
+  key: WindowKey | 'date' | 'calendar-month' | 'range'
   start: Date
   end: Date
   /** Include long runs (exhibitions…) that are ongoing during the window. */
@@ -90,7 +91,24 @@ function dayAt(base: { year: number; month: number; day: number }, addDays: numb
   return parisDate(base.year, base.month, base.day + addDays, hour, minute)
 }
 
+/** Windows that end with the night: asked at 03:30, they would be almost empty. */
+const ROLLING_KEYS: WindowKey[] = ['tonight', 'today', 'weekend']
+
+/**
+ * The window for a key, in Paris time. When "ce soir", "aujourd'hui" or "ce
+ * week-end" has less than an hour left (asked at 03:30, or on Monday at 03:00),
+ * it is the next one that people mean.
+ */
 export function getWindow(key: WindowKey, now: Date = new Date()): TimeWindow {
+  const w = rawWindow(key, now)
+  if (ROLLING_KEYS.includes(key) && w.end.getTime() - now.getTime() < 3600_000) {
+    const next = rawWindow(key, new Date(w.end.getTime() + 60_000))
+    return { ...next, start: next.start < now ? now : next.start }
+  }
+  return w
+}
+
+function rawWindow(key: WindowKey, now: Date): TimeWindow {
   const today = parisNightDay(now)
   const max = (a: Date, b: Date) => (a > b ? a : b)
 
@@ -180,8 +198,96 @@ export function getDateWindow(iso: string, now: Date = new Date()): TimeWindow |
     start: start < now ? now : start,
     end,
     includeOngoing: true,
-    label: formatDayLabel(start),
+    label: formatDayLabel(start, now),
   }
+}
+
+const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+const MONTHS_FR_SHORT = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.']
+
+/** Furthest month a calendar window may target (the scrapers keep 18 months). */
+const MAX_MONTHS_AHEAD = 24
+
+/**
+ * Window for a Paris calendar month "YYYY-MM": from the 1st at 04:00 (night
+ * boundary) to the 1st of the next month at 04:00, never before now.
+ * Long runs ongoing during the month are included (the agenda shows them apart).
+ */
+export function getMonthWindow(ym: string, now: Date = new Date()): TimeWindow | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(ym)
+  if (!m) return null
+  const [y, mo] = [Number(m[1]), Number(m[2])]
+  if (mo < 1 || mo > 12) return null
+  const today = parisParts(now)
+  const ahead = (y - today.year) * 12 + (mo - today.month)
+  if (ahead < 0 || ahead > MAX_MONTHS_AHEAD) return null
+  const start = parisDate(y, mo, 1, NIGHT_END_HOUR)
+  const end = parisDate(y, mo + 1, 1, NIGHT_END_HOUR)
+  return {
+    key: 'calendar-month',
+    start: start < now ? now : start,
+    end,
+    includeOngoing: true,
+    label: formatMonthLong(ym, now),
+  }
+}
+
+/** Window for "YYYY-MM-DD..YYYY-MM-DD" (both days included, Paris nights). */
+export function getRangeWindow(from: string, to: string, now: Date = new Date()): TimeWindow | null {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(from)
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(to)
+  if (!a || !b) return null
+  const start = parisDate(Number(a[1]), Number(a[2]), Number(a[3]), 6)
+  const end = parisDate(Number(b[1]), Number(b[2]), Number(b[3]) + 1, NIGHT_END_HOUR)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end < now) return null
+  if (end.getTime() - start.getTime() > 400 * 86400_000) return null
+  return {
+    key: 'range',
+    start: start < now ? now : start,
+    end,
+    includeOngoing: true,
+    label: `Du ${formatShortDay(start, now)} au ${formatShortDay(new Date(end.getTime() - 6 * 3600_000), now)}`,
+  }
+}
+
+/** "2027-03" in Paris time, night boundary included (a 01:00 concert on 1 April is still March). */
+export function parisMonthKey(date: Date): string {
+  const d = parisNightDay(date)
+  return `${d.year}-${String(d.month).padStart(2, '0')}`
+}
+
+/** "mars 2027", or "mars" during the current year. */
+export function formatMonthLong(ym: string, now: Date = new Date()): string {
+  const [y, mo] = ym.split('-').map(Number)
+  const name = MONTHS_FR[mo - 1] ?? ym
+  return y === parisParts(now).year ? name : `${name} ${y}`
+}
+
+/** "Mars", "Janv. 27" (two-digit year when not the current year): month chips. */
+export function formatMonthChip(ym: string, now: Date = new Date()): string {
+  const [y, mo] = ym.split('-').map(Number)
+  const name = MONTHS_FR_SHORT[mo - 1] ?? ym
+  return y === parisParts(now).year ? name : `${name} ${String(y).slice(2)}`
+}
+
+/** The next `count` month keys, starting with the current Paris month. */
+export function nextMonthKeys(count: number, now: Date = new Date()): string[] {
+  const p = parisNightDay(now)
+  const out: string[] = []
+  for (let i = 0; i < count; i++) {
+    const y = p.year + Math.floor((p.month - 1 + i) / 12)
+    const mo = ((p.month - 1 + i) % 12) + 1
+    out.push(`${y}-${String(mo).padStart(2, '0')}`)
+  }
+  return out
+}
+
+/** "dans 3 jours", "dans 101 jours", "dans 5 mois" (null for today and tomorrow). */
+export function formatCountdown(start: Date, now: Date = new Date()): string | null {
+  const diff = dayDiff(now, start)
+  if (diff <= 1) return null
+  if (diff <= 120) return `dans ${diff} jours`
+  return `dans ${Math.round(diff / 30.4)} mois`
 }
 
 export const WINDOW_KEYS: WindowKey[] = ['now', 'next3h', 'tonight', 'today', 'tomorrow', 'weekend', 'week', 'month']
@@ -203,6 +309,9 @@ export function resolveWindow(value: string | null | undefined, now: Date = new 
   }
   const key = (WINDOW_KEYS as string[]).includes(v) ? (v as WindowKey) : alias[v]
   if (key) return getWindow(key, now)
+  if (/^\d{4}-\d{2}$/.test(v)) return getMonthWindow(v, now)
+  const range = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(v)
+  if (range) return getRangeWindow(range[1], range[2], now)
   return getDateWindow(v, now)
 }
 
@@ -269,9 +378,12 @@ function dayDiff(from: Date, to: Date): number {
   return Math.round((Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) / 86400_000)
 }
 
-/** "lun. 12 oct." */
-export function formatDayLabel(date: Date): string {
-  return fmtWeekdayDay.format(date).replace(/\.$/, '.')
+const sameYear = (date: Date, now: Date) => parisParts(date).year === parisParts(now).year
+
+/** "lun. 12 oct.", "sam. 20 nov. 2027" (year when not the current one). */
+export function formatDayLabel(date: Date, now: Date = new Date()): string {
+  const label = fmtWeekdayDay.format(date)
+  return sameYear(date, now) ? label : `${label} ${parisParts(date).year}`
 }
 
 /** "lundi 12 octobre" (+ year when not the current year) */
@@ -279,9 +391,10 @@ export function formatLongDay(date: Date, now: Date = new Date()): string {
   return parisParts(date).year === parisParts(now).year ? fmtLong.format(date) : fmtLongYear.format(date)
 }
 
-/** "12 nov." */
-export function formatShortDay(date: Date): string {
-  return fmtDayMonth.format(date)
+/** "12 nov.", "14 févr. 2027" (year when not the current one). */
+export function formatShortDay(date: Date, now: Date = new Date()): string {
+  const label = fmtDayMonth.format(date)
+  return sameYear(date, now) ? label : `${label} ${parisParts(date).year}`
 }
 
 /**
@@ -300,10 +413,10 @@ export function formatWhen(e: EventTiming, now: Date = new Date()): string {
       const left = dayDiff(now, end)
       if (left <= 0) return "Dernier jour aujourd'hui"
       if (left === 1) return 'Dernier jour demain'
-      if (left <= 7) return `Plus que ${left} jours · jusqu'au ${formatShortDay(end)}`
-      return `En cours · jusqu'au ${formatShortDay(end)}`
+      if (left <= 7) return `Plus que ${left} jours · jusqu'au ${formatShortDay(end, now)}`
+      return `En cours · jusqu'au ${formatShortDay(end, now)}`
     }
-    return `Du ${formatShortDay(start)} au ${formatShortDay(end)}`
+    return `Du ${formatShortDay(start, now)} au ${formatShortDay(end, now)}`
   }
 
   const time = timeKnown ? ` · ${formatTime(start)}` : ''
@@ -325,7 +438,7 @@ export function formatWhen(e: EventTiming, now: Date = new Date()): string {
     const wd = fmt({ weekday: 'long' }).format(start)
     return `${wd.charAt(0).toUpperCase()}${wd.slice(1)}${time}`
   }
-  const label = formatDayLabel(start)
+  const label = formatDayLabel(start, now)
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}${time}`
 }
 

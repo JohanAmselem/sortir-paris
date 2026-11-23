@@ -6,6 +6,7 @@
  */
 import { CATEGORY_BY_SLUG, INTENT_BY_SLUG, TOPIC_RULES, normalizeArrondissement } from './taxonomy'
 import { extractSearchFilters } from './search-synonyms'
+import { whenFromText } from '../search/when-text'
 import type { EventQuery, SortKey } from './types'
 
 type Params = Record<string, string | string[] | undefined> | URLSearchParams
@@ -20,8 +21,15 @@ const csv = (v: string | undefined) => (v ? v.split(',').map((s) => s.trim()).fi
 
 const SORTS: SortKey[] = ['relevance', 'soon', 'popular', 'distance', 'ending']
 
-export function parseEventParams(p: Params): EventQuery {
-  const when = get(p, 'when') ?? get(p, 'date') ?? null
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
+export function parseEventParams(p: Params, now: Date = new Date()): EventQuery {
+  const from = get(p, 'from')
+  const to = get(p, 'to')
+  let when = get(p, 'when') ?? get(p, 'date') ?? null
+  if (!when && from && DAY.test(from)) when = to && DAY.test(to) ? `${from}..${to}` : from
+  const zoneParam = get(p, 'zone')
+  const zone = zoneParam === 'paris' || zoneParam === 'banlieue' ? zoneParam : null
   const categories = [...csv(get(p, 'cat')), ...csv(get(p, 'category'))].filter((c) => c in CATEGORY_BY_SLUG)
   const arrondissements = csv(get(p, 'arr'))
     .map((a) => normalizeArrondissement(a))
@@ -38,6 +46,14 @@ export function parseEventParams(p: Params): EventQuery {
   let q = get(p, 'q')?.trim().slice(0, 120) || null
   const topics = csv(get(p, 'topic')).filter((t) => t in TOPIC_RULES)
   let free = get(p, 'free') === '1' || get(p, 'free') === 'true'
+  // "jazz samedi", "Angèle en mars" → a date window (unless one is already chosen).
+  if (q && get(p, 'raw') !== '1' && !when) {
+    const found = whenFromText(q, now)
+    if (found.when) {
+      when = found.when
+      q = found.rest
+    }
+  }
   // "expo gratuite", "stand up", "enfants" → filters (unless the exact text is asked for).
   if (q && get(p, 'raw') !== '1') {
     const found = extractSearchFilters(q)
@@ -59,8 +75,10 @@ export function parseEventParams(p: Params): EventQuery {
     free,
     maxPrice: Number.isFinite(max) && max > 0 ? Math.min(max, 500) : null,
     near,
+    zone,
     q,
     sort: sort && SORTS.includes(sort) ? sort : undefined,
+    cursor: get(p, 'cursor')?.slice(0, 120) || null,
     runsEndingWithinDays: Number(get(p, 'runs')) > 0 ? Math.min(Number(get(p, 'runs')), 400) : null,
   }
 }
@@ -74,6 +92,7 @@ export function buildEventParams(q: EventQuery): URLSearchParams {
   if (q.topics?.length) s.set('topic', q.topics.join(','))
   if (q.excludeCategories?.length) s.set('xcat', q.excludeCategories.join(','))
   if (q.free) s.set('free', '1')
+  if (q.zone) s.set('zone', q.zone)
   if (q.maxPrice != null && !q.free) s.set('max', String(q.maxPrice))
   if (q.q) s.set('q', q.q)
   if (q.near) {
@@ -100,6 +119,7 @@ export function countFilters(q: EventQuery): number {
     (q.topics?.length ?? 0) +
     Number(Boolean(q.free)) +
     Number(q.maxPrice != null) +
-    Number(Boolean(q.near))
+    Number(Boolean(q.near)) +
+    Number(Boolean(q.zone))
   )
 }

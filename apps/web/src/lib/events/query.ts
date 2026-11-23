@@ -12,6 +12,7 @@ import { INTENT_RULES, OUTING_CATEGORIES, RECURRING_CLASS_CATEGORIES, TOPIC_RULE
 import { ACCENTS_FROM, ACCENTS_TO, filmSlug, foldText } from './fold'
 import { workLikePattern } from './works-utils'
 import { SIGNATURE_VENUE_REGEX, isSignatureVenue } from '@/lib/venues-signature'
+import { hdImageUrl } from '@/lib/images'
 
 export { foldText }
 import type { CardEvent, EventPage, EventQuery } from './types'
@@ -213,7 +214,7 @@ const cardColumns = {
 
 type CardRow = {
   [K in keyof typeof cardColumns]: unknown
-} & { distanceKm?: unknown; filmN?: unknown; filmM?: unknown; filmTimes?: unknown; filmImage?: unknown }
+} & { distanceKm?: unknown; filmN?: unknown; filmM?: unknown; filmTimes?: unknown; filmImage?: unknown; isNew?: unknown }
 
 export function toCard(r: CardRow): CardEvent {
   const iso = (d: unknown) => (d instanceof Date ? d.toISOString() : d ? String(d) : null)
@@ -222,7 +223,7 @@ export function toCard(r: CardRow): CardEvent {
     slug: String(r.slug),
     title: String(r.title),
     shortDesc: (r.shortDesc as string) ?? null,
-    imageUrl: (r.imageUrl as string) ?? (r.filmImage as string) ?? null,
+    imageUrl: hdImageUrl((r.imageUrl as string) ?? (r.filmImage as string) ?? null),
     startDate: iso(r.startDate)!,
     endDate: iso(r.endDate),
     timeKnown: r.timeKnown !== false,
@@ -248,6 +249,7 @@ export function toCard(r: CardRow): CardEvent {
         }
       : null,
     distanceKm: r.distanceKm == null ? null : Math.round(Number(r.distanceKm) * 10) / 10,
+    ...(r.isNew === true ? { isNew: true } : {}),
     film:
       r.filmN != null && Number(r.filmN) > 1
         ? {
@@ -302,6 +304,9 @@ export function buildConditions(
     conds.push(sql`${events.endDate} <= ${ts(new Date(now.getTime() + query.runsEndingWithinDays * 86400_000))}`)
   }
   if (query.oneOffOnly) conds.push(sql`not ${isLongRunSql}`)
+  if (query.runsOnly) conds.push(isLongRunSql)
+  if (query.zone === 'paris') conds.push(inParisSql)
+  if (query.zone === 'banlieue') conds.push(sql`(${venues.id} is not null and not ${inParisSql})`)
   if (query.withImage) conds.push(sql`${events.imageUrl} is not null`)
   if (query.venueSlug) conds.push(eq(venues.slug, query.venueSlug))
   if (query.signatureOnly) conds.push(signatureVenueSql(signatureIds))
@@ -340,6 +345,27 @@ export function buildConditions(
 /** Server-side limit for listing queries (Postgres cancels them itself). */
 export const STATEMENT_TIMEOUT_MS = 6000
 
+const NEW_EVENT_MS = 7 * 86400_000
+
+/**
+ * Keyset cursor for sort 'soon': "<0|1>.<start ISO>.<id>" (0 = starts in the
+ * window, 1 = already running). Unlike offsets it has no page limit: the agenda
+ * scrolls to 2028.
+ */
+export function encodeCursor(row: { startDate: string; id: string }, windowStart: Date): string {
+  const ongoing = new Date(row.startDate) < windowStart ? 1 : 0
+  return `${ongoing}.${row.startDate}.${row.id}`
+}
+
+export function decodeCursor(cursor: string | null | undefined): { ongoing: 0 | 1; start: Date; id: string } | null {
+  if (!cursor) return null
+  const m = /^([01])\.(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\.([0-9a-f-]{36})$/i.exec(cursor)
+  if (!m) return null
+  const start = new Date(m[2])
+  if (Number.isNaN(start.getTime())) return null
+  return { ongoing: m[1] === '1' ? 1 : 0, start, id: m[3].toLowerCase() }
+}
+
 async function runQuery(query: EventQuery): Promise<EventPage> {
   const nowMs = bucketNow().getTime()
   const now = new Date(nowMs)
@@ -350,10 +376,13 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
   const { where, window } = buildConditions(query, now, signatureIds)
 
   const order: SQL[] = []
+  const windowStart = window?.start ?? now
+  const ongoingFlag = sql`(case when ${events.startDate} < ${ts(windowStart)} then 1 else 0 end)`
+  const cursor = sort === 'soon' ? decodeCursor(query.cursor) : null
   switch (sort) {
     case 'soon':
       // Ongoing runs after the one-offs starting soon.
-      order.push(sql`case when ${events.startDate} < ${ts(window?.start ?? now)} then 1 else 0 end`, asc(events.startDate))
+      order.push(asc(ongoingFlag), asc(events.startDate))
       break
     case 'popular':
       order.push(desc(sql`${events.saveCount} * 3 + ${events.viewCount}`))
@@ -396,7 +425,11 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
           .as('films')
       : null
 
-    const filmWhere = films ? and(where, sql`(${categories.slug} is distinct from 'cinema' or ${films.best} is not null)`)! : where
+    const filmWhere0 = films ? and(where, sql`(${categories.slug} is distinct from 'cinema' or ${films.best} is not null)`)! : where
+    // The cursor only narrows the outer rows: a film keeps its first séance as its place.
+    const filmWhere = cursor
+      ? and(filmWhere0, sql`(${ongoingFlag}, ${events.startDate}, ${events.id}) > (${cursor.ongoing}, ${ts(cursor.start)}, ${cursor.id}::uuid)`)!
+      : filmWhere0
     const base = tx
       .select({
         ...cardColumns,
@@ -405,6 +438,7 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
         filmM: films ? films.m : sql`null`,
         filmTimes: films ? films.times : sql`null`,
         filmImage: films ? films.image : sql`null`,
+        isNew: sql<boolean>`(${events.createdAt} > ${ts(new Date(nowMs - NEW_EVENT_MS))})`,
       })
       .from(events)
       .leftJoin(venues, eq(events.venueId, venues.id))
@@ -421,7 +455,7 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
     let total = offset + page.length + (hasMore ? 1 : 0)
     // The exact total is only shown with the first page ("1 234 sorties").
     // Films count once each, like the cards.
-    if (offset === 0 && hasMore) {
+    if (offset === 0 && !cursor && hasMore) {
       const [c] = await tx
         .select({
           n: groupFilms
@@ -434,7 +468,10 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
         .where(where)
       total = Number(c?.n ?? total)
     }
-    return { events: page.map(toCard), total, hasMore }
+    const cards = page.map(toCard)
+    const last = cards.at(-1)
+    const nextCursor = sort === 'soon' && hasMore && last ? encodeCursor(last, windowStart) : null
+    return { events: cards, total, hasMore, nextCursor }
   })
 }
 
@@ -460,7 +497,7 @@ export function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'query'):
 // Keyed by the query only: entries are refreshed in the background every 5 min and
 // the previous result keeps being served while (or if) the refresh fails.
 // 15 min: the catalogue changes twice a day (scrapes); each refresh is a database query.
-const cachedQuery = unstable_cache(runQuery, ['events-query-v3'], { revalidate: 900, tags: ['events'] })
+const cachedQuery = unstable_cache(runQuery, ['events-query-v5'], { revalidate: 900, tags: ['events'] })
 
 /** Cached, time-bucketed event query. Geolocated queries are rounded to ~100 m for cache hits. */
 export function queryEvents(query: EventQuery): Promise<EventPage> {

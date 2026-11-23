@@ -36,8 +36,10 @@ export interface CardEvent {
   film?: { slug: string; seances: number; salles: number; nextTimes: string[] } | null
   /** Distance in km when the query was geolocated. */
   distanceKm?: number | null
-  /** Why this event is shown (recommendations, AI search). */
+  /** Why this event is shown (recommendations, picks). */
   reason?: string | null
+  /** Added to the catalogue within the last 7 days ("Nouvelle date"). */
+  isNew?: boolean
 }
 
 export type SortKey = 'relevance' | 'soon' | 'popular' | 'distance' | 'ending' | 'random'
@@ -61,6 +63,8 @@ export interface EventQuery {
   /** One card per film for cinema séances (default true). */
   groupFilms?: boolean
   near?: { lat: number; lng: number; radiusKm?: number } | null
+  /** 'paris' = Paris intra-muros only, 'banlieue' = outside Paris only. Default: both. */
+  zone?: 'paris' | 'banlieue' | null
   q?: string | null
   venueSlug?: string | null
   excludeIds?: string[]
@@ -70,6 +74,8 @@ export interface EventQuery {
   runsEndingWithinDays?: number | null
   /** Only one-off events (no exhibitions / long runs). */
   oneOffOnly?: boolean
+  /** Only long runs (exhibitions, seasons) — the agenda shows them apart. */
+  runsOnly?: boolean
   /** Only events at a "lieu phare" (lib/venues-signature.ts). */
   signatureOnly?: boolean
   /** Only events with an image (homepage blocks). */
@@ -77,10 +83,14 @@ export interface EventQuery {
   sort?: SortKey
   limit?: number
   offset?: number
+  /** Keyset cursor (sort 'soon' only): no page limit, unlike offset. */
+  cursor?: string | null
 }
 
 export interface EventPage {
   events: CardEvent[]
   total: number
   hasMore: boolean
+  /** Next page for sort 'soon' (pass back as `cursor`), null at the end. */
+  nextCursor?: string | null
 }

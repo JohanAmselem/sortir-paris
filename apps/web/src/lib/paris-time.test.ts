@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatCountdown,
   formatFullWhen,
+  formatMonthChip,
+  formatShortDay,
+  nextMonthKeys,
+  parisMonthKey,
   formatTime,
   formatWhen,
   getDateWindow,
@@ -178,5 +183,65 @@ describe('next3h window', () => {
     expect(overlapsWindow(concert, w, WED_AFTERNOON)).toBe(true)
     expect(overlapsWindow(expo, w, WED_AFTERNOON)).toBe(false)
     expect(overlapsWindow(later, w, WED_AFTERNOON)).toBe(false)
+  })
+})
+
+describe('agenda : mois, plages, année', () => {
+  // Lundi 23 novembre 2026, 21 h à Paris.
+  const NOW = new Date('2026-11-23T20:00:00Z')
+
+  it('fenêtre de mois calendaire, jamais avant maintenant', () => {
+    const w = resolveWindow('2027-03', NOW)!
+    expect(w.key).toBe('calendar-month')
+    expect(w.start.toISOString()).toBe('2027-03-01T03:00:00.000Z')
+    expect(w.end.toISOString()).toBe('2027-04-01T02:00:00.000Z')
+    expect(w.label).toBe('mars 2027')
+    const cur = resolveWindow('2026-11', NOW)!
+    expect(cur.start).toEqual(NOW)
+    expect(resolveWindow('2026-10', NOW)).toBeNull()
+    expect(resolveWindow('2030-01', NOW)).toBeNull()
+  })
+
+  it('plage de jours inclusive', () => {
+    const w = resolveWindow('2026-12-24..2026-12-25', NOW)!
+    expect(w.key).toBe('range')
+    expect(w.start.toISOString()).toBe('2026-12-24T05:00:00.000Z')
+    expect(w.end.toISOString()).toBe('2026-12-26T03:00:00.000Z')
+    expect(resolveWindow('2026-12-25..2026-12-24', NOW)).toBeNull()
+  })
+
+  it("affiche l'année quand ce n'est pas l'année en cours", () => {
+    expect(formatShortDay(new Date('2026-12-05T19:00:00Z'), NOW)).toBe('5 déc.')
+    expect(formatShortDay(new Date('2027-02-14T19:00:00Z'), NOW)).toBe('14 févr. 2027')
+    expect(formatWhen({ startDate: '2027-11-20T19:00:00Z' }, NOW)).toBe('Sam. 20 nov. 2027 · 20h')
+    expect(formatWhen({ startDate: '2026-12-05T19:00:00Z' }, NOW)).toBe('Sam. 5 déc. · 20h')
+  })
+
+  it('mois et compte à rebours', () => {
+    expect(nextMonthKeys(3, NOW)).toEqual(['2026-11', '2026-12', '2027-01'])
+    expect(formatMonthChip('2026-12', NOW)).toBe('Déc.')
+    expect(formatMonthChip('2027-01', NOW)).toBe('Janv. 27')
+    expect(parisMonthKey(new Date('2027-03-31T23:30:00Z'))).toBe('2027-03')
+    expect(formatCountdown(new Date('2027-03-04T19:00:00Z'), NOW)).toBe('dans 101 jours')
+    expect(formatCountdown(new Date('2026-11-24T19:00:00Z'), NOW)).toBeNull()
+    expect(formatCountdown(new Date('2027-11-20T19:00:00Z'), NOW)).toBe('dans 12 mois')
+  })
+})
+
+describe('fenêtres qui finissent avec la nuit', () => {
+  it('à 3 h 30, « ce soir » est la soirée qui vient', () => {
+    const at330 = new Date('2026-11-24T02:30:00Z') // mardi 03:30 Paris
+    const w = getWindow('tonight', at330)
+    expect(w.start.toISOString()).toBe('2026-11-24T16:00:00.000Z') // mardi 17:00
+    expect(w.end.toISOString()).toBe('2026-11-25T03:00:00.000Z')
+  })
+  it('lundi 3 h 30, « ce week-end » est le suivant', () => {
+    const mon = new Date('2026-11-23T02:30:00Z')
+    const w = getWindow('weekend', mon)
+    expect(w.start.toISOString()).toBe('2026-11-27T17:00:00.000Z') // vendredi 18:00
+  })
+  it('à 1 h, « ce soir » reste la nuit en cours', () => {
+    const at1 = new Date('2026-11-24T00:00:00Z')
+    expect(getWindow('tonight', at1).end.toISOString()).toBe('2026-11-24T03:00:00.000Z')
   })
 })

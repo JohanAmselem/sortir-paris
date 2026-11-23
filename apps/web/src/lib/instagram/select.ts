@@ -274,10 +274,14 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** « Mer. 15 oct. · 20h », or « Jusqu’au 12 nov. » for a long run. */
 export function slideWhen(c: Pick<Candidate, 'startDate' | 'endDate' | 'timeKnown'>): string {
-  if (isLongRun(c) && c.endDate) return `Jusqu’au ${formatShortDay(new Date(c.endDate)).replace(/[\u00a0\u202f]/g, ' ')}`
+  // Slides stay short: never the year (the date itself is passed as "now").
+  if (isLongRun(c) && c.endDate) {
+    const end = new Date(c.endDate)
+    return `Jusqu’au ${formatShortDay(end, end).replace(/[\u00a0\u202f]/g, ' ')}`
+  }
   const start = new Date(c.startDate)
   // Intl puts narrow no-break spaces in « mer. 15 oct. »: plain spaces render better.
-  const day = capitalize(formatDayLabel(start)).replace(/[\u00a0\u202f]/g, ' ')
+  const day = capitalize(formatDayLabel(start, start)).replace(/[\u00a0\u202f]/g, ' ')
   return c.timeKnown ? `${day} · ${formatTime(start)}` : day
 }
 

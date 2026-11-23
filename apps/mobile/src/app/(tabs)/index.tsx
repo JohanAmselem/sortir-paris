@@ -1,177 +1,222 @@
 /**
- * Onglet « Ce soir » : l'accueil du site en appli. « Je veux sortir… », le choix
- * de ce soir, le week-end jour par jour, les grandes scènes, les expos, la
- * dernière chance, le gratuit, et l'entrée du Club.
+ * Onglet « Sortir » (accueil 2.0, maquette du 23/11/2026) : 6 blocs au lieu de 11.
+ *   En-tête (ce soir à Paris, une recherche, 5 pastilles) · Notre choix ·
+ *   Par envie · Ce week-end · Les grosses dates · Expos du moment · Alertes concerts.
  */
-import { useCallback, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Image } from 'expo-image'
+import { useState } from 'react'
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
-import { useStatusBar } from '@/lib/status-bar'
-import { ArrowRight, Flame, Gift } from 'lucide-react-native'
-import type { CardEvent, HomeSection } from '@/shared'
-import { useHome } from '@/lib/queries'
+import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Bell, CalendarDays, LocateFixed, UserRound } from 'lucide-react-native'
+import type { CardEvent, EnvieTile, HomeWhen } from '@/shared'
+import { hdImageUrl } from '@/shared'
+import { useHomeV2 } from '@/lib/queries'
+import { useSession } from '@/lib/auth'
+import { locate, locateMessage, type Coords } from '@/lib/location'
 import { errorMessage } from '@/lib/api'
-import { Discover } from '@/components/home/Discover'
-import { WeekendProgram } from '@/components/home/WeekendProgram'
+import { showToast } from '@/lib/toast'
 import { EventCard } from '@/components/EventCard'
-import { ErrorState, Loading, Notice, SectionHeader, T } from '@/components/ui'
-import { colors, GUTTER, radius } from '@/theme'
+import { Button, Chip, ErrorState, IconButton, Notice, RowSkeleton, SearchButton, SectionHeader, T } from '@/components/ui'
+import { colors, fonts, GUTTER, radius } from '@/theme'
 import { StatusBarBackdrop } from '@/components/StatusBarBackdrop'
 
-function Rail({ events, variant, origin }: { events: CardEvent[]; variant: 'poster' | 'tile'; origin: string }) {
+const WHENS: Array<{ key: HomeWhen; label: string; title: string }> = [
+  { key: 'tonight', label: 'Ce soir', title: 'Ce soir\nà Paris' },
+  { key: 'tomorrow', label: 'Demain', title: 'Demain\nà Paris' },
+  { key: 'weekend', label: 'Ce week-end', title: 'Ce week-end\nà Paris' },
+]
+
+const DATE_FMT = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' })
+
+/** Ouvre l'Agenda avec des filtres (même schéma que les URL du site). */
+export function openAgenda(params = '', focus = false) {
+  router.navigate({ pathname: '/agenda', params: { p: params, ...(focus ? { focus: '1' } : {}) } })
+}
+
+function Rail({ data, render, gap = 12 }: { data: CardEvent[]; render: (e: CardEvent) => React.ReactElement; gap?: number }) {
   return (
     <FlatList
       horizontal
-      data={events}
+      data={data}
       keyExtractor={(e) => e.id}
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 14 }}
-      renderItem={({ item }) => <EventCard event={item} variant={variant} origin={origin} />}
+      contentContainerStyle={{ paddingHorizontal: GUTTER, gap }}
+      renderItem={({ item }) => render(item)}
+      initialNumToRender={3}
     />
   )
 }
 
-function Section({ section }: { section: HomeSection }) {
-  const more = section.moreParams
-    ? () => router.push({ pathname: '/liste', params: { params: section.moreParams!, title: section.title, kicker: section.kicker } })
-    : undefined
+function Tile({ tile }: { tile: EnvieTile }) {
+  const src = hdImageUrl(tile.imageUrl)
   return (
-    <View style={styles.section}>
-      <SectionHeader kicker={section.kicker} title={section.title} onMore={more} />
-      {section.layout === 'list' ? (
-        <View style={{ paddingHorizontal: GUTTER }}>
-          {section.events.slice(0, 6).map((e) => (
-            <EventCard key={e.id} event={e} variant="row" origin={section.id} />
-          ))}
-        </View>
-      ) : (
-        <Rail events={section.events} variant={section.layout === 'posters' ? 'tile' : 'poster'} origin={section.id} />
-      )}
-    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel={tile.label} onPress={() => openAgenda(tile.params)} style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.85 : 1 }]}>
+      {src ? <Image source={{ uri: src }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" /> : null}
+      <LinearGradient colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} />
+      <Text style={styles.tileLabel} numberOfLines={2}>
+        {tile.label}
+      </Text>
+    </Pressable>
   )
 }
 
-function ClubTeaser() {
-  return (
-    <View style={[styles.section, { paddingHorizontal: GUTTER, gap: 10 }]}>
-      <Pressable accessibilityRole="button" onPress={() => router.push('/drop')} style={({ pressed }) => [styles.teaser, { opacity: pressed ? 0.9 : 1 }]}>
-        <Gift size={22} color={colors.accentGlow} />
-        <View style={{ flex: 1 }}>
-          <T v="bodyStrong" style={{ color: colors.paper }}>
-            Le Drop du lundi
-          </T>
-          <T v="small" style={{ color: 'rgba(251,250,247,0.75)' }}>
-            5 idées choisies pour ta semaine.
-          </T>
-        </View>
-        <ArrowRight size={18} color={colors.paper} />
-      </Pressable>
-      <Pressable accessibilityRole="button" onPress={() => router.push('/match')} style={({ pressed }) => [styles.teaserLight, { opacity: pressed ? 0.9 : 1 }]}>
-        <Flame size={22} color={colors.neon} />
-        <View style={{ flex: 1 }}>
-          <T v="bodyStrong">Match</T>
-          <T v="small">Swipe les sorties, on apprend tes goûts.</T>
-        </View>
-        <ArrowRight size={18} color={colors.ink} />
-      </Pressable>
-    </View>
-  )
-}
-
-export default function CeSoir() {
-  useStatusBar('light')
-  const insets = useSafeAreaInsets()
-  const home = useHome()
-  const [refreshing, setRefreshing] = useState(false)
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await home.refetch().catch(() => {})
-    setRefreshing(false)
-  }, [home])
-
+export default function Sortir() {
+  const [when, setWhen] = useState<HomeWhen>('tonight')
+  const [coords, setCoords] = useState<Coords | null>(null)
+  const [locating, setLocating] = useState(false)
+  const session = useSession()
+  const home = useHomeV2(when, coords)
   const data = home.data
+  const current = WHENS.find((w) => w.key === when)!
+
+  const toggleNear = async () => {
+    if (coords) return setCoords(null)
+    setLocating(true)
+    const r = await locate()
+    setLocating(false)
+    if (r.ok) setCoords(r.coords)
+    else showToast(locateMessage(r.reason))
+  }
+
+  const count = data && data.when === when ? data.count : null
+  const today = DATE_FMT.format(new Date())
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentInsetAdjustmentBehavior="never"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.paper} />}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-        <View style={{ backgroundColor: colors.night, paddingTop: insets.top + 6 }}>
-          <View style={styles.brand}>
-            <Image source={require('@/../assets/brand/wordmark-light.png')} style={styles.wordmark} contentFit="contain" accessibilityLabel="Paname Club" />
-          </View>
-          <Discover initial={data?.discover} />
+        contentInsetAdjustmentBehavior="automatic"
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={<RefreshControl tintColor={colors.muted} refreshing={home.isRefetching && !home.isPlaceholderData} onRefresh={() => void home.refetch()} />}>
+        <View style={styles.topbar}>
+          <Text style={styles.logo} accessibilityRole="header" accessibilityLabel="Paname Club">
+            PANAME<Text style={styles.logoClub}>CLUB</Text>
+          </Text>
+          <IconButton label={session ? 'Mon compte et mes réglages' : 'Se connecter, réglages'} onPress={() => router.push('/reglages')}>
+            <UserRound size={19} color={colors.text2} />
+          </IconButton>
         </View>
 
-        {home.isError && data ? <View style={{ marginTop: 16 }}><Notice text="Hors connexion : voici les dernières idées chargées." tone="warning" /></View> : null}
-        {!data && home.isLoading ? (
-          <View style={{ paddingVertical: 60 }}>
-            <Loading label="On cherche les meilleures idées…" />
-          </View>
-        ) : null}
-        {!data && home.isError ? <ErrorState message={errorMessage(home.error)} onRetry={() => home.refetch()} /> : null}
+        <View style={{ paddingHorizontal: GUTTER, marginTop: 14 }}>
+          <T v="display" accessibilityRole="header">
+            {coords ? current.title.replace('à Paris', 'près de toi') : current.title}
+          </T>
+          <T v="small" style={{ marginTop: 8 }}>
+            {when === 'tonight' ? today.charAt(0).toUpperCase() + today.slice(1) : current.label}
+            {count != null ? ` · ${count.toLocaleString('fr-FR')} sortie${count > 1 ? 's' : ''}` : ''}
+          </T>
+          <SearchButton onPress={() => openAgenda('', true)} style={{ marginTop: 16 }} />
+        </View>
 
-        {data ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+          {WHENS.map((w) => (
+            <Chip key={w.key} label={w.label} active={when === w.key} onPress={() => setWhen(w.key)} />
+          ))}
+          <Chip label="Plus tard" icon={<CalendarDays size={16} color={colors.text} />} onPress={() => openAgenda()} />
+          <Chip
+            label={locating ? 'Position…' : 'Près de moi'}
+            active={!!coords}
+            icon={<LocateFixed size={16} color={coords ? colors.bg : colors.text} />}
+            onPress={() => void toggleNear()}
+          />
+        </ScrollView>
+
+        {home.isError && data ? <View style={{ marginTop: 16 }}><Notice text="Hors connexion : les idées telles que chargées la dernière fois." tone="warning" /></View> : null}
+
+        {!data ? (
+          home.isError ? (
+            <View style={{ height: 320 }}>
+              <ErrorState message={errorMessage(home.error)} onRetry={() => void home.refetch()} />
+            </View>
+          ) : (
+            <View style={{ marginTop: 24 }}>
+              <RowSkeleton count={5} />
+            </View>
+          )
+        ) : (
           <>
-            {data.picks.length ? (
+            <View style={styles.section}>
+              <SectionHeader title="Notre choix" onMore={() => openAgenda(`when=${when}`)} moreLabel={when === 'tonight' ? 'Tout ce soir' : 'Tout voir'} />
+              {data.picks.length ? (
+                <Rail data={data.picks} gap={14} render={(e) => <EventCard event={e} variant="poster" origin="choix" />} />
+              ) : (
+                <T v="small" style={{ paddingHorizontal: GUTTER }}>
+                  {coords ? 'Rien d’assez proche pour l’instant : élargis à tout Paris.' : 'Rien de prévu pour l’instant.'}
+                </T>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <SectionHeader title="Par envie" />
+              <View style={styles.tiles}>
+                {data.envies.map((t) => (
+                  <Tile key={t.slug} tile={t} />
+                ))}
+              </View>
+            </View>
+
+            {data.weekend.length ? (
               <View style={styles.section}>
-                <SectionHeader
-                  kicker="Notre sélection"
-                  title={data.tonightIsLate ? 'Encore possible ce soir' : 'Le choix de ce soir'}
-                  onMore={() => router.push({ pathname: '/liste', params: { params: 'when=tonight', title: 'Tout ce soir', kicker: 'Ce soir' } })}
-                  moreLabel="Tout ce soir"
-                />
+                <SectionHeader title="Ce week-end" onMore={() => openAgenda('when=weekend')} moreLabel="Tout le week-end" />
+                <Rail data={data.weekend} render={(e) => <EventCard event={e} variant="card" origin="week-end" />} />
+              </View>
+            ) : null}
+
+            {data.bigDates.length ? (
+              <View style={styles.section}>
+                <SectionHeader title="Les grosses dates" subtitle="Les grandes salles, des mois à l’avance" onMore={() => openAgenda('cat=concerts')} moreLabel="Agenda" />
+                <Rail data={data.bigDates} render={(e) => <EventCard event={e} variant="big" origin="grosses-dates" />} />
+              </View>
+            ) : null}
+
+            {data.expos.length ? (
+              <View style={styles.section}>
+                <SectionHeader title="Expos du moment" onMore={() => openAgenda('cat=expos')} moreLabel="Toutes" />
                 <View style={{ paddingHorizontal: GUTTER }}>
-                  <EventCard event={data.picks[0]} variant="feature" rank={1} origin="picks" />
-                  {data.picks.slice(1).map((e, i) => (
-                    <EventCard key={e.id} event={e} variant="row" rank={i + 2} origin="picks" />
+                  {data.expos.slice(0, 4).map((e) => (
+                    <EventCard key={e.id} event={e} variant="row" origin="expos" />
                   ))}
                 </View>
               </View>
             ) : null}
 
-            {data.weekend.some((d) => d.events.length) ? (
-              <View style={styles.section}>
-                <SectionHeader
-                  kicker="Le programme"
-                  title="Ce week-end"
-                  onMore={() => router.push({ pathname: '/liste', params: { params: 'when=weekend', title: 'Ce week-end', kicker: 'Le programme' } })}
-                />
-                <WeekendProgram days={data.weekend} />
+            <View style={styles.alertCard}>
+              <View style={styles.alertKicker}>
+                <Bell size={15} color={colors.accent} />
+                <T v="micro">Alertes concerts</T>
               </View>
-            ) : null}
-
-            {data.sections.slice(0, 2).map((s) => (
-              <Section key={s.id} section={s} />
-            ))}
-            <ClubTeaser />
-            {data.sections.slice(2).map((s) => (
-              <Section key={s.id} section={s} />
-            ))}
+              <T v="title2" style={{ marginTop: 8 }}>
+                Ne rate plus tes artistes
+              </T>
+              <T v="small" style={{ marginTop: 6, color: colors.text2 }}>
+                Une notification dès qu’ils annoncent une date à Paris, puis la veille du concert.
+              </T>
+              <Button
+                label="Choisir mes artistes"
+                kind="light"
+                compact
+                style={{ alignSelf: 'flex-start', marginTop: 14 }}
+                onPress={() => (session ? router.push('/compte/artistes') : router.push({ pathname: '/connexion', params: { raison: 'alertes' } }))}
+              />
+            </View>
           </>
-        ) : null}
+        )}
       </ScrollView>
-      <StatusBarBackdrop color={colors.night} />
+      <StatusBarBackdrop color={colors.bg} />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  brand: { paddingHorizontal: GUTTER, paddingBottom: 6 },
-  wordmark: { width: 150, height: 16 },
+  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: GUTTER, paddingTop: 4 },
+  logo: { fontFamily: fonts.extrabold, fontSize: 15, letterSpacing: 2.2, color: colors.text },
+  logoClub: { fontFamily: fonts.regular, color: colors.accent },
+  pills: { paddingHorizontal: GUTTER, gap: 8, paddingTop: 14 },
   section: { marginTop: 32 },
-  teaser: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.night, borderRadius: radius.lg, padding: 16 },
-  teaserLight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: GUTTER },
+  tile: { width: '31.9%', height: 92, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surface2, justifyContent: 'flex-end', padding: 10 },
+  tileLabel: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 17, color: colors.white },
+  alertCard: { marginTop: 32, marginHorizontal: GUTTER, padding: 18, borderRadius: radius.xl, backgroundColor: colors.plum, borderWidth: 1, borderColor: colors.accentLine },
+  alertKicker: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 })
-

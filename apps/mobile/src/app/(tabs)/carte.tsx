@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
-import * as Location from 'expo-location'
 import Constants from 'expo-constants'
 import Supercluster, { type ClusterProperties, type PointFeature } from 'supercluster'
 import { LocateFixed } from 'lucide-react-native'
@@ -18,7 +17,7 @@ import { locate, locateMessage } from '@/lib/location'
 import type { MapFeature } from '@/lib/types'
 import { colors, fonts, GUTTER, radius } from '@/theme'
 
-type When = 'now' | 'tonight' | 'tomorrow' | 'weekend'
+type When = 'now' | 'tonight' | 'tomorrow' | 'weekend' | 'week' | 'month'
 type VenueProps = MapFeature['properties']
 
 const WHEN: Array<{ key: When; label: string }> = [
@@ -26,6 +25,24 @@ const WHEN: Array<{ key: When; label: string }> = [
   { key: 'tonight', label: 'Ce soir' },
   { key: 'tomorrow', label: 'Demain' },
   { key: 'weekend', label: 'Ce week-end' },
+  { key: 'week', label: 'Cette semaine' },
+  { key: 'month', label: 'Ce mois-ci' },
+]
+
+/** Hauteur de la barre d'onglets flottante d'iOS (au-dessus de l'indicateur d'accueil). */
+const IOS_TAB_BAR = 58
+
+/** Fond de carte sombre pour Google Maps (Android) ; Plans suit l'apparence sombre. */
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#17151f' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#a9a5b4' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0c0b11' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2735' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1a2b' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#1a1823' }] },
 ]
 
 const PARIS: Region = { latitude: 48.8566, longitude: 2.3522, latitudeDelta: 0.12, longitudeDelta: 0.12 }
@@ -54,7 +71,8 @@ function MapScreen() {
   const [selected, setSelected] = useState<SelectedVenue | null>(null)
   const [userShown, setUserShown] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [locationDenied, setLocationDenied] = useState(false)
+  const [locationMsg, setLocationMsg] = useState<string | null>(null)
+  const bottomOffset = Platform.OS === 'ios' ? insets.bottom + IOS_TAB_BAR : 16
 
   const params = useMemo(() => buildEventParams({ when, free }).toString(), [when, free])
   const map = useMapData(params)
@@ -80,24 +98,16 @@ function MapScreen() {
     [index]
   )
 
-  const locate = async () => {
+  // Même localisation que le reste de l'appli : message juste (refus, GPS lent, hors de Paris).
+  const centerOnMe = async () => {
     setLocating(true)
-    try {
-      const perm = await Location.requestForegroundPermissionsAsync()
-      if (perm.status !== 'granted') {
-        setLocationDenied(true)
-        return
-      }
-      setLocationDenied(false)
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      setUserShown(true)
-      track('map_locate')
-      mapRef.current?.animateToRegion({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 500)
-    } catch {
-      setLocationDenied(true)
-    } finally {
-      setLocating(false)
-    }
+    const r = await locate()
+    setLocating(false)
+    if (!r.ok) return setLocationMsg(locateMessage(r.reason))
+    setLocationMsg(null)
+    setUserShown(true)
+    track('map_locate')
+    mapRef.current?.animateToRegion({ latitude: r.coords.lat, longitude: r.coords.lng, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 500)
   }
 
   const markers = clusters.map((f) => {
@@ -131,6 +141,8 @@ function MapScreen() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER}
+        userInterfaceStyle="dark"
+        customMapStyle={PROVIDER === PROVIDER_GOOGLE ? DARK_MAP_STYLE : undefined}
         initialRegion={PARIS}
         onRegionChangeComplete={setRegion}
         showsUserLocation={userShown}
@@ -152,6 +164,8 @@ function MapScreen() {
           {WHEN.map((w) => (
             <Chip
               key={w.key}
+              floating
+              small
               label={w.label}
               active={when === w.key}
               onPress={() => {
@@ -162,6 +176,8 @@ function MapScreen() {
             />
           ))}
           <Chip
+            floating
+            small
             label="Gratuit"
             active={free}
             onPress={() => {
@@ -193,11 +209,9 @@ function MapScreen() {
             <Text style={[styles.statusText, { color: colors.error }]}>La carte n’est pas encore disponible dans cette version Android.</Text>
           </View>
         ) : null}
-        {locationDenied ? (
-          <Pressable accessibilityRole="button" onPress={() => Linking.openSettings()} style={styles.status}>
-            <Text style={styles.statusText}>
-              Pour voir ce qui est autour de toi, autorise la position dans les Réglages. <Text style={styles.statusLink}>Ouvrir les Réglages</Text>
-            </Text>
+        {locationMsg ? (
+          <Pressable accessibilityRole="button" onPress={() => setLocationMsg(null)} style={styles.status}>
+            <Text style={styles.statusText}>{locationMsg}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -206,20 +220,20 @@ function MapScreen() {
         accessibilityRole="button"
         accessibilityLabel="Autour de moi"
         accessibilityHint="Centre la carte sur ta position"
-        onPress={locate}
+        onPress={() => void centerOnMe()}
         disabled={locating}
-        style={({ pressed }) => [styles.locate, { bottom: (selected ? 440 : 24) + insets.bottom, opacity: pressed ? 0.8 : 1 }]}>
-        {locating ? <ActivityIndicator color={colors.ink} /> : <LocateFixed size={20} color={colors.ink} />}
+        style={({ pressed }) => [styles.locate, { bottom: (selected ? 440 : 16) + bottomOffset, opacity: pressed ? 0.8 : 1 }]}>
+        {locating ? <ActivityIndicator color={colors.text} /> : <LocateFixed size={20} color={colors.text} />}
         <Text style={styles.locateText}>Autour de moi</Text>
       </Pressable>
 
-      {selected ? <VenuePanel venue={selected} params={params} bottomInset={insets.bottom} onClose={() => setSelected(null)} /> : null}
+      {selected ? <VenuePanel venue={selected} params={params} bottomInset={bottomOffset} onClose={() => setSelected(null)} /> : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.paperDeep },
+  screen: { flex: 1, backgroundColor: colors.bg },
   top: { position: 'absolute', left: 0, right: 0, top: 0 },
   chips: { paddingHorizontal: GUTTER, gap: 8, paddingBottom: 8 },
   status: {
@@ -228,33 +242,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(254,253,252,0.96)',
+    backgroundColor: colors.glass,
     borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.line,
   },
-  statusError: { backgroundColor: colors.neonSoft, borderColor: colors.neonSoft },
-  statusText: { flex: 1, fontFamily: fonts.medium, fontSize: 14, lineHeight: 19, color: colors.ink },
-  statusLink: { fontFamily: fonts.semibold, color: colors.accent, textDecorationLine: 'underline' },
+  statusError: { backgroundColor: colors.hotSoft, borderColor: colors.hotSoft },
+  statusText: { flex: 1, fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, color: colors.text },
   locate: {
     position: 'absolute',
     right: GUTTER,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    height: 46,
-    paddingHorizontal: 16,
+    height: 48,
+    paddingHorizontal: 18,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line2,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  locateText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
+  locateText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
 })
 
 /**
@@ -271,13 +286,11 @@ function MapUnavailable() {
     const r = await locate()
     setBusy(false)
     if (!r.ok) return setMessage(locateMessage(r.reason))
-    const params = `when=next3h&lat=${r.coords.lat.toFixed(4)}&lng=${r.coords.lng.toFixed(4)}&sort=distance`
-    router.push({ pathname: '/liste', params: { params, title: 'Autour de moi', kicker: 'Dans les 3 heures' } })
+    router.navigate({ pathname: '/agenda', params: { p: `when=tonight&lat=${r.coords.lat.toFixed(4)}&lng=${r.coords.lng.toFixed(4)}` } })
   }
   return (
-    <View style={[styles.screen, { backgroundColor: colors.paper, paddingTop: insets.top + 24, paddingHorizontal: GUTTER }]}>
-      <T v="kicker">Carte</T>
-      <T v="h1" style={{ marginTop: 4 }}>
+    <View style={[styles.screen, { paddingTop: insets.top + 24, paddingHorizontal: GUTTER }]}>
+      <T v="title1">
         Autour de toi
       </T>
       <T v="small" style={{ marginTop: 8 }}>
@@ -289,7 +302,7 @@ function MapUnavailable() {
         label="Toutes les sorties de ce soir"
         kind="secondary"
         style={{ marginTop: 10 }}
-        onPress={() => router.push({ pathname: '/liste', params: { params: 'when=tonight', title: 'Ce soir', kicker: 'Tout Paris' } })}
+        onPress={() => router.navigate({ pathname: '/agenda', params: { p: 'when=tonight' } })}
       />
     </View>
   )

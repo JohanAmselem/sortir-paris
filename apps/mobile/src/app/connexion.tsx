@@ -29,7 +29,7 @@ export default function Connexion() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const done = () => (router.canGoBack() ? router.back() : router.replace('/moi'))
+  const done = () => (router.canGoBack() ? router.back() : router.replace('/mes-sorties'))
 
   const run = async (key: string, fn: () => Promise<boolean | void>) => {
     setBusy(key)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 import { ChevronRight, X } from 'lucide-react-native'
@@ -6,7 +6,7 @@ import { EventCard } from '@/components/EventCard'
 import { T } from '@/components/ui'
 import { useEventList } from '@/lib/queries'
 import { errorMessage } from '@/lib/api'
-import { colors, fonts, GUTTER, radius } from '@/theme'
+import { colors, fonts, GUTTER } from '@/theme'
 
 export interface SelectedVenue {
   slug: string
@@ -17,7 +17,7 @@ export interface SelectedVenue {
 
 /** Panneau bas : les sorties du lieu touché sur la carte. */
 export function VenuePanel({ venue, params, bottomInset, onClose }: { venue: SelectedVenue; params: string; bottomInset: number; onClose: () => void }) {
-  const slide = useRef(new Animated.Value(0)).current
+  const [slide] = useState(() => new Animated.Value(0))
   useEffect(() => {
     slide.setValue(0)
     Animated.spring(slide, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 180 }).start()
@@ -39,15 +39,15 @@ export function VenuePanel({ venue, params, bottomInset, onClose }: { venue: Sel
       <View style={styles.handle} />
       <View style={styles.head}>
         <View style={{ flex: 1 }}>
-          <T v="h3" accessibilityRole="header" numberOfLines={1}>
+          <T v="title3" accessibilityRole="header" numberOfLines={1}>
             {venue.name}
           </T>
-          <T v="caption">
+          <T v="small">
             {[venue.arr, `${total} sortie${total > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
           </T>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={12} onPress={onClose} style={styles.close}>
-          <X size={20} color={colors.ink} />
+          <X size={20} color={colors.text} />
         </Pressable>
       </View>
       <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ paddingHorizontal: GUTTER }}>
@@ -81,20 +81,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
     paddingTop: 8,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -6 },
     elevation: 12,
   },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, marginBottom: 8 },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line2, marginBottom: 8 },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: GUTTER, paddingBottom: 6, gap: 8 },
-  close: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 12 },
+  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 44 },
   linkText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
 })

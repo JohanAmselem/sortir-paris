@@ -9,11 +9,17 @@ import { colors, fonts } from '@/theme'
  */
 function useTracks(dep: unknown) {
   const [tracks, setTracks] = useState(true)
-  useEffect(() => {
+  const [seen, setSeen] = useState(dep)
+  // Le contenu change : on redessine pendant 600 ms (état ajusté pendant le rendu).
+  if (dep !== seen) {
+    setSeen(dep)
     setTracks(true)
+  }
+  useEffect(() => {
+    if (!tracks) return
     const t = setTimeout(() => setTracks(false), 600)
     return () => clearTimeout(t)
-  }, [dep])
+  }, [tracks, dep])
   return tracks
 }
 
@@ -69,7 +75,7 @@ export const VenueMarker = memo(function VenueMarker({
       zIndex={selected ? 10 : 1}
       accessibilityLabel={`${name}, ${count} sortie${count > 1 ? 's' : ''}`}>
       <View style={[styles.pin, selected && styles.pinSelected, free && !selected && styles.pinFree]}>
-        <Text style={[styles.pinText, selected && { color: colors.white }]}>{count}</Text>
+        <Text style={[styles.pinText, selected && { color: colors.bg }]}>{count}</Text>
       </View>
     </Marker>
   )
@@ -77,25 +83,25 @@ export const VenueMarker = memo(function VenueMarker({
 
 const styles = StyleSheet.create({
   cluster: {
-    backgroundColor: 'rgba(116,54,227,0.92)',
+    backgroundColor: colors.accentStrong,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clusterText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
   pin: {
-    minWidth: 30,
-    height: 30,
-    paddingHorizontal: 8,
-    borderRadius: 15,
+    minWidth: 32,
+    height: 32,
+    paddingHorizontal: 9,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: colors.ink,
+    borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pinFree: { borderColor: colors.free },
-  pinSelected: { backgroundColor: colors.accent, borderColor: colors.white },
-  pinText: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
+  pinSelected: { backgroundColor: colors.text, borderColor: colors.text },
+  pinText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
 })

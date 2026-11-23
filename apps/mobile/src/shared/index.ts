@@ -20,7 +20,12 @@ export {
   formatFilmTimes,
   formatFullWhen,
   urgencyBadge,
+  formatCountdown,
+  formatMonthChip,
+  formatMonthLong,
+  parisMonthKey,
 } from '../../../web/src/lib/paris-time'
+export { hdImageUrl } from '../../../web/src/lib/images'
 export { formatPrice, formatPriceShort, formatDistance, formatArrondissement, pluralize, safeUrl } from '../../../web/src/lib/format'
 export { CATEGORIES, CATEGORY_BY_SLUG, INTENTS, ARRONDISSEMENTS } from '../../../web/src/lib/events/taxonomy'
 export {
@@ -38,3 +43,4 @@ export { buildEventParams } from '../../../web/src/lib/events/params'
 export { containsBlockedWords, BLOCKED_REVIEW_MESSAGE } from '../../../web/src/lib/review-moderation'
 export type { EventQuery } from '../../../web/src/lib/events/types'
 export type * from '../../../web/src/lib/api-v1/contract'
+export type * from '../../../web/src/lib/api-v2/contract'

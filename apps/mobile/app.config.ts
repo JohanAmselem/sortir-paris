@@ -35,18 +35,19 @@ const IOS_GOOGLE_CLIENT = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
 const googleUrlScheme = IOS_GOOGLE_CLIENT ? `com.googleusercontent.apps.${IOS_GOOGLE_CLIENT.replace('.apps.googleusercontent.com', '')}` : null
 
 const CREAM = '#f7f5ef'
+const NIGHT = '#0c0b11'
 
 const baseConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Paname Club',
   slug: 'panameclub',
   owner: process.env.EAS_OWNER || 'johanamselem',
-  version: '1.0.0',
+  version: '2.0.0',
   orientation: 'portrait',
   icon: './assets/brand/icon.png',
   scheme: 'panameclub',
   // L'appli suit la charte claire du site (crème, encre) ; pas de mode sombre en V1.
-  userInterfaceStyle: 'light',
+  userInterfaceStyle: 'dark',
   ios: {
     bundleIdentifier: 'fr.panameclub.app',
     supportsTablet: false,
@@ -101,8 +102,9 @@ const baseConfig = ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: CREAM,
-        image: './assets/brand/splash-mark.png',
+        // 2.0 « Nuit » : fond sombre, logo clair.
+        backgroundColor: NIGHT,
+        image: './assets/brand/splash-mark-light.png',
         imageWidth: 120,
       },
     ],
@@ -149,6 +151,13 @@ const baseConfig = ({ config }: ConfigContext): ExpoConfig => ({
     androidMaps: Boolean(process.env.GOOGLE_MAPS_ANDROID_KEY),
   },
   runtimeVersion: { policy: 'appVersion' },
+  // Mises à jour des écrans sans repasser par la revue des stores (2.0) : seules
+  // les modifications natives exigent un nouveau build.
+  updates: {
+    url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+    checkAutomatically: 'ON_LOAD',
+    fallbackToCacheTimeout: 0,
+  },
 })
 
 export default (ctx: ConfigContext): ExpoConfig => withOptionalPortraitScreen(baseConfig(ctx))

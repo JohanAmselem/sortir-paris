@@ -27,7 +27,8 @@
       "environment": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "extends": "base",
@@ -35,7 +36,8 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.panameclub.fr"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

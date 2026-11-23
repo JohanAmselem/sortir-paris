@@ -26,14 +26,28 @@ export async function openWeb(url: string) {
   await WebBrowser.openBrowserAsync(url, { controlsColor: colors.accent, dismissButtonStyle: 'close' }).catch(() => Linking.openURL(url))
 }
 
-export async function addToCalendar(input: { title: string; start: Date; end: Date | null; location?: string | null; url?: string; notes?: string | null }) {
+/**
+ * Ajout au calendrier par le formulaire du système. Heure inconnue ou longue
+ * série (expo de 3 mois) : un événement « journée entière » sur le jour choisi,
+ * jamais une heure inventée ni un événement de 3 mois.
+ */
+export async function addToCalendar(input: {
+  title: string
+  start: Date
+  end: Date | null
+  allDay?: boolean
+  location?: string | null
+  url?: string
+  notes?: string | null
+}) {
   track('calendar_add')
-  const end = input.end && input.end > input.start ? input.end : new Date(input.start.getTime() + 2 * 3600_000)
+  const end = input.allDay ? input.start : input.end && input.end > input.start ? input.end : new Date(input.start.getTime() + 2 * 3600_000)
   try {
     await CalendarLegacy.createEventInCalendarAsync({
       title: input.title,
       startDate: input.start,
       endDate: end,
+      allDay: input.allDay || undefined,
       location: input.location ?? undefined,
       url: input.url,
       notes: [input.notes, input.url].filter(Boolean).join('\n\n') || undefined,

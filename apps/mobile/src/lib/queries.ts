@@ -1,46 +1,75 @@
 /**
  * Accès aux données de l'appli (TanStack Query). Clés : [famille, …paramètres].
- * Les familles 'home', 'meta', 'event', 'venue', 'me', 'club', 'drop' sont
- * gardées hors-ligne (lib/query.tsx).
+ * Les familles 'home2', 'meta', 'event', 'venue', 'me' sont gardées
+ * hors-ligne (lib/query.tsx).
  */
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
 import type {
+  AgendaResponse,
   CardEvent,
-  ClubResponse,
   EventPage,
+  HomeV2Response,
+  HomeWhen,
   EventResponse,
-  HomeResponse,
   MeResponse,
   MetaResponse,
   VenueResponse,
   WorkResponse,
 } from '@/shared'
-import { api } from './api'
+import { api, ApiError } from './api'
+import { showToast } from './toast'
 import { useSession } from './auth'
 import { toggleLocalSave, useLocalState } from './local-store'
 import { track } from './analytics'
 import type {
-  AdnResponse,
   ArtistDate,
   ArtistSuggestion,
   AttendanceInfo,
-  DropResponse,
   FollowState,
   GamificationResult,
   MapResponse,
-  Recommendation,
-  ReviewsResponse,
   Suggestions,
-  SwipeDeck,
-  TasteQuizState,
 } from './types'
 
 // ── Lecture ─────────────────────────────────────────────────────────────
 
 export const useMeta = () => useQuery({ queryKey: ['meta'], queryFn: () => api<MetaResponse>('/api/v1/meta'), staleTime: 24 * 3600_000 })
 
-export const useHome = () => useQuery({ queryKey: ['home'], queryFn: () => api<HomeResponse>('/api/v1/home', { timeoutMs: 25_000 }) })
+/** Accueil 2.0 : notre choix pour la fenêtre choisie, envies, week-end, grosses dates, expos. */
+export const useHomeV2 = (when: HomeWhen, coords: { lat: number; lng: number } | null = null) =>
+  useQuery({
+    queryKey: ['home2', when, coords ? `${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}` : null],
+    queryFn: () => {
+      const sp = new URLSearchParams({ when })
+      if (coords) {
+        sp.set('lat', coords.lat.toFixed(4))
+        sp.set('lng', coords.lng.toFixed(4))
+      }
+      return api<HomeV2Response>(`/api/v2/home?${sp.toString()}`, { timeoutMs: 25_000 })
+    },
+    placeholderData: keepPreviousData,
+  })
+
+/**
+ * L'Agenda : tout ce qui vient, trié par date, page après page sans limite
+ * (curseur), ou par distance (décalage) quand on cherche près de soi.
+ */
+export function useAgenda(params: string) {
+  return useInfiniteQuery({
+    queryKey: ['agenda', params],
+    initialPageParam: { cursor: null as string | null, offset: 0 },
+    queryFn: ({ pageParam }) => {
+      const sp = new URLSearchParams(params)
+      if (pageParam.cursor) sp.set('cursor', pageParam.cursor)
+      if (pageParam.offset) sp.set('offset', String(pageParam.offset))
+      return api<AgendaResponse>(`/api/v2/agenda?${sp.toString()}`, { timeoutMs: 20_000 })
+    },
+    getNextPageParam: (last) =>
+      last.nextCursor ? { cursor: last.nextCursor, offset: 0 } : last.nextOffset != null ? { cursor: null, offset: last.nextOffset } : undefined,
+    placeholderData: keepPreviousData,
+  })
+}
 
 export const useEvent = (slug: string) =>
   useQuery({ queryKey: ['event', slug], queryFn: () => api<EventResponse>(`/api/v1/events/${encodeURIComponent(slug)}`), enabled: !!slug })
@@ -78,38 +107,10 @@ export const useSuggest = (q: string) =>
     placeholderData: keepPreviousData,
   })
 
-export const useClub = () => {
-  const session = useSession()
-  return useQuery({ queryKey: ['club', session?.user.id ?? 'anon'], queryFn: () => api<ClubResponse>('/api/v1/club', { timeoutMs: 25_000 }) })
-}
-
-export const useDrop = () => {
-  const session = useSession()
-  return useQuery({ queryKey: ['drop', session?.user.id ?? 'anon'], queryFn: () => api<DropResponse>('/api/drop', { timeoutMs: 25_000 }) })
-}
-
 export const useMe = () => {
   const session = useSession()
   return useQuery({ queryKey: ['me', session?.user.id], queryFn: () => api<MeResponse>('/api/v1/me'), enabled: !!session })
 }
-
-export const useAdn = () => {
-  const session = useSession()
-  return useQuery({ queryKey: ['adn', session?.user.id], queryFn: () => api<AdnResponse>('/api/profile/adn'), enabled: !!session })
-}
-
-export const useTasteQuiz = () => {
-  const session = useSession()
-  return useQuery({ queryKey: ['taste-quiz', session?.user.id], queryFn: () => api<TasteQuizState>('/api/taste-quiz'), enabled: !!session })
-}
-
-export const useSwipeDeck = () => {
-  const session = useSession()
-  return useQuery({ queryKey: ['swipe-deck', session?.user.id ?? 'anon'], queryFn: () => api<SwipeDeck>('/api/swipe'), staleTime: Infinity, gcTime: 0, refetchOnWindowFocus: false })
-}
-
-export const useReviews = (eventId: string | undefined) =>
-  useQuery({ queryKey: ['reviews', eventId], queryFn: () => api<ReviewsResponse>(`/api/reviews?eventId=${eventId}`), enabled: !!eventId })
 
 export const useAttendance = (eventId: string | undefined) => {
   const session = useSession()
@@ -152,15 +153,6 @@ export const useArtistDates = (key: string | undefined) =>
     enabled: !!key,
   })
 
-/** « Je veux sortir… » : pastilles (GET, en cache CDN) ou phrase libre (POST). */
-export async function discover(input: { params?: URLSearchParams; text?: string; coords?: { lat: number; lng: number } | null }): Promise<Recommendation> {
-  if (input.text) {
-    track('ai_search', { length: input.text.length })
-    return api<Recommendation>('/api/discover', { method: 'POST', body: { q: input.text, limit: 4, ...(input.coords ?? {}) } })
-  }
-  return api<Recommendation>(`/api/discover?${input.params?.toString() ?? ''}`)
-}
-
 // ── Garder (avec ou sans compte) ────────────────────────────────────────
 
 /** Ids gardés : ceux du compte si connecté, sinon ceux du téléphone. */
@@ -197,8 +189,9 @@ export function useToggleSave() {
       }
       return { prev, key }
     },
-    onError: (_e, _v, ctx) => {
+    onError: (err, { saved }, ctx) => {
       if (ctx?.prev) qc.setQueryData(ctx.key, ctx.prev)
+      showToast(err instanceof ApiError && err.status === 0 ? 'Pas de connexion : réessaie quand tu as du réseau.' : saved ? 'La sortie n’a pas pu être gardée.' : 'La sortie n’a pas pu être retirée.')
     },
     onSettled: () => {
       if (session) qc.invalidateQueries({ queryKey: ['me'] })
@@ -263,14 +256,6 @@ export function useUnfollow() {
       qc.invalidateQueries({ queryKey: ['follow'] })
       qc.invalidateQueries({ queryKey: ['me'] })
     },
-  })
-}
-
-export function useSendReview(eventId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (body: { rating: number; comment?: string | null }) => api('/api/reviews', { method: 'POST', body: { eventId, ...body } }),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['reviews', eventId] }),
   })
 }
 

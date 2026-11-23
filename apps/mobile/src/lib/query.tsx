@@ -26,7 +26,7 @@ export const queryClient = new QueryClient({
 const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: 'paname-cache-v1', throttleTime: 2000 })
 
 /** Seules ces familles de requêtes sont gardées hors-ligne. */
-const PERSISTED = new Set(['home', 'meta', 'event', 'venue', 'me', 'club', 'drop'])
+const PERSISTED = new Set(['home2', 'meta', 'event', 'venue', 'me'])
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   return (
@@ -35,7 +35,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       persistOptions={{
         persister,
         maxAge: 7 * DAY,
-        buster: 'v1',
+        buster: 'v2',
         dehydrateOptions: {
           shouldDehydrateQuery: (q) => q.state.status === 'success' && PERSISTED.has(String(q.queryKey[0])),
         },

@@ -7,6 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { focusManager, onlineManager } from '@tanstack/react-query'
 import { useFonts, Archivo_400Regular, Archivo_500Medium, Archivo_600SemiBold, Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archivo'
+import { StatusBar } from 'expo-status-bar'
+import { Toast } from '@/components/Toast'
 import { QueryProvider } from '@/lib/query'
 import { AuthProvider, useSession } from '@/lib/auth'
 import { loadLocalState } from '@/lib/local-store'
@@ -47,7 +49,16 @@ function ScreenTracker() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({ Archivo_400Regular, Archivo_500Medium, Archivo_600SemiBold, Archivo_700Bold, Archivo_800ExtraBold })
+  const [fontsLoaded, fontError] = useFonts({
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
+    // Instances condensées d'Archivo (titres), voir src/theme.ts.
+    ArchivoDisplay: require('../../assets/fonts/ArchivoDisplay-ExtraBold.ttf'),
+    ArchivoTitle: require('../../assets/fonts/ArchivoTitle-Bold.ttf'),
+  })
   const [localReady, setLocalReady] = useState(false)
 
   useEffect(() => {
@@ -60,35 +71,32 @@ export default function RootLayout() {
   if (!ready) return null
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
         <QueryProvider>
           <AuthProvider>
             <PushBridge />
             <ScreenTracker />
+            <StatusBar style="light" />
             <Stack
               screenOptions={{
-                headerTintColor: colors.ink,
-                headerTitleStyle: { fontFamily: fonts.semibold },
+                headerTintColor: colors.text,
+                headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text },
                 headerBackButtonDisplayMode: 'minimal',
                 headerShadowVisible: false,
-                headerStyle: { backgroundColor: colors.paper },
-                contentStyle: { backgroundColor: colors.paper },
+                headerStyle: { backgroundColor: colors.bg },
+                contentStyle: { backgroundColor: colors.bg },
               }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Accueil' }} />
-              <Stack.Screen name="evenements/[slug]" options={{ title: '', headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Sortir' }} />
+              <Stack.Screen name="evenements/[slug]" options={{ title: '', headerShown: false }} />
               <Stack.Screen name="lieux/[slug]" options={{ title: '' }} />
               <Stack.Screen name="oeuvres/[slug]" options={{ title: '' }} />
               <Stack.Screen name="films/[slug]" options={{ title: '' }} />
-              <Stack.Screen name="liste" options={{ title: '' }} />
-              <Stack.Screen name="drop" options={{ title: 'Le Drop' }} />
-              <Stack.Screen name="adn" options={{ title: 'Mon ADN culturel' }} />
               <Stack.Screen name="compte/artistes" options={{ title: 'Mes artistes et lieux' }} />
-              <Stack.Screen name="reglages" options={{ title: 'Réglages' }} />
-              <Stack.Screen name="connexion" options={{ presentation: 'modal', title: 'Rejoindre le Club' }} />
-              <Stack.Screen name="quiz" options={{ presentation: 'fullScreenModal', headerShown: false }} />
-              <Stack.Screen name="match" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+              <Stack.Screen name="reglages" options={{ title: 'Compte et réglages' }} />
+              <Stack.Screen name="connexion" options={{ presentation: 'modal', title: 'Se connecter' }} />
             </Stack>
+            <Toast />
           </AuthProvider>
         </QueryProvider>
       </SafeAreaProvider>

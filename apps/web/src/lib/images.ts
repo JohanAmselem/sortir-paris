@@ -8,6 +8,7 @@
 export function hdImageUrl(url: string | null | undefined): string | null {
   if (!url) return null
   if (url.includes('files.offi.fr/')) return url.replace('/images/120/', '/images/1000/')
-  if (url.includes('theatreonline.com/')) return url.replace(/\/xs_([^/?#]+)$/, '/$1')
+  // Only the poster files (xs_1_affiche.jpg), as the scrapers and 0013_images_hd.sql do.
+  if (url.includes('theatreonline.com/')) return url.replace(/\/xs_(\d+_affiche\.[a-z]+)$/i, '/$1')
   return url
 }

@@ -25,7 +25,7 @@ const TOGGLES: Array<{ key: AlertKey; label: string; hint: string }> = [
   { key: 'notifyNewDate', label: 'Nouvelle date', hint: 'Un artiste suivi annonce une date à Paris' },
   { key: 'notifyOnSale', label: 'Ouverture de la billetterie', hint: 'Pour ne pas rater les places' },
   { key: 'notifyReminder', label: 'Rappel la veille', hint: 'Pour tes « J’y vais »' },
-  { key: 'notifyDrop', label: 'Le Drop du lundi', hint: 'Tes 5 idées de la semaine, le lundi matin' },
+  { key: 'notifyDrop', label: 'Les idées du lundi', hint: 'Une notification le lundi matin pour préparer ta semaine' },
 ]
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
@@ -108,7 +108,7 @@ export default function Reglages() {
                     ? 'Les notifications de Paname Club sont coupées dans les Réglages du téléphone.'
                     : status === 'unavailable'
                       ? 'Les notifications ne sont pas disponibles sur cet appareil.'
-                      : 'Active les notifications pour recevoir tes alertes concerts et ton Drop du lundi.'}
+                      : 'Active les notifications pour recevoir tes alertes concerts et les idées du lundi.'}
                 </T>
                 {status === 'denied' ? (
                   <Button label="Ouvrir les Réglages" kind="secondary" compact onPress={() => Linking.openSettings()} />

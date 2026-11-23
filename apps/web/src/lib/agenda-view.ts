@@ -18,7 +18,7 @@ const MONTH = /^\d{4}-\d{2}$/
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 /** Filtres explicites repris tels quels d'une URL à l'autre. */
-const KEPT = ['arr', 'max', 'zone', 'mood', 'topic', 'xcat', 'lat', 'lng', 'radius', 'runs'] as const
+const KEPT = ['arr', 'max', 'zone', 'mood', 'topic', 'xcat', 'lat', 'lng', 'radius', 'runs', 'affiche'] as const
 
 function read(p: Params, key: string): string | undefined {
   if (p instanceof URLSearchParams) return p.get(key) ?? undefined

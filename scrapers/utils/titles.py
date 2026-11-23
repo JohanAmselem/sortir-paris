@@ -429,7 +429,7 @@ _CONTEST_RE = re.compile(
     r"|\b(?:places?|invitations?|billets?|entr[ée]es?|pass|lots?|cadeaux?)\s+(?:sont\s+)?[àa]\s+gagner\b"
     r"|^\s*[àa]\s+gagner\b"
     r"|^\s*concours\b(?!.*\b(?:finale?s?|demi-finales?|gala|r[ée]cital|concerts?|laur[ée]at(?:e|s|es)?|"
-    r"[ée]preuves?|remise\s+des\s+prix|c[ée]r[ée]monie|audition)\b)",
+    r"[ée]preuves?|remise\s+des\s+prix|c[ée]r[ée]monie|audition|l[ée]pine|[ée]loquence)\b)",
     re.I,
 )
 

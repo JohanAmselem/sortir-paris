@@ -81,6 +81,7 @@ export async function AgendaView({
   children,
 }: AgendaViewProps) {
   const now = bucketNow()
+  const affiche = params.get('affiche') === '1'
   const agenda = await loadAgenda(params.toString())
   const u = agenda.understood
   const state = agendaState(params, u)
@@ -219,6 +220,20 @@ export async function AgendaView({
         {groupBy === 'day' && total > 1 ? ', du plus proche au plus lointain' : ''}
       </p>
 
+      {affiche && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="t-small text-text-muted">Déjà à l’affiche, ce qui ferme bientôt d’abord :</span>
+          <Link
+            href={agendaHref(withParam(state, 'affiche', null))}
+            className="t-small inline-flex h-11 items-center gap-1.5 rounded-full bg-accent-soft pl-3.5 pr-3 font-semibold text-accent hover:bg-accent/25"
+          >
+            Expos et saisons
+            <X className="h-4 w-4" aria-hidden />
+            <span className="sr-only">(revenir à l’agenda par date)</span>
+          </Link>
+        </div>
+      )}
+
       {agenda.ongoing && agenda.ongoing.length > 0 && (
         <details className="group mt-4 rounded-2xl border border-border bg-surface">
           <summary className="t-body flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-ink [&::-webkit-details-marker]:hidden">
@@ -228,6 +243,14 @@ export async function AgendaView({
             <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
           </summary>
           <EventList events={agenda.ongoing} now={now} className="border-t border-border px-4" />
+          {(agenda.ongoingTotal ?? 0) > agenda.ongoing.length && (
+            <Link
+              href={agendaHref(withParam(state, 'affiche', '1'))}
+              className="t-small flex min-h-12 items-center justify-center gap-1 border-t border-border font-semibold text-accent hover:text-accent-hover"
+            >
+              Tout voir · {agenda.ongoingTotal} à l’affiche
+            </Link>
+          )}
         </details>
       )}
 
@@ -253,7 +276,7 @@ export async function AgendaView({
           nextOffset={agenda.nextOffset}
           params={params.toString()}
           nowIso={now.toISOString()}
-          fromIso={window && window.start > now ? window.start.toISOString() : null}
+          fromIso={affiche ? (window && window.start > now ? window.start : now).toISOString() : window && window.start > now ? window.start.toISOString() : null}
           groupBy={groupBy}
           dayCounts={Object.fromEntries(dayCounts.map((d) => [d.key, d.n]))}
           categories={u.categories}

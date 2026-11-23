@@ -190,7 +190,8 @@ export function getDateWindow(iso: string, now: Date = new Date()): TimeWindow |
   if (!m) return null
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
-  const start = parisDate(y, mo, d, 6)
+  // From 04:00 (night boundary), like the day counters: no gap before 06:00.
+  const start = parisDate(y, mo, d, NIGHT_END_HOUR)
   const end = parisDate(y, mo, d + 1, NIGHT_END_HOUR)
   if (end < now) return null
   return {
@@ -218,7 +219,8 @@ export function getMonthWindow(ym: string, now: Date = new Date()): TimeWindow |
   if (!m) return null
   const [y, mo] = [Number(m[1]), Number(m[2])]
   if (mo < 1 || mo > 12) return null
-  const today = parisParts(now)
+  // Night day: on 1 December at 00:30, November is still "this month".
+  const today = parisNightDay(now)
   const ahead = (y - today.year) * 12 + (mo - today.month)
   if (ahead < 0 || ahead > MAX_MONTHS_AHEAD) return null
   const start = parisDate(y, mo, 1, NIGHT_END_HOUR)

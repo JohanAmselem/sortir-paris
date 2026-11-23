@@ -7,6 +7,11 @@ import { getMonthWindow, nextMonthKeys } from './paris-time'
 
 const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
 
+/** Un mois déjà passé (« 2026-11 » en décembre) : sa page redirige vers l'Agenda. */
+export function isPastMonth(ym: string, now: Date = new Date()): boolean {
+  return /^\d{4}-\d{2}$/.test(ym) && ym < nextMonthKeys(1, now)[0]
+}
+
 /** Un mois que l'Agenda sait montrer (du mois en cours à 24 mois). */
 export function validMonth(ym: string, now: Date = new Date()): boolean {
   return /^\d{4}-\d{2}$/.test(ym) && getMonthWindow(ym, now) !== null

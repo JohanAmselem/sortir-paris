@@ -305,6 +305,9 @@ export function buildConditions(
   }
   if (query.oneOffOnly) conds.push(sql`not ${isLongRunSql}`)
   if (query.runsOnly) conds.push(isLongRunSql)
+  const startRef = window?.start ?? now
+  if (query.excludeOngoing) conds.push(sql`${events.startDate} >= ${ts(startRef)}`)
+  if (query.ongoingOnly) conds.push(sql`${events.startDate} < ${ts(startRef)}`)
   if (query.zone === 'paris') conds.push(inParisSql)
   if (query.zone === 'banlieue') conds.push(sql`(${venues.id} is not null and not ${inParisSql})`)
   if (query.withImage) conds.push(sql`${events.imageUrl} is not null`)
@@ -438,7 +441,8 @@ async function runQuery(query: EventQuery): Promise<EventPage> {
         filmM: films ? films.m : sql`null`,
         filmTimes: films ? films.times : sql`null`,
         filmImage: films ? films.image : sql`null`,
-        isNew: sql<boolean>`(${events.createdAt} > ${ts(new Date(nowMs - NEW_EVENT_MS))})`,
+        // Cinema séances are created every day: never a "new date".
+        isNew: sql<boolean>`(${events.createdAt} > ${ts(new Date(nowMs - NEW_EVENT_MS))} and ${categories.slug} is distinct from 'cinema')`,
       })
       .from(events)
       .leftJoin(venues, eq(events.venueId, venues.id))

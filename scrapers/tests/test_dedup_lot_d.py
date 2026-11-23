@@ -221,3 +221,10 @@ def test_same_words_in_another_order():
     a = ev("a", "offi", "Haendel : Le Messie", at(11, "20:45"), **church)
     b = ev("b", "paris_opendata", "Le Messie de Haendel", at(11, "20:45"), **church)
     assert is_duplicate(a, b)  # mots génériques seuls, mais les mêmes
+
+
+def test_grand_et_petit_palais_ne_sont_pas_le_meme_lieu():
+    from pipelines.dedup import _shared_venue_word
+    a = {"venue_name": "Grand Palais"}
+    b = {"venue_name": "Petit Palais - Musée des Beaux-Arts de la Ville de Paris"}
+    assert not _shared_venue_word(a, b)

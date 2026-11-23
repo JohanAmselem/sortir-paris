@@ -22,8 +22,15 @@ describe('whenFromText', () => {
 
   it('un jour de la semaine devient ce jour-là, pas le week-end', () => {
     expect(w('jazz samedi')).toMatchObject({ when: '2026-11-28', rest: 'jazz' })
-    expect(w('lundi')).toMatchObject({ when: '2026-11-23' })
+    expect(w('ce lundi')).toMatchObject({ when: '2026-11-23' })
     expect(w('dimanche prochain')).toMatchObject({ when: '2026-11-29' })
+    expect(w('concert samedi soir')).toMatchObject({ when: '2026-11-28', rest: 'concert' })
+  })
+
+  it('ne prend pas un titre pour une date', () => {
+    for (const t of ['Mercredi', 'Le Lundi au soleil', 'Un dimanche à Kigali', 'Apéro du jeudi', 'Marché de Noël', 'nouvel an chinois', 'Blanche-Neige et les sept nains', 'Les Sept Samouraïs']) {
+      expect(w(t).when, t).toBeNull()
+    }
   })
 
   it('lit un jour précis, l’année suivante une fois passé', () => {
@@ -51,6 +58,8 @@ describe('whenFromText', () => {
 
   it('Noël et le nouvel an', () => {
     expect(w('concert à noël')).toMatchObject({ when: '2026-12-24..2026-12-25', rest: 'concert' })
-    expect(w('soirée nouvel an')).toMatchObject({ when: '2026-12-31', rest: 'soiree' })
+    expect(w('noël')).toMatchObject({ when: '2026-12-24..2026-12-25', rest: null })
+    expect(w('soirée nouvel an')).toMatchObject({ when: '2026-12-31', rest: null })
+    expect(w('en sept. 2027')).toMatchObject({ when: '2027-09' })
   })
 })

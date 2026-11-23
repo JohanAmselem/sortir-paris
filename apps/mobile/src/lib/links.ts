@@ -51,6 +51,16 @@ export function appRouteForWebPath(raw: string): Href | null {
   return null
 }
 
+/** Même chose sous forme de chemin texte (liens universels : app/+native-intent.tsx). */
+export function appPathForWebPath(raw: string): string | null {
+  const route = appRouteForWebPath(raw)
+  if (route == null) return null
+  if (typeof route === 'string') return route
+  const r = route as { pathname: string; params?: Record<string, string> }
+  const qs = new URLSearchParams(r.params ?? {}).toString()
+  return qs ? `${r.pathname}?${qs}` : r.pathname
+}
+
 /** URL publique d'un écran (pour partager). */
 export function webUrl(path: string): string {
   return `https://www.panameclub.fr${path}`

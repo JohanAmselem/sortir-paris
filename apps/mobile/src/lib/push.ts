@@ -25,11 +25,13 @@ export async function setupAndroidChannels() {
   await Notifications.setNotificationChannelAsync('alertes', {
     name: 'Alertes concerts',
     description: 'Nouvelles dates, ouverture de billetterie, rappel la veille',
+    // eslint-disable-next-line import/namespace -- enum réexporté par `export *`, que la règle ne suit pas (tsc le valide)
     importance: Notifications.AndroidImportance.HIGH,
   })
   await Notifications.setNotificationChannelAsync('drop', {
     name: 'Drop du lundi',
     description: 'Tes 5 idées de la semaine',
+    // eslint-disable-next-line import/namespace -- enum réexporté par `export *`, que la règle ne suit pas (tsc le valide)
     importance: Notifications.AndroidImportance.DEFAULT,
   })
 }

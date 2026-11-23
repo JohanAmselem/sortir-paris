@@ -76,6 +76,10 @@ export interface EventQuery {
   oneOffOnly?: boolean
   /** Only long runs (exhibitions, seasons) — the agenda shows them apart. */
   runsOnly?: boolean
+  /** Only what starts in the window (or from now): the agenda's day list, runs included. */
+  excludeOngoing?: boolean
+  /** Only what already started before the window and still runs (« À l'affiche »). */
+  ongoingOnly?: boolean
   /** Only events at a "lieu phare" (lib/venues-signature.ts). */
   signatureOnly?: boolean
   /** Only events with an image (homepage blocks). */

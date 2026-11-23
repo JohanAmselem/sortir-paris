@@ -250,11 +250,19 @@ def same_venue(a: dict, b: dict) -> bool:
     return not (single_day(a) and single_day(b)) and _shared_venue_word(a, b)
 
 
+# Mots trop courants pour dire « même lieu » entre deux fiches voisines : le Grand
+# Palais et le Petit Palais sont à 155 m l'un de l'autre.
+NEARBY_GENERIC_WORDS = {"palais", "grand", "grande", "petit", "petite", "espace", "paris", "nouveau", "nouvelle", "saint", "sainte", "royal", "national", "nationale"}
+
+
 def _shared_venue_word(a: dict, b: dict) -> bool:
     """Un mot distinctif commun aux deux noms de lieu (« carnavalet », pas « musée »)."""
     _prepare(a)
     _prepare(b)
-    return any(len(w) >= 4 and not w.isdigit() and w not in VENUE_GENERIC_KEYS for w in a["_vw"] & b["_vw"])
+    return any(
+        len(w) >= 4 and not w.isdigit() and w not in VENUE_GENERIC_KEYS and w not in NEARBY_GENERIC_WORDS
+        for w in a["_vw"] & b["_vw"]
+    )
 
 
 def nearby_same_place(a: dict, b: dict) -> bool:

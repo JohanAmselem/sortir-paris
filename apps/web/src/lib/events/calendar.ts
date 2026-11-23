@@ -28,9 +28,14 @@ const nightShift = sql`(${events.startDate} at time zone 'Europe/Paris' - interv
 const countExpr = sql<number>`(count(*) filter (where ${categories.slug} is distinct from 'cinema')
   + count(distinct ${filmKeySql}) filter (where ${categories.slug} = 'cinema'))::int`
 
-/** Filters of the listing, without its window, cursor or paging. */
+/**
+ * Filters of the listing, without its window, cursor or paging. Counts what
+ * STARTS each month or day (runs included), like the Agenda's day list.
+ * Positions are rounded to ~100 m so "près de moi" hits the cache.
+ */
 function filtersOnly(q: EventQuery): EventQuery {
-  return { ...q, when: null, cursor: null, offset: 0, limit: undefined, sort: undefined, oneOffOnly: true, runsOnly: false }
+  const near = q.near ? { lat: Math.round(q.near.lat * 1000) / 1000, lng: Math.round(q.near.lng * 1000) / 1000, radiusKm: q.near.radiusKm } : null
+  return { ...q, near, when: null, cursor: null, offset: 0, limit: undefined, sort: undefined, oneOffOnly: false, runsOnly: false, excludeOngoing: false, ongoingOnly: false }
 }
 
 async function loadMonthCounts(q: EventQuery): Promise<MonthCount[]> {

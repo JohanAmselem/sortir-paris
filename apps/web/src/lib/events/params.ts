@@ -23,7 +23,12 @@ const SORTS: SortKey[] = ['relevance', 'soon', 'popular', 'distance', 'ending']
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
-export function parseEventParams(p: Params, now: Date = new Date()): EventQuery {
+/**
+ * `readDates`: read dates written in the search text ("jazz samedi"). Only the
+ * Agenda (site and app 2.0) asks for it: the 1.0 app shows no "understood" chip,
+ * so its searches keep their text untouched.
+ */
+export function parseEventParams(p: Params, now: Date = new Date(), opts: { readDates?: boolean } = {}): EventQuery {
   const from = get(p, 'from')
   const to = get(p, 'to')
   let when = get(p, 'when') ?? get(p, 'date') ?? null
@@ -47,7 +52,7 @@ export function parseEventParams(p: Params, now: Date = new Date()): EventQuery 
   const topics = csv(get(p, 'topic')).filter((t) => t in TOPIC_RULES)
   let free = get(p, 'free') === '1' || get(p, 'free') === 'true'
   // "jazz samedi", "Angèle en mars" → a date window (unless one is already chosen).
-  if (q && get(p, 'raw') !== '1' && !when) {
+  if (q && opts.readDates && get(p, 'raw') !== '1' && !when) {
     const found = whenFromText(q, now)
     if (found.when) {
       when = found.when

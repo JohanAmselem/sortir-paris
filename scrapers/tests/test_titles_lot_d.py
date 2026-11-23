@@ -184,3 +184,10 @@ def test_articles_rejected_only_for_editorial_sources():
     _, hard, _, _ = validate(dict(base, source="venue_theatre"), now=NOW)
     assert "editorial_article" not in hard  # le site d'un lieu ne publie pas de critiques
     assert "editorial_article" in SKIP_INSERT
+
+
+def test_concours_lepine_et_eloquence_ne_sont_pas_des_jeux():
+    from utils.titles import is_contest
+    assert not is_contest("Concours Lépine 2027 à la Foire de Paris")
+    assert not is_contest("Concours d'éloquence de la Conférence du stage")
+    assert is_contest("Concours : 10 places à gagner pour le Zénith")

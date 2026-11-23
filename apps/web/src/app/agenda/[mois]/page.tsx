@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { AgendaView, loadAgenda } from '@/components/agenda/agenda-view'
 import { countLabel } from '@/lib/agenda-view'
-import { monthWithYear, validMonth } from '@/lib/agenda-pages'
+import { isPastMonth, monthWithYear, validMonth } from '@/lib/agenda-pages'
 import { DEFAULT_OG_IMAGE } from '@/lib/seo'
 
 export const revalidate = 900
@@ -33,6 +33,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function AgendaMonthPage({ params }: Props) {
   const { mois } = await params
+  // Mois passé déjà indexé : vers l'agenda (301), pas une 404.
+  if (isPastMonth(mois)) permanentRedirect('/agenda')
   if (!validMonth(mois)) notFound()
   const label = monthWithYear(mois)
   return <AgendaView params={new URLSearchParams({ when: mois })} title={`Sortir à Paris en ${label}`} />

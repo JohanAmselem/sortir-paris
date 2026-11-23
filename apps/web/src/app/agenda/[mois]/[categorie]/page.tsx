@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { AgendaView, loadAgenda } from '@/components/agenda/agenda-view'
 import { countLabel } from '@/lib/agenda-view'
-import { monthWithYear, validMonth } from '@/lib/agenda-pages'
+import { isPastMonth, monthWithYear, validMonth } from '@/lib/agenda-pages'
 import { CATEGORY_BY_SLUG } from '@/lib/events/taxonomy'
 import { DEFAULT_OG_IMAGE } from '@/lib/seo'
 
@@ -36,6 +36,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function AgendaMonthCategoryPage({ params }: Props) {
   const { mois, categorie } = await params
   const cat = CATEGORY_BY_SLUG[categorie]
+  // Mois passé déjà indexé : vers l'agenda de la catégorie (301), pas une 404.
+  if (isPastMonth(mois) && cat) permanentRedirect(`/agenda?cat=${categorie}`)
   if (!validMonth(mois) || !cat) notFound()
   return <AgendaView params={new URLSearchParams({ when: mois, cat: categorie })} title={`${cat.plural} à Paris en ${monthWithYear(mois)}`} />
 }

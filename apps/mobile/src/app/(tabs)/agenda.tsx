@@ -36,9 +36,11 @@ interface Filters {
   near: Coords | null
   /** Texte cherché tel quel (sans lire de date dedans). */
   raw: boolean
+  /** Liste « déjà à l'affiche » (expos, saisons) au lieu de la liste par date. */
+  affiche: boolean
 }
 
-const EMPTY: Filters = { q: '', when: null, cats: [], price: null, arr: [], zone: null, near: null, raw: false }
+const EMPTY: Filters = { q: '', when: null, cats: [], price: null, arr: [], zone: null, near: null, raw: false, affiche: false }
 
 function fromParams(p: string | undefined): Filters {
   const sp = new URLSearchParams(p ?? '')
@@ -51,6 +53,7 @@ function fromParams(p: string | undefined): Filters {
     price: sp.get('free') === '1' ? 'free' : sp.get('max') === '20' ? '20' : sp.get('max') === '50' ? '50' : null,
     arr: csv('arr'),
     zone: sp.get('zone') === 'paris' || sp.get('zone') === 'banlieue' ? (sp.get('zone') as 'paris' | 'banlieue') : null,
+    affiche: sp.get('affiche') === '1',
   }
 }
 
@@ -68,10 +71,12 @@ function toParams(f: Filters, opts: { withWhen?: boolean } = {}): string {
     sp.set('lng', f.near.lng.toFixed(4))
   }
   if (f.raw) sp.set('raw', '1')
+  if (f.affiche && opts.withWhen !== false) sp.set('affiche', '1')
   return sp.toString()
 }
 
-const monthOf = (when: string | null) => (when && /^\d{4}-\d{2}/.test(when) ? when.slice(0, 7) : null)
+/** Mois d'un `when` (mois ou jour) ; jamais pour une plage (« en 2027 »). */
+const monthOf = (when: string | null) => (when && !when.includes('..') && /^\d{4}-\d{2}/.test(when) ? when.slice(0, 7) : null)
 
 // ── Regroupement par jour ─────────────────────────────────────────────────
 
@@ -86,8 +91,10 @@ export function groupByDay(events: CardEvent[], dayCounts: Map<string, number>, 
   const sections: DaySection[] = []
   const seen = new Set<string>()
   for (const e of events) {
-    if (seen.has(e.id)) continue
-    seen.add(e.id)
+    // Un film peut revenir d'une page à l'autre sous une autre séance : une seule carte.
+    const uniq = e.film ? `film:${e.film.slug}` : e.id
+    if (seen.has(uniq)) continue
+    seen.add(uniq)
     const start = new Date(e.startDate)
     const ongoing = start < now
     const key = ongoing ? 'en-cours' : parisISODate(new Date(start.getTime() - 4 * 3600_000))
@@ -150,9 +157,9 @@ export default function Agenda() {
   // Mois (toujours) et jours du mois choisi : mêmes filtres, sans la date.
   const month = monthOf(f.when) ?? monthOf(dateFromText)
   const counts = useQuery({
-    queryKey: ['agenda-counts', toParams({ ...f, q: textQ, when: null }), month],
+    queryKey: ['agenda-counts', toParams({ ...f, q: textQ, when: null, affiche: false }), month],
     queryFn: () => {
-      const sp = new URLSearchParams(toParams({ ...f, q: textQ, when: month }))
+      const sp = new URLSearchParams(toParams({ ...f, q: textQ, when: month, affiche: false }))
       sp.set('limit', '1')
       return api<AgendaResponse>(`/api/v2/agenda?${sp.toString()}`, { timeoutMs: 20_000 })
     },
@@ -164,10 +171,12 @@ export default function Agenda() {
 
   const events = useMemo(() => (list.data?.pages ?? []).flatMap((p) => p.events), [list.data])
   // Près de moi : triées par distance, donc une seule section.
-  const sections = useMemo(
-    () => (f.near ? (events.length ? [{ key: 'near', title: 'Autour de toi', count: null, data: events }] : []) : groupByDay(events, dayCounts)),
-    [events, dayCounts, f.near]
-  )
+  const sections = useMemo(() => {
+    if (!events.length) return []
+    if (f.affiche) return [{ key: 'affiche', title: 'Déjà à l’affiche, ce qui ferme bientôt d’abord', count: null, data: events }]
+    if (f.near) return [{ key: 'near', title: 'Autour de toi', count: null, data: events }]
+    return groupByDay(events, dayCounts)
+  }, [events, dayCounts, f.near, f.affiche])
   const ongoing = first?.ongoing ?? []
 
   const setWhen = (when: string | null) => {
@@ -197,6 +206,13 @@ export default function Agenda() {
         <Chip small label={locating ? 'Position…' : 'Près de moi'} active={!!f.near} icon={<LocateFixed size={15} color={f.near ? colors.bg : colors.text} />} onPress={() => void toggleNear()} />
         {active ? <Chip small label="Effacer" onPress={() => setF((x) => ({ ...EMPTY, q: x.q, when: x.when }))} /> : null}
       </ScrollView>
+
+      {f.affiche ? (
+        <View style={styles.understood}>
+          <T v="small">Déjà à l’affiche :</T>
+          <Chip small label="Expos et saisons" active onPress={() => setF((x) => ({ ...x, affiche: false }))} trailing={<X size={14} color={colors.bg} />} />
+        </View>
+      ) : null}
 
       {fromText ? (
         <View style={styles.understood}>
@@ -251,6 +267,15 @@ export default function Agenda() {
               <EventCard event={e} variant="row" origin="agenda-affiche" />
             </View>
           ))}
+          {showOngoing && (first?.ongoingTotal ?? 0) > ongoing.length ? (
+            <Button
+              label={`Tout voir · ${first?.ongoingTotal} à l’affiche`}
+              kind="secondary"
+              compact
+              style={{ alignSelf: 'flex-start', marginHorizontal: GUTTER, marginTop: 8 }}
+              onPress={() => setF((x) => ({ ...x, affiche: true }))}
+            />
+          ) : null}
         </View>
       ) : null}
     </View>

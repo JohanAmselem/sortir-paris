@@ -1,6 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { eq } from 'drizzle-orm'
-import { db, users } from '@sortir/db'
 import { createClient } from '@/lib/supabase/server'
 import { ensureUserRow } from '@/lib/member/api'
 import { safeNext } from '@/lib/member/safe-next'
@@ -34,8 +32,8 @@ export async function GET(request: NextRequest) {
     const pending = request.cookies.get(PENDING_FOLLOW_COOKIE)?.value
     const activated = pending ? await consumePendingFollow(user, pending) : null
 
-    const [row] = await db.select({ onboarded: users.onboarded }).from(users).where(eq(users.id, user.id)).limit(1)
-    const res = row && !row.onboarded ? to(`/onboarding?next=${encodeURIComponent(next)}`) : to(next)
+    // No onboarding step any more (refonte 2.0, /onboarding redirects home): back where the person was.
+    const res = to(next)
     applyActivatedCookies(res, activated, Boolean(pending))
     return res
   } catch (err) {

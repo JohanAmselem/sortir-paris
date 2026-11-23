@@ -79,8 +79,10 @@ export interface AgendaResponse {
   nextOffset: number | null
   /** Présents sur la première page seulement : */
   total?: number
-  /** Expos et spectacles à l'affiche pendant la période (montrés à part). */
+  /** Expos et spectacles déjà à l'affiche pendant la période (10 premiers, montrés à part). */
   ongoing?: CardEvent[]
+  /** Leur nombre total (« Tout voir » : mêmes paramètres + `affiche=1`). */
+  ongoingTotal?: number
   /** Les 18 prochains mois avec leur nombre de sorties (mêmes filtres). */
   months?: MonthCountV2[]
   /** Les jours du mois choisi (quand `when` est un mois). */

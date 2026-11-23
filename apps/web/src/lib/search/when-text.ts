@@ -47,6 +47,10 @@ const CONTEXT_WORDS = new Set(
   ).split(' ')
 )
 
+/** Around a weekday, only real context words count (not « au », « du », « le »…). */
+const PREPOSITIONS = new Set(['en', 'de', 'du', 'au', 'le', 'la', 'les', 'mois', 'debut', 'fin', 'mi'])
+const WEEKDAY_CONTEXT = new Set([...CONTEXT_WORDS].filter((w) => !PREPOSITIONS.has(w)))
+
 const FILLERS = /^(?:(?:a|au|aux|de|des|du|en|et|la|le|les|l|d|un|une|pour|avec|ce|cet|cette|ces|paris|mois)\s*)*$/
 
 function monthNumber(token: string): number | null {
@@ -121,9 +125,11 @@ export function whenFromText(raw: string, now: Date = new Date()): WhenFromText 
       rest = rest.replace(m[0], ' ')
     }
   }
+  // Nouvel an / Noël : seuls, ou après « à » / « pour » (« Marché de Noël », « nouvel
+  // an chinois » sont des titres, pas des dates).
   if (!when) {
-    const m = /\s(?:a |pour |le )?(nouvel an|reveillon(?: du nouvel an)?|saint-sylvestre|saint sylvestre)\s/.exec(rest)
-    if (m) {
+    const m = /^\s(?:(?:a|pour|le|soiree|soirees|fete|fetes)\s)?(nouvel an|reveillon(?: du nouvel an)?|saint-sylvestre|saint sylvestre)\s$|\s(?:a|pour)\s(nouvel an|reveillon(?: du nouvel an)?|saint-sylvestre|saint sylvestre)\s/.exec(rest)
+    if (m && !/\schinois/.test(rest)) {
       const y = today.month === 1 && today.day <= 1 ? today.year - 1 : today.year
       when = isoDay(y, 12, 31)
       label = 'le 31 décembre'
@@ -131,7 +137,7 @@ export function whenFromText(raw: string, now: Date = new Date()): WhenFromText 
     }
   }
   if (!when) {
-    const m = /\s(?:a |pour )?noel\s/.exec(rest)
+    const m = /^\s(?:(?:a|pour)\s)?noel\s$|\s(?:a|pour)\snoel\s/.exec(rest)
     if (m) {
       const y = today.month === 12 && today.day > 25 ? today.year + 1 : today.year
       when = `${isoDay(y, 12, 24)}..${isoDay(y, 12, 25)}`
@@ -173,19 +179,32 @@ export function whenFromText(raw: string, now: Date = new Date()): WhenFromText 
     }
   }
 
-  // 4. Weekdays: "samedi", "ce samedi", "samedi prochain" → the next one (today counts).
+  // 4. Weekdays: "jazz samedi", "ce samedi", "samedi soir", "samedi prochain" → the
+  // next one (today counts). Only with a clear context: « Le Lundi au soleil », « Un
+  // dimanche à Kigali », « Apéro du jeudi » or « Mercredi » alone are titles.
   if (!when) {
-    const m = /\s(?:ce |le )?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)(?: soir| prochain)?\s/.exec(rest)
-    if (m) {
-      const target = WEEKDAYS[m[1]]
-      const offset = (target - today.weekday + 7) % 7
-      const dt = new Date(Date.UTC(today.year, today.month - 1, today.day + offset))
-      when = isoDay(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate())
-      label = dayLabel(when, now)
-      rest = rest.replace(m[0], ' ')
+    const tokens = rest.trim().split(' ').filter(Boolean)
+    const i = tokens.findIndex((t) => t in WEEKDAYS)
+    if (i >= 0) {
+      const prev = tokens[i - 1]
+      const next = tokens[i + 1]
+      const marked = prev === 'ce' || next === 'soir' || next === 'prochain' || next === 'matin' || next === 'apres-midi'
+      const nextOk = next == null || next === 'soir' || next === 'prochain' || next === 'matin' || next === 'apres-midi' || WEEKDAY_CONTEXT.has(next)
+      const prevOk = prev == null || prev === 'ce' || WEEKDAY_CONTEXT.has(prev)
+      const alone = tokens.length === 1
+      if (!alone && prevOk && nextOk && (marked || (prev != null && WEEKDAY_CONTEXT.has(prev)) || (next != null && WEEKDAY_CONTEXT.has(next)))) {
+        const end = i + (next === 'soir' || next === 'prochain' || next === 'matin' || next === 'apres-midi' ? 2 : 1)
+        const start = prev === 'ce' ? i - 1 : i
+        const target = WEEKDAYS[tokens[i]]
+        const offset = (target - today.weekday + 7) % 7
+        const dt = new Date(Date.UTC(today.year, today.month - 1, today.day + offset))
+        when = isoDay(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate())
+        label = dayLabel(when, now)
+        tokens.splice(start, end - start)
+        rest = ` ${tokens.join(' ')} `
+      }
     }
   }
-
   // 5. Months: "mars 2027", "en mars", "concert mars" (not "Bruno Mars").
   if (!when) {
     const tokens = rest.trim().split(' ').filter(Boolean)
@@ -197,6 +216,8 @@ export function whenFromText(raw: string, now: Date = new Date()): WhenFromText 
       const hasYear = next != null && /^20\d{2}$/.test(next)
       const alone = tokens.length === 1
       const inContext = prev != null && CONTEXT_WORDS.has(prev)
+      // « sept » est d'abord un nombre (« Les Sept Samouraïs ») : seulement « en sept. », « sept 2027 ».
+      if (mo === 9 && tokens[i] === 'sept' && !hasYear && !['en', 'de', 'mois', 'debut', 'fin', 'mi'].includes(prev ?? '')) continue
       if (!hasYear && !alone && !inContext) continue
       const y = hasYear ? Number(next) : yearFor(mo, null, today)
       const key = `${y}-${pad(mo)}`

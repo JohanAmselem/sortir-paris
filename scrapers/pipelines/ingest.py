@@ -236,7 +236,7 @@ def _write_artists(cur, planned: List[dict], stats: dict) -> None:
 # Out-of-zone / online / junk rows are not stored at all (they used to be inserted as
 # "rejected", which bloated the table with thousands of useless rows).
 SKIP_INSERT = {"no_title", "no_start_date", "ended", "too_far_ahead", "out_of_zone", "online", "junk_title",
-               "placeholder_venue"}
+               "placeholder_venue", "contest", "editorial_article"}
 UNSTORABLE = {"no_title", "no_start_date"}
 
 

@@ -134,11 +134,16 @@ def parse_browse(html: str, category_slug: Optional[str] = None) -> List[dict]:
     return out
 
 
-def fetch_events(days_ahead: int = 60, max_pages: int = 10) -> Generator[dict, None, None]:
-    """One browse page per filter (max_pages caps the number of filter pages)."""
-    horizon = datetime.now(timezone.utc) + timedelta(days=days_ahead)
+DAYS_AHEAD = 180  # lot D (23/11/2026) : 60 jours auparavant
+
+
+def fetch_events(days_ahead: int = DAYS_AHEAD, max_pages: int = 10, client=None,
+                 now: Optional[datetime] = None) -> Generator[dict, None, None]:
+    """One browse page per filter (max_pages caps the number of filter pages): 10 calls,
+    whatever the horizon. Events starting after now + days_ahead are dropped."""
+    horizon = (now or datetime.now(timezone.utc)) + timedelta(days=days_ahead)
     seen: set = set()
-    with PoliteClient() as client:
+    with (client or PoliteClient()) as client:
         for i, (path, category) in enumerate(FILTERS[:max_pages]):
             url = f"{PARIS_BROWSE}/{path}"
             try:

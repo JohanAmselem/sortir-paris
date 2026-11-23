@@ -58,6 +58,19 @@ def test_zero_coordinates_and_missing_postcode_are_repaired():
 
 # ── fetch_events with a fake client ──
 
+class _FrozenDatetime(datetime):
+    """Les fixtures datent du 07/10/2026 : sans horloge figée, leurs dates sont passées
+    et fetch_events (qui lit l'heure courante) ne garde plus rien."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW.astimezone(tz) if tz else NOW.replace(tzinfo=None)
+
+
+@pytest.fixture
+def frozen_now(monkeypatch):
+    monkeypatch.setattr(oa, "datetime", _FrozenDatetime)
+
 class FakeClient:
     def __init__(self, pages):
         self.pages = list(pages)
@@ -75,7 +88,7 @@ def ev_at(uid, postal):
     return e
 
 
-def test_out_of_zone_events_dropped_and_params(monkeypatch):
+def test_out_of_zone_events_dropped_and_params(monkeypatch, frozen_now):
     page = {"total": 3, "events": [ev_at(1, "75001"), ev_at(2, "78000"), ev_at(3, "92100")]}
     client = FakeClient([page])
     st = {}
@@ -97,7 +110,7 @@ def test_agenda_entirely_out_of_zone_is_abandoned_after_first_page():
     assert len(client.calls) == 1 and st["skipped_out_of_zone"]
 
 
-def test_pagination_with_after_cursor_and_cap():
+def test_pagination_with_after_cursor_and_cap(frozen_now):
     p1 = {"total": 5, "after": ["a1"], "events": [ev_at(1, "75001"), ev_at(2, "75002")]}
     p2 = {"total": 5, "after": ["a2"], "events": [ev_at(3, "75003"), ev_at(4, "75004")]}
     client = FakeClient([p1, p2, {"events": []}])

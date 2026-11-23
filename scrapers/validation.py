@@ -26,7 +26,15 @@ from utils.normalize import (
     smart_title_case_safe,
     title_category_override,
 )
-from utils.titles import strip_date_affixes, title_flags
+from utils.images import hd_image_url
+from utils.titles import (
+    EDITORIAL_SOURCES,
+    clean_display_title,
+    is_contest,
+    is_editorial_article,
+    strip_date_affixes,
+    title_flags,
+)
 
 PUBLISH_THRESHOLD = 50
 MAX_PRICE_CENTIMES = 50_000  # 500 €
@@ -61,6 +69,8 @@ HARD_REASONS = (
     "no_title", "junk_title", "no_start_date", "ended", "too_far_ahead", "end_before_start",
     "span_too_long", "price_outlier", "price_inconsistent", "free_with_price", "out_of_zone",
     "online", "cancelled", "placeholder_venue",
+    # lot D (23/11/2026) : « Gagnez des places… », « On a vu, on a aimé… »
+    "contest", "editorial_article",
 )
 
 _JUNK_TITLE_RE = re.compile(
@@ -125,6 +135,11 @@ class EventIn(BaseModel):
             return to_utc_paris(v)
         return v
 
+    @field_validator("image_url", mode="after")
+    @classmethod
+    def _hd_image(cls, v):
+        return hd_image_url(v)  # même règle que make_event, pour les spiders qui la contournent
+
     @field_validator("venue_zip", mode="before")
     @classmethod
     def _zip(cls, v):
@@ -142,10 +157,14 @@ def _clean_title(ev: "EventIn") -> bool:
     - "ANNULÉ - X" / "X (reporté)" → event_status cancelled, marker removed
     - "COMPLET" / "sold out" → removed (soft reason sold_out + tag "complet")
     - date prefixes/suffixes ("09.OCT | PARIS | X", "X – 09/10/2026 - 17:30") removed
-    - mostly upper-case titles → smart title case (acronyms kept)"""
+    - mostly upper-case titles → smart title case (acronyms kept)
+    - then (lot D) utils.titles.clean_display_title: Ticketmaster « Prestation X » → « X »,
+      sortiraparis « X en concert à … » → « X », redundant venue suffix « Peet - l'Olympia »
+      → « Peet ». Applied AFTER the title case, so « KALIKA - L'Olympia » stays « KALIKA »."""
     title, cancelled, sold_out = title_flags(ev.title)
     title = strip_date_affixes(title)
-    ev.title = smart_title_case_safe(title) or title
+    title = smart_title_case_safe(title) or title
+    ev.title = clean_display_title(title, source=ev.source, venue_names=[ev.venue_name]) or title
     if cancelled:
         ev.event_status = "cancelled"
     return sold_out
@@ -217,6 +236,10 @@ def validate(
         hard.append("no_title")
     elif len(title) < 3 or _JUNK_TITLE_RE.match(title):
         hard.append("junk_title")
+    if is_contest(title):
+        hard.append("contest")  # jeu concours, pas une sortie
+    if ev.source in EDITORIAL_SOURCES and is_editorial_article(title):
+        hard.append("editorial_article")  # critique / sélection : jamais une fiche
 
     if ev.start_date is None:
         hard.append("no_start_date")

@@ -8,8 +8,14 @@ Env: TICKETMASTER_API_KEY (optional — without it the source is skipped).
 
 Query: countryCode=FR, latlong=48.8566,2.3522, radius=18 km, locale=fr-fr, size=200,
 sort=date,asc. Deep paging is limited to size*page < 1000, so the date range is split
-into windows (default 7 days) and each window is paginated (≤ 5 pages of 200); a window
-that still exceeds the limit is split in two.
+into windows and each window is paginated (≤ 5 pages of 200); a window that still exceeds
+the limit is split in two.
+
+Horizon (lot D, 23/11/2026) : 365 jours (90 auparavant : les grandes salles vendent
+un an à l'avance). Fenêtres de 7 jours jusqu'à J+90, puis de 30 jours (la fin de l'année
+est clairsemée) ; une fenêtre trop pleine est coupée en deux. Environ 60 à 120 appels par
+passage, plafond MAX_REQUESTS = 400 : deux passages par jour restent loin du quota de
+5 000 appels/jour, et PoliteClient(delay=0.3) reste sous 5 appels/s.
 
 Mapping:
 - dates.start.dateTime (UTC) when the time is known; localDate only (or timeTBA /
@@ -40,6 +46,11 @@ SOURCE = "ticketmaster"
 API_URL = "https://app.ticketmaster.com/discovery/v2/events.json"
 PAGE_SIZE = 200
 DEEP_PAGING_LIMIT = 1000  # size * page must stay < 1000
+DAYS_AHEAD = 365
+# (jusqu'au jour J+n, largeur des fenêtres en jours)
+WINDOW_PLAN = ((90, 7), (DAYS_AHEAD, 30))
+MAX_REQUESTS = 400
+REQUEST_DELAY = 0.3  # s entre deux appels : < 5 appels/s
 
 BASE_PARAMS = {
     "countryCode": "FR",
@@ -338,24 +349,43 @@ def build_params(api_key: str, start: datetime, end: datetime, page: int) -> dic
     return params
 
 
-def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int = 200) -> Generator[dict, None, None]:
+def plan_windows(now: datetime, days_ahead: int = DAYS_AHEAD,
+                 window_days: Optional[int] = None) -> List[Tuple[datetime, datetime]]:
+    """Fenêtres de dates contiguës de now à now + days_ahead. window_days fixe une largeur
+    unique ; sinon WINDOW_PLAN (7 jours jusqu'à J+90, puis 30 jours)."""
+    horizon = now + timedelta(days=days_ahead)
+    plan = ((days_ahead, window_days),) if window_days else WINDOW_PLAN
+    windows: List[Tuple[datetime, datetime]] = []
+    t = now
+    for until_day, width in plan:
+        limit = min(horizon, now + timedelta(days=until_day))
+        while t < limit:
+            end = min(t + timedelta(days=width), limit)
+            windows.append((t, end))
+            t = end
+    if t < horizon:  # days_ahead au-delà du plan : une dernière fenêtre
+        windows.append((t, horizon))
+    return windows
+
+
+def fetch_events(days_ahead: int = DAYS_AHEAD, window_days: Optional[int] = None,
+                 max_requests: int = MAX_REQUESTS, client=None,
+                 now: Optional[datetime] = None) -> Generator[dict, None, None]:
     api_key = os.environ.get("TICKETMASTER_API_KEY")
     if not api_key:
         print(f"  [{SOURCE}] TICKETMASTER_API_KEY not set, skipping")
         return
-    now = datetime.now(timezone.utc).replace(microsecond=0)
-    horizon = now + timedelta(days=days_ahead)
-    windows: List[Tuple[datetime, datetime]] = []
-    t = now
-    while t < horizon:
-        windows.append((t, min(t + timedelta(days=window_days), horizon)))
-        t += timedelta(days=window_days)
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    windows = plan_windows(now, days_ahead, window_days)
 
     seen: set = set()
     collected: List[dict] = []
     requests = 0
     max_pages = DEEP_PAGING_LIMIT // PAGE_SIZE  # pages 0..4 → size*page < 1000
-    with PoliteClient(delay=0.3) as client:
+    own_client = client is None
+    if own_client:
+        client = PoliteClient(delay=REQUEST_DELAY)
+    try:
         while windows:
             w_start, w_end = windows.pop(0)
             page = 0
@@ -389,6 +419,9 @@ def fetch_events(days_ahead: int = 90, window_days: int = 7, max_requests: int =
                 if page + 1 >= int(info.get("totalPages") or 0):
                     break
                 page += 1
+    finally:
+        if own_client:
+            client.close()
     series = collapse_series(collected)
     print(f"  [{SOURCE}] {len(seen)} sessions from {requests} requests → {len(series)} events")
     yield from series

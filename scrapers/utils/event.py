@@ -21,6 +21,7 @@ import hashlib
 from typing import Iterable, Optional, Union
 
 from utils.dates import FrDate, normalize_when
+from utils.images import hd_image_url
 from utils.normalize import (
     UNKNOWN_PRICE,
     arrondissement_from_zip,
@@ -84,6 +85,7 @@ def make_event(
 ) -> dict:
     title_c = clean_text(title) or ""
     desc_c = clean_text(description)
+    image_url = hd_image_url(image_url)  # Offi /images/120/ → /1000/, Theatreonline xs_ → affiche complète
     short_c = clean_text(short_desc)
 
     # ── dates ──

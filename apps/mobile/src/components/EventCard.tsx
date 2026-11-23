@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, minWidth: 0 },
   rowRight: { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch', gap: 8 },
   ticket: { flexDirection: 'row', borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
-  ticketDate: { width: 64, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: colors.surface2, borderRightWidth: 1, borderRightColor: colors.line2, borderStyle: 'dashed' },
+  ticketDate: { width: 64, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: colors.surface2, borderRightWidth: 1, borderRightColor: colors.line2 },
   ticketWeekday: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
   ticketDay: { fontFamily: fonts.display, fontSize: 28, lineHeight: 30, color: colors.text },
   ticketBody: { flex: 1, minWidth: 0, paddingVertical: 12, paddingLeft: 12 },

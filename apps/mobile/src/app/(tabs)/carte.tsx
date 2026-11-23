@@ -260,7 +260,8 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 18,
     borderRadius: radius.full,
-    backgroundColor: colors.glass,
+    // Fond plein : une ombre sur un fond transparent se calcule mal sur iOS.
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.line2,
     shadowColor: '#000',

@@ -52,7 +52,9 @@ Nouvelle Paname Club : un nouveau look sombre, plus simple. Un Agenda pour trouv
 
 ## Mots-clés (App Store, 100 caractères max., séparés par des virgules)
 
-sortir,paris,concert,expo,théâtre,ce soir,week-end,gratuit,agenda,spectacle,humour,jazz,musée,culture
+sortir,concert,expo,théâtre,ce soir,week-end,gratuit,agenda,spectacle,humour,jazz,musée,culture
+
+(« paris » retiré : il est déjà dans le sous-titre, et la liste dépassait 100 caractères.)
 
 ## Note pour la revue Apple (App Review Information)
 
@@ -100,7 +102,9 @@ L'ordre ci-dessous est celui des fichiers.
 
 1.0 (21/11) : « Je veux sortir… », le choix de ce soir, une fiche concert, la carte, Match, le Drop, Mes sorties, Alertes concerts.
 
-2.0 (à refaire après la recette, même format) :
+2.0 (faites le 23/11, simulateur iPhone 17 Pro Max, heure 9:41) : `captures/ios-6.9-v2/` (1320 × 2868),
+`captures/ios-6.3-v2/` (1206 × 2622, pour l'emplacement obligatoire « iPhone avec Dynamic Island, écran moyen »
+d'App Store Connect) et `captures/android-v2/` (1080 × 2160, bandes sombres sur les côtés). Six écrans :
 
 1. Sortir : « Ce soir à Paris » et notre choix
 2. Les grosses dates (grandes salles, mois à venir)
@@ -108,4 +112,5 @@ L'ordre ci-dessous est celui des fichiers.
 4. Une fiche concert (Réserver avec le prix, Garder, suivre l’artiste)
 5. La carte sombre « autour de moi »
 6. Mes sorties en billets
-7. Alertes concerts (Mes artistes)
+
+(La 7e, Alertes concerts, n'a pas été faite : « Mes artistes » est visible sur la 6e.)
